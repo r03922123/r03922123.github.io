@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About · r03922123</title>
+<meta name="description" content="Jie-Hong Lin, machine learning engineer: work on generative audio, speech, detection and medical imaging.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="./">r03922123</a>
+  <nav><a href="./">Posts</a><a href="about.html" aria-current="page">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main class="about">
+<section class="intro">
+  <h1>Jie-Hong Lin</h1>
+  <p>Machine learning engineer. For five-plus years I have built and tuned models that have to work under
+  hard constraints: a streaming latency budget, a recall floor fixed by policy, a few hundred labels. The
+  work spans generative audio, Japanese speech, ad-creative integrity and medical imaging.</p>
+  <p>This site is where I write up what I learn, with the code and numbers behind it.</p>
+  <p class="contact"><a href="mailto:csam020410@gmail.com">Email</a> · <a href="https://linkedin.com/in/jie-hong-lin">LinkedIn</a> · <a href="https://github.com/r03922123">GitHub</a></p>
+</section>
+
+<h2>Experience</h2>
+
+<section class="role">
+  <div class="role-head"><h3>KKCompany</h3><span>May 2023 – Jul 2025</span></div>
+  <div class="role-sub"><span>Applied Scientist, Applied Data Science</span><span>Taipei, Taiwan</span></div>
+  <ul>
+    <li><b>Best-of-N music generation at ~42% less compute.</b> On a self-hosted MusicGen pipeline (audiocraft,
+    PyTorch, batched GPU generation), I scored the partial candidates against the prompt with CLAP at the
+    10 s and 20 s marks of a 30 s clip and dropped the weaker half each time (8 → 4 → 2), with no noticeable drop in the final CLAP score
+    or in listening. <a href="/musicgen-prune-inference/">Write-up</a>.</li>
+    <li><b>Fixing product names in live Japanese captions.</b> For an automotive client, a post-correction
+    layer on Azure speech-to-text recovered ~75% of the product terms known to be mis-transcribed: Janome
+    tokenization, katakana normalization and RapidFuzz matching over a 1–3 morpheme window. It adds ~1 ms
+    inside a sub-50 ms streaming budget on client-owned hardware.</li>
+    <li><b>An automated first pass for text-to-music evaluation.</b> MAEST style tags, taken chunk by chunk,
+    were checked against the prompt by an LLM judge alongside a CLAP score. Clear passes and clear rejects
+    were decided automatically, and only the borderline ~40% of clips went to a human, removing ~60% of
+    manual listening time.</li>
+  </ul>
+</section>
+
+<section class="role">
+  <div class="role-head"><h3>TikTok</h3><span>Mar 2022 – Jul 2022</span></div>
+  <div class="role-sub"><span>Algorithm Engineer, Trust &amp; Safety</span><span>Singapore</span></div>
+  <ul>
+    <li><b>Higher precision at a fixed recall floor.</b> On the ad-creative smoking-violation model, an
+    anchor-free YOLOX detector over sampled video frames, precision rose ~25 points at the recall floor set
+    by policy, which cut the model's false positives by roughly two thirds across 50+ markets.</li>
+    <li><b>Training data for a very rare positive class.</b> Positive oversampling, hard negatives mined from
+    production near-misses, and a loss that down-weights the mass of easy negatives. The model returned
+    localized detections, not bare scores, to the internal reviewer tool.</li>
+  </ul>
+</section>
+
+<section class="role">
+  <div class="role-head"><h3>HTC</h3><span>Sep 2018 – Oct 2021</span></div>
+  <div class="role-sub"><span>Deep Learning Engineer, Applied Deep Learning</span><span>Taipei, Taiwan</span></div>
+  <ul>
+    <li><b>CT stroke triage from 500 labeled volumes.</b> A 2.5D CNN encoder pretrained on ~750K
+    hemorrhage-labeled CT slices (RSNA), through a DICOM preprocessing pipeline, with per-slice embeddings
+    attention-pooled into one decision per volume: 0.88 volume-level AUC.</li>
+    <li><b>Review tooling built with radiologists.</b> A Grad-CAM tool that showed slice-level attention for a
+    CT triage prototype, plus windowing presets and a multi-reader adjudication protocol co-designed with
+    board-certified radiologists in weekly sessions. The protocol became the team's labeling standard for
+    later datasets.</li>
+  </ul>
+</section>
+
+<h2>Education</h2>
+<section class="role">
+  <div class="role-head"><h3>National Taiwan University</h3><span>2014 – 2018</span></div>
+  <div class="role-sub"><span>M.S. in Computer Science</span><span>Taipei, Taiwan</span></div>
+</section>
+<section class="role">
+  <div class="role-head"><h3>National Taipei University</h3><span>2010 – 2014</span></div>
+  <div class="role-sub"><span>B.S. in Computer Science</span><span>Taipei, Taiwan</span></div>
+</section>
+
+<h2>Competitions</h2>
+<ul class="plain">
+  <li><b>RSNA Intracranial Hemorrhage Detection</b>, Kaggle 2019: rank 30 of 1,345 (top 3%). EfficientNet
+  ensemble, DICOM-specific preprocessing, weighted multi-label log loss over six imbalanced labels.</li>
+  <li><b>APTOS 2019 Blindness Detection</b>, Kaggle 2019: rank 113 of 2,928 (top 4%). EfficientNet ensemble with
+  CLAHE preprocessing and test-time augmentation for diabetic retinopathy grading.</li>
+</ul>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

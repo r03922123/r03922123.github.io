@@ -20,3 +20,16 @@ header nav { display: flex; gap: 18px; }
 .post p { margin: 0 0 .7em; color: var(--muted); }
 .post .meta { font-size: .85em; color: var(--muted); }
 footer { color: var(--muted); font-size: .85em; padding: 40px 0 32px; }
+header nav [aria-current="page"] { color: var(--fg); }
+
+/* About page: roles as a heading row (name · dates) over a subheading row (title · place). */
+.about h2 { font-size: 1.3rem; margin: 40px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.about .intro p { color: var(--fg); }
+.about .intro p + p { margin-top: .8em; }
+.role { margin: 20px 0; }
+.role-head, .role-sub { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.role-head h3 { font-size: 1.05rem; margin: 0; }
+.role-head span, .role-sub { color: var(--muted); font-size: .9em; }
+.role ul, .plain { padding-left: 1.2em; margin: .6em 0 0; }
+.role li, .plain li { margin: .5em 0; }
+.plain { list-style: disc; }
