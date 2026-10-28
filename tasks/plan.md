@@ -42,7 +42,7 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 ## Task List
 
 ### Phase 1: Foundation
-- [ ] Task 1: Privacy and integrity check script
+- [x] Task 1: Privacy and integrity check script
 - [ ] Task 2: Nav and About page
 
 ### Checkpoint A — after Tasks 1–2 (review with you)
