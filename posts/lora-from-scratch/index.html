@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoRA from scratch · r03922123</title>
+<meta name="description" content="Build a tiny GPT, freeze it, add LoRA adapters, fine-tune only those, and check every claim about LoRA with an assert. Runs on a laptop CPU in seconds.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<header class="post-head">
+  <h1>LoRA from scratch, proven with asserts</h1>
+  <div class="meta">October 31, 2026 · 7 min read · fine-tuning · LLM · PyTorch</div>
+</header>
+
+<p>LoRA is usually explained with one equation. Knowing the equation and knowing it holds for the code you
+just wrote are different things. This post builds a tiny GPT, "pretrains" it, wraps it in LoRA adapters,
+fine-tunes only the adapters on a new domain, and fuses them back into the weights. Every claim made along
+the way gets an <code>assert</code> next to it. If an assert fails, the claim is wrong.</p>
+<p>The whole thing runs on a laptop CPU in a few seconds: no GPU, no downloads. The code blocks, run in
+order, make one script.</p>
+
+<nav class="toc"><h2>Contents</h2><ol>
+  <li><a href="#idea">The idea</a></li>
+  <li><a href="#gpt">A GPT small enough to read</a></li>
+  <li><a href="#pretrain">Pretraining it</a></li>
+  <li><a href="#lora">LoRA, wrapped onto real weights</a></li>
+  <li><a href="#finetune">Fine-tuning only the adapters</a></li>
+  <li><a href="#fuse">Fusing for inference</a></li>
+  <li><a href="#learned">What the asserts proved</a></li>
+  <li><a href="#refs">References</a></li>
+</ol></nav>
+
+<h2 id="idea">The idea</h2>
+<p>Fine-tuning changes a pretrained weight \(W_0 \in \mathbb{R}^{d \times k}\) by some \(\Delta W\). LoRA
+<a href="#ref-1">[1]</a> bets that this update has low intrinsic rank, building on evidence that fine-tuning
+lives in a low-dimensional subspace <a href="#ref-2">[2]</a>. So it learns the update as a product of two thin
+matrices and leaves \(W_0\) frozen:</p>
+\[ h = W_0 x + \frac{\alpha}{r} B A x, \qquad B \in \mathbb{R}^{d \times r},\; A \in \mathbb{R}^{r \times k},\; r \ll \min(d, k). \]
+<ul>
+  <li><b>Parameter count.</b> For \(d = k = 4096\), a full update has 16.8M parameters per matrix. At \(r = 8\),
+  \(A\) and \(B\) together have 65.5K, about 256 times fewer.</li>
+  <li><b>Initialization.</b> \(B = 0\) and \(A\) is small and random. The product \(BA\) is then exactly zero, so
+  training starts from the pretrained model's behavior. \(A\) cannot also be zero, or the gradients of
+  both factors would be zero and nothing would train.</li>
+  <li><b>The \(\alpha / r\) scale.</b> This keeps the update's size roughly stable as you change \(r\), so the learning
+  rate does not need retuning. Setting \(\alpha = r\) gives a scale of 1.</li>
+  <li><b>Inference.</b> \(W = W_0 + \frac{\alpha}{r} BA\) can be computed once, after which the adapted model costs
+  exactly what the original did.</li>
+</ul>
+<p>The rest of the post checks each of these.</p>
+
+<h2 id="gpt">A GPT small enough to read</h2>
+<p>Character-level, two layers, 48-dimensional embeddings. It is far too small to write English, but it has
+real attention weights to freeze and adapt. The attention block keeps separate <code>q_proj</code>,
+<code>k_proj</code>, <code>v_proj</code> and <code>out_proj</code> layers instead of one fused projection, because
+LoRA wraps individual linear layers by name.</p>
+<pre><code class="language-python">import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+torch.manual_seed(1337)
+
+
+class CausalSelfAttention(nn.Module):
+    def __init__(self, n_embd, n_head, block_size):
+        super().__init__()
+        assert n_embd % n_head == 0
+        self.n_head, self.head_dim = n_head, n_embd // n_head
+        self.q_proj = nn.Linear(n_embd, n_embd, bias=False)
+        self.k_proj = nn.Linear(n_embd, n_embd, bias=False)
+        self.v_proj = nn.Linear(n_embd, n_embd, bias=False)
+        self.out_proj = nn.Linear(n_embd, n_embd, bias=False)
+        mask = torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size)
+        self.register_buffer("mask", mask)
+
+    def forward(self, x):
+        B, T, C = x.shape
+        q = self.q_proj(x).view(B, T, self.n_head, self.head_dim).transpose(1, 2)  # [B, nh, T, hd]
+        k = self.k_proj(x).view(B, T, self.n_head, self.head_dim).transpose(1, 2)
+        v = self.v_proj(x).view(B, T, self.n_head, self.head_dim).transpose(1, 2)
+        att = (q @ k.transpose(-2, -1)) / math.sqrt(self.head_dim)                 # [B, nh, T, T]
+        att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float("-inf")).softmax(-1)
+        out = (att @ v).transpose(1, 2).contiguous().view(B, T, C)
+        return self.out_proj(out)
+
+
+class Block(nn.Module):
+    def __init__(self, n_embd, n_head, block_size):
+        super().__init__()
+        self.ln1, self.ln2 = nn.LayerNorm(n_embd), nn.LayerNorm(n_embd)
+        self.attn = CausalSelfAttention(n_embd, n_head, block_size)
+        self.mlp = nn.Sequential(nn.Linear(n_embd, 4 * n_embd), nn.GELU(), nn.Linear(4 * n_embd, n_embd))
+
+    def forward(self, x):
+        x = x + self.attn(self.ln1(x))   # residual around attention
+        return x + self.mlp(self.ln2(x)) # residual around the MLP
+
+
+class TinyGPT(nn.Module):
+    def __init__(self, vocab_size, n_embd=48, n_head=4, n_layer=2, block_size=32):
+        super().__init__()
+        self.tok_emb = nn.Embedding(vocab_size, n_embd)
+        self.pos_emb = nn.Embedding(block_size, n_embd)
+        self.blocks = nn.ModuleList([Block(n_embd, n_head, block_size) for _ in range(n_layer)])
+        self.ln_f = nn.LayerNorm(n_embd)
+        self.head = nn.Linear(n_embd, vocab_size, bias=False)
+
+    def forward(self, idx):
+        x = self.tok_emb(idx) + self.pos_emb(torch.arange(idx.shape[1], device=idx.device))
+        for block in self.blocks:
+            x = block(x)
+        return self.head(self.ln_f(x))  # [B, T, vocab_size]
+
+
+out = TinyGPT(vocab_size=30)(torch.randint(0, 30, (2, 16)))
+assert out.shape == (2, 16, 30), out.shape</code></pre>
+
+<h2 id="pretrain">Pretraining it</h2>
+<p>Two toy corpora in deliberately different styles: corpus A stands in for general pretraining data, corpus B
+for the domain we will adapt to.</p>
+<pre><code class="language-python">CORPUS_A = ("the quarterly report shows steady growth across all regions. "
+            "management expects revenue to increase next fiscal year. "
+            "the board approved the proposed budget for infrastructure. ") * 20
+CORPUS_B = ("arrr the treasure be buried past the rocky shore, matey. "
+            "captain hoisted the sails and charted a course for open water. "
+            "the crew spotted land after three long days at sea. ") * 20
+chars = sorted(set(CORPUS_A + CORPUS_B))
+stoi = {ch: i for i, ch in enumerate(chars)}
+vocab_size = len(chars)
+
+
+def get_batch(text, block_size=32, batch_size=16):
+    data = torch.tensor([stoi[c] for c in text])
+    ix = torch.randint(0, len(data) - block_size - 1, (batch_size,))
+    x = torch.stack([data[i:i + block_size] for i in ix])
+    y = torch.stack([data[i + 1:i + block_size + 1] for i in ix])
+    return x, y
+
+
+def train(model, params, text, lr, steps=300):
+    opt = torch.optim.AdamW(params, lr=lr)
+    for step in range(steps):
+        x, y = get_batch(text)
+        loss = F.cross_entropy(model(x).view(-1, vocab_size), y.view(-1))
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+        if step % 100 == 0:
+            print(f"step {step}: loss {loss.item():.3f}")
+    return loss.item()
+
+
+model = TinyGPT(vocab_size)
+final_loss = train(model, model.parameters(), CORPUS_A, lr=3e-3)
+random_guess_loss = math.log(vocab_size)          # loss of a uniform guess over the vocabulary
+assert final_loss &lt; random_guess_loss * 0.7, (final_loss, random_guess_loss)</code></pre>
+<p>The loss falls from 3.43 to 0.11 against a random-guess baseline of \(\ln 27 = 3.30\). The model has learned
+corpus A, so it has weights worth freezing.</p>
+
+<h2 id="lora">LoRA, wrapped onto real weights</h2>
+<pre><code class="language-python">class LoRALinear(nn.Module):
+    def __init__(self, base: nn.Linear, rank=4, alpha=4):
+        super().__init__()
+        self.base = base
+        out_features, in_features = base.weight.shape
+        self.A = nn.Parameter(torch.randn(rank, in_features) * 0.01)  # small Gaussian
+        self.B = nn.Parameter(torch.zeros(out_features, rank))        # zero, so B @ A = 0 at init
+        self.scale = alpha / rank
+
+    def forward(self, x):
+        return self.base(x) + self.scale * ((x @ self.A.T) @ self.B.T)
+
+    @torch.no_grad()
+    def fuse(self):
+        self.base.weight += self.scale * (self.B @ self.A)
+
+
+def apply_lora(model, rank=4, alpha=4):
+    for p in model.parameters():      # freeze everything first, not just the wrapped layers
+        p.requires_grad = False
+    for block in model.blocks:        # then adapt q and v, as in the LoRA paper
+        block.attn.q_proj = LoRALinear(block.attn.q_proj, rank, alpha)
+        block.attn.v_proj = LoRALinear(block.attn.v_proj, rank, alpha)
+    return model</code></pre>
+<p>Two claims to check. First, only a small fraction of parameters is trainable. This catches a common bug:
+freezing only the wrapped layers' weights leaves the embeddings, MLPs and head trainable. Second, because
+\(B = 0\), wrapping changes nothing. The test compares the whole model's output before and after wrapping,
+and expects bit-identical results, not merely close ones.</p>
+<pre><code class="language-python">total_params = sum(p.numel() for p in model.parameters())
+model.eval()
+x_b, _ = get_batch(CORPUS_B, batch_size=4)
+with torch.no_grad():
+    out_before = model(x_b)
+
+apply_lora(model)
+trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"trainable {trainable:,} of {total_params:,} ({trainable / total_params:.1%})")
+assert trainable &lt; total_params * 0.1
+
+with torch.no_grad():
+    out_wrapped = model(x_b)
+assert torch.equal(out_before, out_wrapped), "B = 0 must make wrapping an exact no-op"</code></pre>
+<p>It prints 1,536 trainable parameters out of 60,384 (2.5%), and the outputs match bit for bit. Adding
+\(0.5 \times 0\) to a float changes nothing, so exact equality is the right test.</p>
+
+<h2 id="finetune">Fine-tuning only the adapters</h2>
+<p>The optimizer sees only \(A\) and \(B\). Every frozen tensor is snapshotted first, to prove that none of them
+moves.</p>
+<pre><code class="language-python">model.train()
+lora_params = [p for p in model.parameters() if p.requires_grad]
+frozen = {n: p.clone() for n, p in model.named_parameters() if not p.requires_grad}
+
+lora_final_loss = train(model, lora_params, CORPUS_B, lr=1e-2)
+assert lora_final_loss &lt; random_guess_loss * 0.7, lora_final_loss
+assert all(torch.equal(p, frozen[n]) for n, p in model.named_parameters() if not p.requires_grad)</code></pre>
+<p>Two numbers here are worth reading. The first step on corpus B has a loss of 6.69, about twice the
+random-guess loss: the pretrained model is <em>confidently wrong</em> about the new domain, which is worse than
+knowing nothing. After 300 steps the adapters bring it down to 1.37, with all 29 frozen tensors unchanged.
+That is real adaptation, but far from the 0.11 that full training reached on corpus A. Rank-4 adapters on two
+projections are a narrow channel, and a domain shift this large (a new vocabulary of phrases) pushes against
+it. Raising the rank or adapting more layers is the usual next step; full fine-tuning is the alternative when
+the gap is very large.</p>
+
+<h2 id="fuse">Fusing for inference</h2>
+<pre><code class="language-python">model.eval()
+with torch.no_grad():
+    out_unfused = model(x_b)
+    for block in model.blocks:
+        for name in ("q_proj", "v_proj"):
+            lora = getattr(block.attn, name)
+            lora.fuse()                          # W0 += (alpha / r) * B @ A
+            setattr(block.attn, name, lora.base) # back to a plain nn.Linear
+    out_fused = model(x_b)
+
+diff = (out_unfused - out_fused).abs().max().item()
+assert torch.allclose(out_unfused, out_fused, atol=1e-4), diff
+assert not any(isinstance(m, LoRALinear) for m in model.modules())
+print(f"max |diff| = {diff:.1e}")</code></pre>
+<p>The fused and adapter outputs agree to \(6 \times 10^{-6}\), not exactly. The two paths add the same terms
+in a different order, \(W_0 x + s\,B(Ax)\) versus \((W_0 + sBA)\,x\), and float32 rounding depends on order. So
+fusion is free of extra <em>latency</em>, not free of <em>numerical difference</em>. Those are two separate
+claims.</p>
+
+<h2 id="learned">What the asserts proved</h2>
+<ol>
+  <li>The transformer's forward pass has the shape we expect.</li>
+  <li>Pretraining takes the loss well below a uniform guess, so there is something real to freeze.</li>
+  <li>Wrapping with \(B = 0\) is an exact no-op on the whole model's output, and only 2.5% of parameters train.</li>
+  <li>Training \(A\) and \(B\) leaves every other tensor, including the frozen half of each wrapped layer,
+  bit-identical.</li>
+  <li>Fusing reproduces the adapter's behavior up to floating-point reassociation, and leaves an ordinary
+  model behind.</li>
+</ol>
+<p>Variants build on the same skeleton. QLoRA <a href="#ref-3">[3]</a> stores the frozen \(W_0\) in 4-bit
+precision to cut memory, keeping the adapters in higher precision. Prefix and prompt tuning
+<a href="#ref-4">[4]</a> train even fewer parameters by learning input vectors instead of weight updates,
+usually at some cost in quality.</p>
+
+<h2 id="refs">References</h2>
+<ol class="refs">
+  <li id="ref-1">E. J. Hu et al. <i>LoRA: Low-Rank Adaptation of Large Language Models.</i> ICLR 2022.</li>
+  <li id="ref-2">A. Aghajanyan, L. Zettlemoyer, S. Gupta. <i>Intrinsic Dimensionality Explains the Effectiveness of Language Model Fine-Tuning.</i> ACL 2021.</li>
+  <li id="ref-3">T. Dettmers, A. Pagnoni, A. Holtzman, L. Zettlemoyer. <i>QLoRA: Efficient Finetuning of Quantized LLMs.</i> NeurIPS 2023.</li>
+  <li id="ref-4">X. L. Li, P. Liang. <i>Prefix-Tuning: Optimizing Continuous Prompts for Generation.</i> ACL 2021.</li>
+</ol>
+
+<h2 id="cite">Cite as</h2>
+<pre class="cite"><code class="language-plaintext">@article{lin2026lora,
+  title   = {LoRA from scratch, proven with asserts},
+  author  = {Lin, Jie-Hong},
+  journal = {r03922123.github.io},
+  year    = {2026},
+  month   = {Oct},
+  url     = {https://r03922123.github.io/posts/lora-from-scratch/}
+}</code></pre>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

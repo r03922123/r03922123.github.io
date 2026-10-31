@@ -55,7 +55,7 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 ### Checkpoint B — after Tasks 3–4 (review with you)
 - [ ] Two posts render math, code, TOC at 375px, light + dark
 
-- [ ] Task 5: Post 3 (LoRA from scratch)
+- [x] Task 5: Post 3 (LoRA from scratch)
 - [ ] Task 6: Post 4 (evaluating ML systems)
 
 ### Phase 2b: LeetCode series (added 2026-10-31)
