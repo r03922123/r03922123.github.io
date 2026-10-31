@@ -96,3 +96,30 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 ## Open Questions
 
 None blocking. Decisions taken at spec approval are recorded in `SPEC.md`.
+
+## Phase V2: version 2 (wizarding-game common room) — HANDOFF, 2026-11-01
+
+Live site: https://r03922123.github.io/ still serves **version 1** (Tokyo desk, pushed fcf76c0). Nothing of
+version 2 is pushed. Specs: `CAPABILITY-MAP.md` v2, `SPEC-posts-vault.md`, `SPEC-room.md`, `SPEC-theme.md` v2,
+`SPEC-lofi.md` / `SPEC-reskin.md` amendments — all approved by the owner.
+
+- [x] Specs v2, posts renderer (`tools/posts/build.py`), vendored three.js r169 + Cinzel (80b502a)
+- [x] Theme v2 + reskin v2: parchment/candlelit, Cinzel, "Common room" nav, gilt frames, castle 404 (dafb657)
+- [ ] **posts-vault**: 7 of 55 sources drafted in `tools/posts/src/` (batchnorm-vs-layernorm, cross-entropy-vs-mse,
+      entropy-and-information, ml-fundamentals-quick-reference, regression-as-maximum-likelihood,
+      regularization-l1-l2, stable-softmax-cross-entropy) but **none reviewed**; uncommitted on disk with their
+      rendered `posts/<slug>/` and the regenerated `posts/index.html`. The run stopped on a usage limit.
+      Resume: run `tools/dev/workflows/vault-posts.js` with the Workflow tool, after removing the 7 drafted slugs from
+      POSTS for the writer stage (they still need the review stage only).
+- [ ] **room**: no draft exists yet (both designers stopped on the usage limit). Before running
+      `tools/dev/workflows/room-design-panel.js`: `mkdir -p .cache/room/shared`, copy
+      `vendor/three/0.169.0/three.module.min.js` and `fonts/cinzel/cinzel-latin.woff2` into it, and serve it with
+      `(cd .cache/room && python3 -m http.server 8767 &)`. 3D screenshots: `tools/dev/shoot3d.sh` (SwiftShader;
+      slow under load, up to 75 s each). Then merge `.cache/room/final/` into `index.html`, `room.js`, `style.css`
+      (replacing the Tokyo scene section), pointing imports at `/vendor/...` and `/fonts/...`.
+- [ ] **lofi** amendment: no-WebGL → lo-fi; never load three.js in lo-fi mode.
+- [ ] Full rebuild (`python3 -I tools/posts/build.py .`, `python3 -I tools/leetcode/build.py .`), review workflow,
+      fixes, local preview for the owner, then push only with the owner's OK.
+
+Dev tools: `tools/dev/shoot.sh` (2D screenshots, light/dark, phone frame), `tools/dev/shoot3d.sh` (WebGL),
+`tools/dev/same_articles.py <git-ref>` (article text unchanged check). Scratch output goes to `.cache/` (gitignored).

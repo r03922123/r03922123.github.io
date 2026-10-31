@@ -1,0 +1,5 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone frame (dev)</title><meta name="description" content="Dev tool: shows a page in a 375 px frame for screenshots.">
+<style>body{margin:0;background:#888}iframe{border:0;display:block;margin:0 auto;background:#fff}</style></head>
+<body><iframe id="f" width="375" height="1200"></iframe>
+<script>document.getElementById('f').src = decodeURIComponent(location.hash.slice(1));</script></body></html>

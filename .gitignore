@@ -1,2 +1,3 @@
 __pycache__/
 scripts/denylist.local.txt
+.cache/
