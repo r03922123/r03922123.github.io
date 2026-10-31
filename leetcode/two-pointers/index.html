@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two pointers: move the side that limits you · r03922123</title>
+<meta name="description" content="Two indices walking toward each other over sorted or bounded data. Three sum, container with most water, and trapping rain water, each reduced to one rule about which pointer moves.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Two pointers, windows and prefix sums</p>
+<header class="post-head">
+  <h1>Two pointers: move the side that limits you</h1>
+  <div class="meta">October 31, 2026 · 3 min read · two pointers · arrays · sorting</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#the-rule">The rule</a></li><li><a href="#three-sum">Three sum</a></li><li><a href="#container-with-most-water">Container with most water</a></li><li><a href="#trapping-rain-water">Trapping rain water</a></li><li><a href="#when-it-applies">When it applies</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Many array problems ask for the best pair, or every pair, that satisfies a condition. Checking all pairs costs \(O(n^2)\). Two pointers get it down to \(O(n)\) when the data has an order you can exploit: put one pointer at each end, and at every step move the pointer that <b>cannot possibly be part of a better answer</b>. The whole skill is proving which side that is.</p>
+<h2 id="the-rule">The rule</h2>
+<p>At each step there are two candidates to discard, the element under the left pointer or the one under the right. If you can show that one of them has already been paired with everything that could make it useful, drop it and move on. Each step drops one element, so the scan ends after at most \(n\) steps.</p>
+<h2 id="three-sum">Three sum</h2>
+<p><a href="https://leetcode.com/problems/3sum/">15. 3Sum</a> asks for all unique triples that sum to zero. Sort the array, fix the smallest element <code>nums[i]</code>, and look for a pair summing to <code>-nums[i]</code> in the rest with two pointers. If the pair's sum is too small, the left element is too small for <b>every</b> remaining right partner, since they only get smaller as <code>hi</code> moves left, so <code>lo</code> moves right. Symmetrically, a sum that is too large moves <code>hi</code> left.</p>
+<pre><code class="language-python">def three_sum(nums):
+    nums = sorted(nums)
+    n, out = len(nums), []
+    for i in range(n - 2):
+        if i and nums[i] == nums[i - 1]:      # skip duplicate anchors
+            continue
+        lo, hi = i + 1, n - 1
+        while lo &lt; hi:
+            s = nums[i] + nums[lo] + nums[hi]
+            if s &lt; 0:
+                lo += 1
+            elif s &gt; 0:
+                hi -= 1
+            else:
+                out.append([nums[i], nums[lo], nums[hi]])
+                lo += 1
+                while lo &lt; hi and nums[lo] == nums[lo - 1]:   # skip duplicate partners
+                    lo += 1
+    return out
+
+
+assert three_sum([-1, 0, 1, 2, -1, -4]) == [[-1, -1, 2], [-1, 0, 1]]
+assert three_sum([0, 0, 0, 0]) == [[0, 0, 0]]</code></pre>
+<p>Sorting costs \(O(n \log n)\) and each anchor scans once, so the total is \(O(n^2)\), down from \(O(n^3)\).</p>
+<h2 id="container-with-most-water">Container with most water</h2>
+<p><a href="https://leetcode.com/problems/container-with-most-water/">11. Container With Most Water</a>: pick two walls to hold the most water. The area is <code>width × min(height[lo], height[hi])</code>. Moving the <b>taller</b> wall inward can never help: the width shrinks and the height is still capped by the shorter wall. So the shorter wall has met its best partner already, and it is the one to drop.</p>
+<pre><code class="language-python">def max_area(height):
+    lo, hi, best = 0, len(height) - 1, 0
+    while lo &lt; hi:
+        best = max(best, (hi - lo) * min(height[lo], height[hi]))
+        if height[lo] &lt; height[hi]:
+            lo += 1
+        else:
+            hi -= 1
+    return best
+
+
+assert max_area([1, 8, 6, 2, 5, 4, 8, 3, 7]) == 49
+assert max_area([1, 1]) == 1</code></pre>
+<h2 id="trapping-rain-water">Trapping rain water</h2>
+<p><a href="https://leetcode.com/problems/trapping-rain-water/">42. Trapping Rain Water</a>: water above a bar is <code>min(tallest bar to its left, tallest to its right) − its height</code>. Keep the running maximum seen from each end. Whichever side has the <b>lower</b> maximum is settled: its water level is fixed by its own maximum, because a taller wall is guaranteed on the other side. Add that bar's water and move that pointer.</p>
+<pre><code class="language-python">def trap(height):
+    lo, hi = 0, len(height) - 1
+    left_max = right_max = water = 0
+    while lo &lt; hi:
+        if height[lo] &lt; height[hi]:
+            left_max = max(left_max, height[lo])
+            water += left_max - height[lo]
+            lo += 1
+        else:
+            right_max = max(right_max, height[hi])
+            water += right_max - height[hi]
+            hi -= 1
+    return water
+
+
+def trap_brute(height):
+    return sum(max(0, min(max(height[:i + 1]), max(height[i:])) - h) for i, h in enumerate(height))
+
+
+assert trap([0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]) == 6
+assert trap([4, 2, 0, 3, 2, 5]) == 9
+import random
+for _ in range(500):
+    hs = [random.randint(0, 6) for _ in range(random.randint(0, 12))]
+    assert trap(hs) == trap_brute(hs)</code></pre>
+<p>\(O(n)\) time and \(O(1)\) extra space, against \(O(n)\) space for the version with prefix and suffix maximum arrays.</p>
+<h2 id="when-it-applies">When it applies</h2>
+<ul><li>The data is sorted, or can be sorted without losing the answer (three sum, but not "return original indices" unless you keep them).</li><li>A local argument tells you which end is dominated: the shorter wall, the smaller sum, the lower maximum.</li><li>If instead both pointers move the <b>same</b> direction and you care about a contiguous stretch, it is a <a href="../sliding-window/">sliding window</a>.</li></ul>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/push-dominoes/">838. Push Dominoes</a></li><li><a href="https://leetcode.com/problems/swap-adjacent-in-lr-string/">777. Swap Adjacent in LR String</a></li><li><a href="https://leetcode.com/problems/shortest-way-to-form-string/">1055. Shortest Way to Form String</a></li><li><a href="https://leetcode.com/problems/minimum-window-subsequence/">727. Minimum Window Subsequence</a></li><li><a href="https://leetcode.com/problems/count-pairs-of-nodes/">1782. Count Pairs Of Nodes</a></li></ul>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

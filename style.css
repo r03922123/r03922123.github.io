@@ -11,6 +11,7 @@ a:hover { text-decoration: underline; }
 header { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; }
 header .home { font-weight: 700; color: var(--fg); font-size: 1.1rem; }
 header nav { display: flex; gap: 18px; }
+@media (max-width: 420px) { header nav { gap: 12px; } header nav a { font-size: .95em; } }
 .intro { padding: 40px 0 24px; }
 .intro h1 { font-size: 2rem; margin: 0 0 .3em; }
 .intro p { color: var(--muted); margin: 0; }
@@ -35,7 +36,7 @@ header nav [aria-current="page"] { color: var(--fg); }
 .plain { list-style: disc; }
 
 /* Posts: long-form reading column, TOC, tables, code, references. */
-.post-head { padding: 40px 0 8px; }
+.post-head { display: block; padding: 40px 0 8px; }   /* not the flex site header */
 .post-head h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 .4em; }
 .post-head .meta, .post .tags { color: var(--muted); font-size: .9em; }
 .post-body h2 { font-size: 1.4rem; margin: 2em 0 .5em; }
@@ -58,3 +59,10 @@ header nav [aria-current="page"] { color: var(--fg); }
 .post-body h4 { font-size: 1rem; margin: 1.4em 0 .3em; }
 .post-body .note { background: var(--card); border-left: 3px solid var(--link); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: .92em; }
 .post-body .tag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8em; color: var(--muted); white-space: nowrap; }
+
+/* LeetCode series: breadcrumb on posts, a compact list on the series page. */
+.crumb { font-size: .85em; color: var(--muted); margin: 32px 0 -24px; }
+.series { list-style: none; padding: 0; margin: 0; }
+.series li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.series li a { font-weight: 600; }
+.series li span { display: block; color: var(--muted); font-size: .9em; margin-top: 2px; }

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeetCode patterns · r03922123</title>
+<meta name="description" content="Short posts on the algorithm patterns behind LeetCode problems: the idea, a reusable Python template, worked problems and practice links.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<section class="intro">
+  <h1>LeetCode patterns</h1>
+  <p>5 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
+  problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
+  asserts pass.</p>
+</section>
+<h2 id="two-pointers-windows-and-prefix-sums">Two pointers, windows and prefix sums</h2>
+<ul class="series">
+  <li><a href="two-pointers/">Two pointers: move the side that limits you</a><span>Two indices walking toward each other over sorted or bounded data. Three sum, container with most water, and trapping rain water, each reduced to one rule about which pointer moves.</span></li>
+  <li><a href="sliding-window/">Sliding window: three templates and the exactly-k trick</a><span>A window over a contiguous stretch that grows on the right and shrinks on the left. Templates for the shortest valid window, the longest valid window, and counting windows with exactly k of something.</span></li>
+  <li><a href="prefix-state-map/">Prefix state map: subarrays as differences of prefixes</a><span>Store each prefix's state in a hash map, and a subarray becomes a pair of prefixes. Counting subarrays with sum k, nice subarrays, and the longest substring with even vowel counts using a bitmask.</span></li>
+  <li><a href="sweep-line/">Sweep line: turn intervals into events</a><span>Replace each interval with a +change at its start and a −change at its end, then sweep in order. Difference arrays, sorted events, and answering point queries with binary search.</span></li>
+  <li><a href="majority-vote-and-sieve/">Majority vote and the sieve of Eratosthenes</a><span>Two small classics. Boyer–Moore voting finds a majority element in one pass and O(1) space, and generalizes to elements above n/3. The sieve finds every prime below n in O(n log log n).</span></li>
+</ul>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

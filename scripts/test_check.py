@@ -83,6 +83,14 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertIn("unpinned", out[0])
 
+    def test_leetcode_post_must_be_listed_on_series_page(self):
+        files = {"index.html": PAGE.format(body='<a href="leetcode/">series</a>'),
+                 "leetcode/index.html": PAGE.format(body='<a href="two-pointers/">a</a>'),
+                 "leetcode/two-pointers/index.html": PAGE.format(body=""),
+                 "leetcode/heap/index.html": PAGE.format(body="")}
+        out = self.findings(files)
+        self.assertEqual(out, ["leetcode/index.html: leetcode/heap/ is not listed"])
+
     def test_post_not_listed_on_home(self):
         out = self.findings({"index.html": PAGE.format(body=""), "posts/a/index.html": PAGE.format(body="")})
         self.assertEqual(len(out), 1)

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Majority vote and the sieve of Eratosthenes · r03922123</title>
+<meta name="description" content="Two small classics. Boyer–Moore voting finds a majority element in one pass and O(1) space, and generalizes to elements above n/3. The sieve finds every prime below n in O(n log log n).">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Two pointers, windows and prefix sums</p>
+<header class="post-head">
+  <h1>Majority vote and the sieve of Eratosthenes</h1>
+  <div class="meta">October 31, 2026 · 3 min read · arrays · counting · number theory</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#boyer-moore-majority-vote">Boyer–Moore majority vote</a></li><li><a href="#sieve-of-eratosthenes">Sieve of Eratosthenes</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Two short algorithms that come up often enough to know by heart. Both replace an obvious approach (count everything, test every number) with an argument that makes most of the work unnecessary.</p>
+<h2 id="boyer-moore-majority-vote">Boyer–Moore majority vote</h2>
+<p>Given an array where one value appears more than \(n/2\) times, find it in one pass with \(O(1)\) extra space (<a href="https://leetcode.com/problems/majority-element/">169. Majority Element</a>). Keep a candidate and a counter. A matching element adds one vote, a different one cancels one. When the counter hits zero, the next element becomes the candidate.</p>
+<p>Why it works: think of each cancellation as removing a pair of <b>different</b> values. Every pair removed contains at most one copy of the majority, so removing pairs can never use up all its copies; whatever survives at the end must be the majority. Cut the array wherever the counter returns to zero, and each finished segment has no majority of its own, so the majority must dominate the final segment:</p>
+<pre><code class="language-plaintext">[7, 7, 5, 7, 5, 1 | 5, 7 | 5, 5, 7, 7 | 7, 7, 7, 7]</code></pre>
+<pre><code class="language-python">def majority_element(nums):
+    candidate, count = None, 0
+    for x in nums:
+        if count == 0:
+            candidate = x
+        count += 1 if x == candidate else -1
+    return candidate
+
+
+assert majority_element([3, 2, 3]) == 3
+assert majority_element([2, 2, 1, 1, 1, 2, 2]) == 2
+assert majority_element([7, 7, 5, 7, 5, 1, 5, 7, 5, 5, 7, 7, 7, 7, 7, 7]) == 7</code></pre>
+<p>If a majority is not guaranteed, the candidate is only a candidate: a second pass must count it.</p>
+<h3 id="more-than-n-3">More than n/3</h3>
+<p>At most two values can each appear more than \(n/3\) times (<a href="https://leetcode.com/problems/majority-element-ii/">229. Majority Element II</a>). Keep two candidates; an element that matches neither cancels one vote from <b>both</b>, which removes a triple of distinct values. Then verify both candidates with a count.</p>
+<pre><code class="language-python">def majority_element_ii(nums):
+    c1, c2, n1, n2 = None, None, 0, 0
+    for x in nums:
+        if x == c1:
+            n1 += 1
+        elif x == c2:
+            n2 += 1
+        elif n1 == 0:
+            c1, n1 = x, 1
+        elif n2 == 0:
+            c2, n2 = x, 1
+        else:
+            n1, n2 = n1 - 1, n2 - 1
+    return sorted(c for c in {c1, c2} if c is not None and nums.count(c) &gt; len(nums) // 3)
+
+
+assert majority_element_ii([3, 2, 3]) == [3]
+assert majority_element_ii([1, 2]) == [1, 2]
+import random
+from collections import Counter
+for _ in range(500):
+    xs = [random.randint(1, 4) for _ in range(random.randint(1, 12))]
+    assert majority_element_ii(xs) == sorted(v for v, c in Counter(xs).items() if c &gt; len(xs) // 3)</code></pre>
+<p>The same idea with \(k - 1\) counters finds every value above \(n/k\) (the Misra–Gries summary).</p>
+<h2 id="sieve-of-eratosthenes">Sieve of Eratosthenes</h2>
+<p>To find every prime below \(n\), cross out multiples instead of testing each number. Start crossing out at \(p^2\): any smaller multiple \(m \cdot p\) with \(m &lt; p\) was already crossed out by a smaller prime factor of \(m\). For the same reason the outer loop can stop at \(\sqrt{n}\). <a href="https://leetcode.com/problems/count-primes/">204. Count Primes</a>:</p>
+<pre><code class="language-python">def count_primes(n):
+    if n &lt; 3:
+        return 0
+    is_prime = [True] * n
+    is_prime[0] = is_prime[1] = False
+    for p in range(2, int(n ** 0.5) + 1):
+        if is_prime[p]:
+            is_prime[p * p::p] = [False] * len(range(p * p, n, p))   # cross out p², p² + p, ...
+    return sum(is_prime)
+
+
+assert count_primes(10) == 4                # 2, 3, 5, 7
+assert count_primes(0) == 0 and count_primes(2) == 0
+assert count_primes(100) == 25</code></pre>
+<p>The total work is \(\sum_{p \le n} n/p = O(n \log \log n)\). The slice assignment does the inner loop in C, which matters at \(n = 5 \times 10^6\).</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/majority-element-ii/">229. Majority Element II</a></li><li><a href="https://leetcode.com/problems/online-majority-element-in-subarray/">1157. Online Majority Element In Subarray</a></li><li><a href="https://leetcode.com/problems/closest-prime-numbers-in-range/">2523. Closest Prime Numbers in Range</a></li></ul>
+<p>The voting algorithm is due to R. S. Boyer and J S. Moore, "MJRTY: A Fast Majority Vote Algorithm" (1991); the generalization to \(n/k\) to J. Misra and D. Gries, "Finding Repeated Elements" (1982).</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sweep line: turn intervals into events · r03922123</title>
+<meta name="description" content="Replace each interval with a +change at its start and a −change at its end, then sweep in order. Difference arrays, sorted events, and answering point queries with binary search.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Two pointers, windows and prefix sums</p>
+<header class="post-head">
+  <h1>Sweep line: turn intervals into events</h1>
+  <div class="meta">October 31, 2026 · 3 min read · sweep line · difference array · intervals</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#three-ways-to-store-the-events">Three ways to store the events</a></li><li><a href="#difference-array">Difference array</a></li><li><a href="#sorted-events">Sorted events</a></li><li><a href="#point-queries-with-binary-search">Point queries with binary search</a></li><li><a href="#when-the-value-is-not-a-sum">When the value is not a sum</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Interval problems ask what is true <b>at each moment</b>: how many meetings overlap, how many passengers are in the car, how many flowers are in bloom. Scanning every interval for every moment is slow. Instead, record only where things change: each interval <code>[start, end)</code> with value <code>delta</code> becomes two events, <code>+delta</code> at <code>start</code> and <code>-delta</code> at <code>end</code>. A running sum over the events in time order is the value at each moment.</p>
+<h2 id="three-ways-to-store-the-events">Three ways to store the events</h2>
+<ol><li><b>A difference array</b>, when times are small integers: <code>diff[start] += delta</code>, <code>diff[end] -= delta</code>, then a prefix sum. \(O(n + T)\).</li><li><b>A sorted list of events</b>, when times are large or real-valued: \(O(n \log n)\) for the sort.</li><li><b>A hash map then sorted keys</b>, when many events share a time and you want to merge them first.</li></ol>
+<p>At equal times, ends must come before starts for half-open intervals, so a meeting ending at 10 frees its room for one starting at 10. Storing <code>-delta</code> and sorting by <code>(time, delta)</code> does this automatically.</p>
+<h2 id="difference-array">Difference array</h2>
+<p><a href="https://leetcode.com/problems/car-pooling/">1094. Car Pooling</a>: passengers get on at <code>start</code> and off at <code>end</code>; can a car of a given capacity take every trip?</p>
+<pre><code class="language-python">from itertools import accumulate
+
+
+def car_pooling(trips, capacity):
+    diff = [0] * 1001                        # stops are at most 1000
+    for passengers, start, end in trips:
+        diff[start] += passengers
+        diff[end] -= passengers              # they are off before anyone boards at `end`
+    return max(accumulate(diff)) &lt;= capacity
+
+
+assert car_pooling([[2, 1, 5], [3, 3, 7]], 4) is False
+assert car_pooling([[2, 1, 5], [3, 3, 7]], 5) is True</code></pre>
+<h2 id="sorted-events">Sorted events</h2>
+<p>The minimum number of rooms for a set of meetings is the maximum overlap at any moment (<a href="https://leetcode.com/problems/meeting-rooms-ii/">253. Meeting Rooms II</a>). Times can be large, so sort events instead of allocating an array:</p>
+<pre><code class="language-python">def min_meeting_rooms(intervals):
+    events = sorted([(s, 1) for s, _ in intervals] + [(e, -1) for _, e in intervals])
+    rooms = best = 0
+    for _, delta in events:                  # at equal times, -1 sorts before +1
+        rooms += delta
+        best = max(best, rooms)
+    return best
+
+
+def brute(intervals):
+    times = {t for iv in intervals for t in iv}
+    return max((sum(s &lt;= t &lt; e for s, e in intervals) for t in times), default=0)
+
+
+assert min_meeting_rooms([[0, 30], [5, 10], [15, 20]]) == 2
+assert min_meeting_rooms([[7, 10], [2, 4]]) == 1
+assert min_meeting_rooms([[1, 5], [5, 9]]) == 1   # back-to-back meetings share a room
+import random
+for _ in range(300):
+    ivs = []
+    for _ in range(random.randint(1, 8)):
+        s = random.randint(0, 20)
+        ivs.append([s, s + random.randint(1, 6)])
+    assert min_meeting_rooms(ivs) == brute(ivs)</code></pre>
+<p>The same count answers <a href="https://leetcode.com/problems/divide-intervals-into-minimum-number-of-groups/">2406. Divide Intervals Into Minimum Number of Groups</a>, with closed intervals: there, <code>end + 1</code> is the release time.</p>
+<h2 id="point-queries-with-binary-search">Point queries with binary search</h2>
+<p>Sometimes the question is the value at given <b>query</b> times. <a href="https://leetcode.com/problems/number-of-flowers-in-full-bloom/">2251. Number of Flowers in Full Bloom</a>: flowers bloom on the closed interval <code>[start, end]</code>. The number in bloom at time <code>t</code> is (flowers started by <code>t</code>) minus (flowers ended before <code>t</code>), and both counts are binary searches over sorted arrays:</p>
+<pre><code class="language-python">from bisect import bisect_left, bisect_right
+
+
+def full_bloom_flowers(flowers, people):
+    starts = sorted(s for s, _ in flowers)
+    ends = sorted(e for _, e in flowers)
+    return [bisect_right(starts, t) - bisect_left(ends, t) for t in people]
+
+
+assert full_bloom_flowers([[1, 6], [3, 7], [9, 12], [4, 13]], [2, 3, 7, 11]) == [1, 2, 2, 2]
+assert full_bloom_flowers([[1, 10], [3, 3]], [3, 3, 2]) == [2, 2, 1]</code></pre>
+<p><code>bisect_right</code> counts starts at or before <code>t</code>; <code>bisect_left</code> counts ends strictly before <code>t</code>, so a flower ending at <code>t</code> still counts.</p>
+<h2 id="when-the-value-is-not-a-sum">When the value is not a sum</h2>
+<p>If you need the <b>maximum</b> active height rather than a count, as in <a href="https://leetcode.com/problems/the-skyline-problem/">218. The Skyline Problem</a>, a running sum is not enough: sweep the events and keep the active heights in a heap with lazy deletion (see heaps).</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/corporate-flight-bookings/">1109. Corporate Flight Bookings</a></li><li><a href="https://leetcode.com/problems/maximum-population-year/">1854. Maximum Population Year</a></li><li><a href="https://leetcode.com/problems/describe-the-painting/">1943. Describe the Painting</a></li><li><a href="https://leetcode.com/problems/shifting-letters-ii/">2381. Shifting Letters II</a></li><li><a href="https://leetcode.com/problems/maximum-sum-obtained-of-any-permutation/">1589. Maximum Sum Obtained of Any Permutation</a></li><li><a href="https://leetcode.com/problems/my-calendar-iii/">732. My Calendar III</a></li><li><a href="https://leetcode.com/problems/minimum-interval-to-include-each-query/">1851. Minimum Interval to Include Each Query</a></li><li><a href="https://leetcode.com/problems/the-skyline-problem/">218. The Skyline Problem</a></li></ul>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

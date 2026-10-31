@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sliding window: three templates and the exactly-k trick · r03922123</title>
+<meta name="description" content="A window over a contiguous stretch that grows on the right and shrinks on the left. Templates for the shortest valid window, the longest valid window, and counting windows with exactly k of something.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Two pointers, windows and prefix sums</p>
+<header class="post-head">
+  <h1>Sliding window: three templates and the exactly-k trick</h1>
+  <div class="meta">October 31, 2026 · 4 min read · sliding window · two pointers · strings</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#shortest-valid-window">Shortest valid window</a></li><li><a href="#longest-valid-window">Longest valid window</a></li><li><a href="#counting-windows-with-exactly-k">Counting windows with exactly k</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>A sliding window answers questions about <b>contiguous</b> subarrays or substrings: the shortest one that contains something, the longest one that avoids something, how many satisfy a condition. Both ends only move right, so each element enters and leaves the window at most once and the scan is \(O(n)\).</p>
+<p>It works when validity is <b>monotone</b>: if a window is valid, every window containing it is valid too (or every window inside it is). That is what makes it safe to move <code>lo</code> without looking back.</p>
+<h2 id="shortest-valid-window">Shortest valid window</h2>
+<p>Grow <code>hi</code> until the window is valid, then shrink <code>lo</code> while it stays valid, recording the best each time. <a href="https://leetcode.com/problems/minimum-window-substring/">76. Minimum Window Substring</a> asks for the shortest substring of <code>s</code> containing every character of <code>t</code>, with multiplicity.</p>
+<pre><code class="language-python">from collections import Counter
+
+
+def min_window(s, t):
+    need, missing = Counter(t), len(t)       # missing = characters of t not yet covered
+    lo, best = 0, (0, float("inf"))
+    for hi, ch in enumerate(s):
+        if need[ch] &gt; 0:
+            missing -= 1
+        need[ch] -= 1
+        while missing == 0:                  # valid: shrink while it stays valid
+            if hi - lo &lt; best[1] - best[0]:
+                best = (lo, hi)
+            need[s[lo]] += 1
+            if need[s[lo]] &gt; 0:
+                missing += 1
+            lo += 1
+    return "" if best[1] == float("inf") else s[best[0]:best[1] + 1]
+
+
+assert min_window("ADOBECODEBANC", "ABC") == "BANC"
+assert min_window("a", "aa") == ""</code></pre>
+<h2 id="longest-valid-window">Longest valid window</h2>
+<p>Grow <code>hi</code> every step; when the window becomes invalid, shrink <code>lo</code> until it is valid again. <a href="https://leetcode.com/problems/longest-substring-without-repeating-characters/">3. Longest Substring Without Repeating Characters</a>:</p>
+<pre><code class="language-python">def length_of_longest_substring(s):
+    seen, lo, best = {}, 0, 0
+    for hi, ch in enumerate(s):
+        if seen.get(ch, -1) &gt;= lo:          # ch repeats inside the window: jump lo past it
+            lo = seen[ch] + 1
+        seen[ch] = hi
+        best = max(best, hi - lo + 1)
+    return best
+
+
+assert length_of_longest_substring("abcabcbb") == 3
+assert length_of_longest_substring("pwwkew") == 3</code></pre>
+<h3 id="a-window-that-never-shrinks">A window that never shrinks</h3>
+<p>When only the <b>length</b> of the longest window matters, the window never needs to get smaller: once it reaches length \(L\), you only care about finding a valid window of length \(L + 1\). So move <code>lo</code> by <b>one</b> step when invalid, instead of a <code>while</code>. The window slides at constant size, grows when it can, and its final size is the answer. In <a href="https://leetcode.com/problems/longest-repeating-character-replacement/">424. Longest Repeating Character Replacement</a> this also lets <code>top</code> stay stale: it only needs to be correct when the window grows.</p>
+<pre><code class="language-python">def character_replacement(s, k):
+    count, lo, top = Counter(), 0, 0
+    for hi, ch in enumerate(s):
+        count[ch] += 1
+        top = max(top, count[ch])           # most frequent char ever seen in a window this size
+        if hi - lo + 1 - top &gt; k:           # invalid: slide, do not shrink
+            count[s[lo]] -= 1
+            lo += 1
+    return len(s) - lo
+
+
+assert character_replacement("ABAB", 2) == 4
+assert character_replacement("AABABBA", 1) == 4</code></pre>
+<h2 id="counting-windows-with-exactly-k">Counting windows with exactly k</h2>
+<p>"Exactly k" is not monotone: adding an element can take a window from valid to invalid and back. "At most k" <b>is</b> monotone, and for each right end <code>hi</code> the valid windows ending there are exactly those starting in <code>[lo, hi]</code>, which is <code>hi - lo + 1</code> of them. So count exactly-k as a difference:</p>
+\[ \text{exactly}(k) = \text{atMost}(k) - \text{atMost}(k - 1). \]
+<p><a href="https://leetcode.com/problems/subarrays-with-k-different-integers/">992. Subarrays with K Different Integers</a>:</p>
+<pre><code class="language-python">def subarrays_with_k_distinct(nums, k):
+    def at_most(k):
+        count, lo, total = Counter(), 0, 0
+        for hi, x in enumerate(nums):
+            count[x] += 1
+            while len(count) &gt; k:
+                count[nums[lo]] -= 1
+                if count[nums[lo]] == 0:
+                    del count[nums[lo]]
+                lo += 1
+            total += hi - lo + 1             # windows [lo..hi], [lo+1..hi], ..., [hi..hi]
+        return total
+    return at_most(k) - at_most(k - 1)
+
+
+def brute(nums, k):
+    return sum(len(set(nums[i:j + 1])) == k for i in range(len(nums)) for j in range(i, len(nums)))
+
+
+assert subarrays_with_k_distinct([1, 2, 1, 2, 3], 2) == 7
+assert subarrays_with_k_distinct([1, 2, 1, 3, 4], 3) == 3
+import random
+for _ in range(300):
+    xs = [random.randint(1, 4) for _ in range(random.randint(1, 10))]
+    kk = random.randint(1, 4)
+    assert subarrays_with_k_distinct(xs, kk) == brute(xs, kk)</code></pre>
+<h3 id="at-least-k-counted-directly">At least k, counted directly</h3>
+<p>For "at least", validity is monotone the other way: once <code>[lo, hi]</code> is valid, every extension to the right is valid too. While the window is valid, every start in <code>[0, lo]</code> works for this <code>hi</code>, so after shrinking to the first invalid <code>lo</code>, add <code>lo</code>. <a href="https://leetcode.com/problems/number-of-substrings-containing-all-three-characters/">1358. Number of Substrings Containing All Three Characters</a>:</p>
+<pre><code class="language-python">def number_of_substrings(s):
+    count, lo, total = Counter(), 0, 0
+    for ch in s:
+        count[ch] += 1
+        while len(count) == 3:              # valid: shrink until it is not
+            count[s[lo]] -= 1
+            if count[s[lo]] == 0:
+                del count[s[lo]]
+            lo += 1
+        total += lo                         # starts 0..lo-1 all give a valid window ending here
+    return total
+
+
+assert number_of_substrings("abcabc") == 10
+assert number_of_substrings("aaacb") == 3</code></pre>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/count-of-substrings-containing-every-vowel-and-k-consonants-ii/">3306. Count of Substrings Containing Every Vowel and K Consonants II</a></li><li><a href="https://leetcode.com/problems/frequency-of-the-most-frequent-element/">1838. Frequency of the Most Frequent Element</a></li><li><a href="https://leetcode.com/problems/minimum-number-of-flips-to-make-the-binary-string-alternating/">1888. Minimum Number of Flips to Make the Binary String Alternating</a></li><li><a href="https://leetcode.com/problems/minimum-number-of-operations-to-make-array-continuous/">2009. Minimum Number of Operations to Make Array Continuous</a></li><li><a href="https://leetcode.com/problems/maximum-number-of-visible-points/">1610. Maximum Number of Visible Points</a></li><li><a href="https://leetcode.com/problems/max-value-of-equation/">1499. Max Value of Equation</a>, which pairs a window with a monotonic queue</li></ul>
+<p>The templates follow the structure of Liu Zhenglai's <a href="https://liuzhenglaichn.gitbook.io/algorithm/array/sliding-window">sliding-window notes</a>.</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

@@ -67,11 +67,13 @@ def check(root, denylist):
         for script, style in CDN.findall(text):
             if not PINNED.search(script or style):
                 findings.append(f"{rel}: unpinned CDN {script or style}")
-    home = (root / "index.html").read_text() if (root / "index.html").exists() else ""
-    for post in sorted(root.glob("posts/*/index.html")):
-        slug = f"posts/{post.parent.name}/"
-        if slug not in home:
-            findings.append(f"index.html: {slug} is not listed")
+    # Each post folder must be linked from its listing page: posts/ from the home page, leetcode/ from its series page.
+    for section, listing in (("posts", "index.html"), ("leetcode", "leetcode/index.html")):
+        page = (root / listing).read_text() if (root / listing).exists() else ""
+        for post in sorted(root.glob(f"{section}/*/index.html")):
+            href = f"{section}/{post.parent.name}/"
+            if href not in page and f'"{post.parent.name}/"' not in page:
+                findings.append(f"{listing}: {href} is not listed")
     return findings
 
 
