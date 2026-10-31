@@ -33,6 +33,7 @@ header.site nav a { color: var(--muted); }
 header.site nav a:hover, header.site nav [aria-current="page"] { color: var(--fg); }
 header.site nav [aria-current="page"] { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
 @media (max-width: 480px) { header.site nav { gap: 4px 14px; font-size: .95em; } }
+@media (min-width: 481px) { header.site nav { margin-left: auto; } }   /* stays right-aligned when the home adds its toggle */
 footer.site { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .85em; padding: 40px 0 32px; }
 footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted); opacity: .45; }
 
@@ -112,3 +113,163 @@ footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted
 .lost { text-align: center; padding-top: 72px; }
 .lost-skyline { width: 240px; height: 50px; color: var(--muted); opacity: .5; }
 .lost p { color: var(--fg); }
+
+/* Scene: the home page's desk at night (SPEC-scene). Every class is sc-*, except the links (.door).
+   Literal colours are allowed here: this is artwork. */
+/* Greeting and stage. The SVG is always 1600x900; the stage shows the slice named by --x (left edge), --w and --h
+   (counted up from the bottom), so tablets and phones get a crop centred on the desk instead of a tiny picture.
+   The height cap keeps the whole desk above the fold on short laptop and iPad-landscape windows. */
+.sc-greet { font-size: clamp(1.05rem, 2.1vw, 1.3rem); font-weight: 650; line-height: 1.4; margin: 6px 0 18px; }
+.sc-greet span { color: var(--muted); font-weight: 400; }
+.sc-stage { --x: 0; --w: 1600; --h: 900; position: relative; overflow: hidden; margin: 0 auto; background: #0b0d1a;
+            width: min(100%, 1600px, max(1000px, (100svh - 150px) * 16 / 9)); aspect-ratio: var(--w) / var(--h); }
+.sc-svg { position: absolute; bottom: 0; left: calc(-100% * var(--x) / var(--w)); width: calc(100% * 1600 / var(--w));
+          height: auto; aspect-ratio: 16 / 9; display: block; pointer-events: none; }
+@media (max-width: 1099px) { .sc-stage { --x: 170; --w: 1300; --h: 860; width: min(100%, max(600px, (100svh - 150px) * 1300 / 860)); } }
+@media (max-width: 699px) { .sc-stage { --x: 428; --w: 786; --h: 830; width: 100%; } }   /* lamp, mug, four doors and the tower's beacon */
+
+/* Doors. The art ignores the pointer; only the static .sc-hit rects take it, so the target never moves with the art. */
+.sc-hit { fill: #000; fill-opacity: 0; pointer-events: all; }
+.door, .door:hover { cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent; }   /* iOS would grey the whole box, hidden pill included */
+.door:focus-visible { outline: none; }
+.sc-ring, .sc-lbl { opacity: 0; }
+.sc-ring rect { fill: none; stroke: #0d1020; stroke-width: 7; }    /* dark under-stroke keeps the ring visible on beige and lit wood */
+.sc-ring rect + rect { stroke: #5eead4; stroke-width: 3; }
+.sc-tag rect { fill: #0d1020; fill-opacity: .92; stroke: #f5b14c; stroke-width: 1.5; }
+.sc-tag text { font: 700 22px var(--font-mono); letter-spacing: .12em; fill: #fbe9c8; text-anchor: middle; }
+.sc-screen-t { font: 700 40px var(--font-mono); letter-spacing: .08em; text-anchor: middle; paint-order: stroke; stroke: #06302c; stroke-width: 5px; stroke-linejoin: round; }
+.sc-term { font: 500 10px var(--font-mono); fill: #8ff5d2; }
+.sc-term .sc-pr { fill: #5eead4; font-weight: 700; }
+.sc-nbt { font: 700 9.6px var(--font-mono); letter-spacing: 1.2px; fill: #5a1f26; text-anchor: middle; }
+.sc-csh { fill: var(--sc-sh); stroke: var(--sc-sd); }    /* cassette body colours, set per tape on its <use> */
+.sc-csd { fill: var(--sc-sd); }
+.sc-cst { fill: var(--sc-st); }
+
+/* Sky tint by local hour (set by the inline script): sc-night is the default, sc-dusk 17-19h, sc-late 0-5h,
+   sc-blue for daytime, shown as blue hour because the scene is always night-ish. */
+.sc-s1 { stop-color: #050817; } .sc-s2 { stop-color: #0f1338; } .sc-s3 { stop-color: #2b2256; } .sc-s4 { stop-color: #64405f; }
+.sc-hz { stop-color: #704a7a; } .sc-gl { stop-color: #ff9a6b; }
+.sc-ba0 { fill: #29274f; } .sc-ba1 { fill: #2d2a55; } .sc-bb0 { fill: #17183a; } .sc-bb1 { fill: #1b1c41; } .sc-bc0 { fill: #0b0c1f; } .sc-bc1 { fill: #0e0f25; }
+.sc-dusk .sc-s1 { stop-color: #151c4a; } .sc-dusk .sc-s2 { stop-color: #3d2f70; } .sc-dusk .sc-s3 { stop-color: #a4507a; } .sc-dusk .sc-s4 { stop-color: #f2915f; }
+.sc-dusk .sc-hz { stop-color: #c4708a; } .sc-dusk .sc-gl { stop-color: #ffb070; }
+.sc-dusk .sc-ba0, .sc-dusk .sc-ba1 { fill: #4c3a6c; } .sc-dusk .sc-bb0, .sc-dusk .sc-bb1 { fill: #2a2350; }
+.sc-late .sc-s1 { stop-color: #02040c; } .sc-late .sc-s2 { stop-color: #080b24; } .sc-late .sc-s3 { stop-color: #171940; } .sc-late .sc-s4 { stop-color: #2e2549; }
+.sc-late .sc-hz { stop-color: #3c3360; } .sc-late .sc-ba0, .sc-late .sc-ba1 { fill: #1b1b39; } .sc-late .sc-bb0, .sc-late .sc-bb1 { fill: #111230; }
+.sc-late .sc-lt { opacity: .1; }
+.sc-blue .sc-s1 { stop-color: #10224f; } .sc-blue .sc-s2 { stop-color: #1f3b78; } .sc-blue .sc-s3 { stop-color: #4b5f9e; } .sc-blue .sc-s4 { stop-color: #8e88b8; }
+.sc-blue .sc-hz { stop-color: #8088ba; } .sc-blue .sc-gl { stop-color: #d0a0c0; }
+.sc-blue .sc-ba0, .sc-blue .sc-ba1 { fill: #36427c; } .sc-blue .sc-bb0, .sc-blue .sc-bb1 { fill: #232c5c; } .sc-blue .sc-bc0, .sc-blue .sc-bc1 { fill: #121634; }
+.sc-blue .sc-lt { opacity: .45; }
+.sc-dusk .sc-stars, .sc-blue .sc-stars { opacity: .15; }
+
+/* Door states that hold without motion. :focus-visible applies everywhere; :hover only where a pointer can
+   really hover, so a tap on a phone never leaves a label showing. */
+.sc-bright, .sc-roll { opacity: 0; }
+.sc-crtglow, .sc-dialglow { opacity: .55; }
+.sc-bars rect { opacity: .35; transform-box: fill-box; transform-origin: 50% 100%; }
+.sc-cover { transform-origin: 553px 816px; }
+.sc-tape-art { transform-box: fill-box; transform-origin: 50% 100%; }
+.sc-knob { transform-box: fill-box; transform-origin: 50% 50%; }
+.sc-steam g { opacity: .3; }
+.door:focus-visible .sc-ring, .door:focus-visible .sc-lbl { opacity: 1; }
+.sc-d-crt:focus-visible .sc-bright { opacity: .3; }
+.sc-d-crt:focus-visible .sc-code { opacity: .12; }
+.sc-d-crt:focus-visible .sc-crtglow, .sc-d-radio:focus-visible .sc-dialglow, .sc-d-radio:focus-visible .sc-bars rect { opacity: 1; }
+.sc-d-nb:focus-visible .sc-cover { transform: translateY(-3px) rotate(-5.5deg); }
+.sc-d-tape:focus-visible .sc-tape-art { transform: translate(-6px, -30px) rotate(-1.5deg); }
+.sc-d-radio:focus-visible .sc-needle { transform: translateX(30px); }
+.sc-d-radio:focus-visible .sc-knob { transform: rotate(150deg); }
+@media (hover: hover) {
+  .door:hover .sc-lbl { opacity: 1; }
+  .sc-d-crt:hover .sc-bright { opacity: .3; }
+  .sc-d-crt:hover .sc-code { opacity: .12; }
+  .sc-d-crt:hover .sc-crtglow, .sc-d-radio:hover .sc-dialglow, .sc-d-radio:hover .sc-bars rect { opacity: 1; }
+  .sc-d-nb:hover .sc-cover { transform: translateY(-3px) rotate(-5.5deg); }
+  .sc-d-tape:hover .sc-tape-art { transform: translate(-6px, -30px) rotate(-1.5deg); }
+  .sc-d-radio:hover .sc-needle { transform: translateX(30px); }
+  .sc-d-radio:hover .sc-knob { transform: rotate(150deg); }
+}
+.sc-bars rect:nth-child(2) { --sc-d: -.2s; }
+.sc-bars rect:nth-child(3) { --sc-d: -.35s; }
+.sc-bars rect:nth-child(4) { --sc-d: -.1s; }
+
+/* Ambient life and door motion: transform and opacity only, and none of it for visitors who ask for reduced motion.
+   Large soft shapes (lamp light, bokeh) move in steps, so they repaint a few times a second rather than every frame. */
+@media (prefers-reduced-motion: no-preference) {
+  .sc-lbl, .sc-bright, .sc-code, .sc-crtglow, .sc-dialglow, .sc-bars rect { transition: opacity .25s; }
+  .sc-cover, .sc-tape-art, .sc-needle, .sc-knob { transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+  .sc-d-crt:focus-visible .sc-scan { animation: sc-flick .14s steps(2) infinite; }
+  .sc-d-crt:focus-visible .sc-roll { opacity: .16; animation: sc-roll 2.4s linear infinite; }
+  .sc-d-radio:focus-visible .sc-needle { animation: sc-sweep 1.8s ease-in-out infinite alternate; }
+  .sc-d-radio:focus-visible .sc-knob { animation: sc-knob 1.8s ease-in-out infinite alternate; }
+  .sc-d-radio:focus-visible .sc-bars rect { animation: sc-bar .5s ease-in-out var(--sc-d, 0s) infinite alternate; }
+  @media (hover: hover) {
+    .sc-d-crt:hover .sc-scan { animation: sc-flick .14s steps(2) infinite; }
+    .sc-d-crt:hover .sc-roll { opacity: .16; animation: sc-roll 2.4s linear infinite; }
+    .sc-d-radio:hover .sc-needle { animation: sc-sweep 1.8s ease-in-out infinite alternate; }
+    .sc-d-radio:hover .sc-knob { animation: sc-knob 1.8s ease-in-out infinite alternate; }
+    .sc-d-radio:hover .sc-bars rect { animation: sc-bar .5s ease-in-out var(--sc-d, 0s) infinite alternate; }
+  }
+  .sc-cursor { animation: sc-blink 1.1s steps(1) infinite; }
+  .sc-f1, .sc-f3, .sc-f5, .sc-f7 { animation: sc-off 13s steps(1) infinite; }
+  .sc-f2, .sc-f4, .sc-f6, .sc-f8 { animation: sc-on 17s steps(1) infinite; }
+  .sc-f2 { animation-duration: 11s; animation-delay: -4s; }
+  .sc-f3 { animation-duration: 23s; animation-delay: -9s; }
+  .sc-f4 { animation-duration: 29s; animation-delay: -17s; }
+  .sc-f5 { animation-duration: 19s; animation-delay: -3s; }
+  .sc-f6 { animation-duration: 31s; animation-delay: -12s; }
+  .sc-f7 { animation-duration: 37s; animation-delay: -25s; }
+  .sc-f8 { animation-delay: -7s; }
+  .sc-red { animation: sc-blinkred 2.4s ease-in-out infinite; }
+  .sc-red2 { animation: sc-blinkred 2.4s ease-in-out -1.2s infinite; }
+  .sc-beacon { animation: sc-blinkred 1.8s ease-in-out infinite; }
+  .sc-strobe { animation: sc-strobe 3.2s linear infinite; }
+  .sc-neonf { animation: sc-neon 7s linear infinite; }
+  .sc-train { animation: sc-train 20s linear infinite; }
+  .sc-steam g { animation: sc-steam 6.5s ease-in infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+  .sc-steam g:nth-child(2) { animation-delay: -2.2s; }
+  .sc-steam g:nth-child(3) { animation-delay: -4.4s; }
+  .sc-lamplight { animation: sc-glow 9s steps(36) infinite alternate; }
+  .sc-tw { animation: sc-tw 9s steps(40) infinite alternate; }
+  .sc-tw:nth-child(2n) { animation-duration: 13s; animation-delay: -4s; }
+  .sc-tail { transform-box: fill-box; transform-origin: 0 100%; animation: sc-tail 6s ease-in-out infinite; }
+  @keyframes sc-off { 0% { opacity: 1; } 64% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes sc-on { 0% { opacity: 0; } 38% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes sc-blinkred { 0%, 100% { opacity: 1; } 50% { opacity: .12; } }
+  @keyframes sc-strobe { 0%, 6% { opacity: 1; } 9%, 100% { opacity: 0; } }
+  @keyframes sc-neon { 0%, 88%, 91%, 93%, 100% { opacity: 1; } 89%, 92% { opacity: .25; } }
+  @keyframes sc-train { 0% { transform: translateX(-780px); } 52%, 100% { transform: translateX(1620px); } }
+  @keyframes sc-steam { 0% { opacity: 0; transform: translateY(12px) scale(.85); } 25% { opacity: .45; } 100% { opacity: 0; transform: translate(-8px, -64px) scale(1.35); } }
+  @keyframes sc-glow { 0% { opacity: .82; } 100% { opacity: 1; } }
+  @keyframes sc-tw { 0% { opacity: .2; } 100% { opacity: 1; } }
+  @keyframes sc-tail { 0%, 70%, 100% { transform: rotate(0); } 80% { transform: rotate(-9deg); } 90% { transform: rotate(4deg); } }
+  @keyframes sc-blink { 0% { opacity: 1; } 50% { opacity: 0; } }
+  @keyframes sc-flick { 0% { opacity: .55; } 100% { opacity: .3; } }
+  @keyframes sc-roll { 0% { transform: translateY(-20px); } 100% { transform: translateY(150px); } }
+  @keyframes sc-sweep { 0% { transform: translateX(-6px); } 100% { transform: translateX(40px); } }
+  @keyframes sc-knob { 0% { transform: rotate(-30deg); } 100% { transform: rotate(200deg); } }
+  @keyframes sc-bar { 0% { transform: scaleY(.35); } 100% { transform: scaleY(1); } }
+}
+
+/* The same four doors as plain links, so navigation never depends on the picture. */
+.sc-list { margin: 22px 0 0; }
+.sc-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px 28px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.sc-list li { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.sc-list a { font-weight: 600; }
+.sc-list span { display: block; color: var(--muted); font-size: .9em; }
+
+/* Lo-fi: the plain home and its toggle (SPEC-lofi) */
+header.site .mode-toggle { order: 3; }
+@media (max-width: 480px) { header.site .mode-toggle { order: 1; margin-left: auto; } header.site nav { order: 2; flex-basis: 100%; } }
+.mode-toggle { font: 600 .72rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+               background: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+.mode-toggle:hover, .mode-toggle[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); }
+.lofi { display: none; padding: 40px 0 8px; }
+[data-mode="lofi"] .lofi { display: block; }
+[data-mode="lofi"] .sc-home { display: none; }      /* the scene, its greeting and its door list */
+.lofi h1 { font-size: 2rem; margin: 0 0 .3em; }
+.lofi > p { color: var(--muted); margin: 0 0 1.2em; }
+.lofi-doors, .lofi-latest { padding-left: 1.2em; margin: 0; }
+.lofi-doors li, .lofi-latest li { margin: .45em 0; }
+.lofi-doors span { color: var(--muted); }
+.lofi h2 { font-size: 1.1rem; margin: 2em 0 .4em; }
