@@ -71,7 +71,7 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 - [x] Task R2 `reskin`: posts index, nav, posts/LeetCode/About/404 restyled, article text unchanged
 - [x] Task R3 `scene`: design panel (3 drafts, 3 judges, synthesis), then integrate into index.html
 - [x] Task R4 `lofi`: toggle, pre-paint mode script, plain home
-- [ ] Task R5 review: multi-lens review workflow over the redesign, verified findings fixed
+- [x] Task R5 review: multi-lens review workflow over the redesign, verified findings fixed
 
 ### Checkpoint R
 - [ ] All module success criteria checked; you review the live preview before any push
