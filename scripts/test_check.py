@@ -1,4 +1,5 @@
 # Tests for check.py: a clean site passes; each planted fault is reported.
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -99,3 +100,47 @@ class CheckTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+STYLE = Path(__file__).resolve().parent.parent / "style.css"
+
+
+def tokens(block):
+    return dict(re.findall(r"--([a-z-]+):\s*(#[0-9a-fA-F]{6})", block))
+
+
+def luminance(hex_color):
+    channels = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def contrast(a, b):
+    hi, lo = sorted((luminance(a), luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+class ThemeTest(unittest.TestCase):
+    """SPEC-theme: text tokens meet WCAG AA on every background, in both variants; colours live in tokens."""
+
+    def variants(self):
+        css = STYLE.read_text()
+        light = css[css.index(":root {"):css.index("}", css.index(":root {"))]
+        dark_start = css.index("@media (prefers-color-scheme: dark)")
+        dark = css[dark_start:css.index("}", css.index(":root {", dark_start))]
+        return {"paper": tokens(light), "night": tokens(dark)}
+
+    def test_text_tokens_meet_aa(self):
+        for name, t in self.variants().items():
+            for text in ("fg", "muted", "link", "accent"):
+                for surface in ("bg", "card"):
+                    ratio = contrast(t[text], t[surface])
+                    self.assertGreaterEqual(ratio, 4.5, f"{name}: --{text} on --{surface} is {ratio:.2f}:1")
+
+    def test_no_hard_coded_colours_outside_tokens_and_scene(self):
+        css = STYLE.read_text()
+        dark_start = css.index("@media (prefers-color-scheme: dark)")
+        body = css[css.index("}", css.index(":root {", dark_start)) + 1:]        # after both token blocks
+        body = body.split("/* Scene", 1)[0]                                       # scene art may use literal colours
+        stray = re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", body)
+        self.assertEqual(stray, [], "colours outside the token blocks")

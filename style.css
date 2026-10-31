@@ -1,17 +1,42 @@
-/* Hub: one narrow column, a post list, light by default and dark when the OS asks. */
-:root { --bg: #fff; --fg: #1f2328; --muted: #59636e; --line: #e3e7eb; --card: #f6f8fa; --link: #0b5fd3; color-scheme: light dark; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0f1115; --fg: #e6e8eb; --muted: #9aa4b2; --line: #2b313a; --card: #171a20; --link: #6cb6ff; }
+/* r03922123: one stylesheet. Sections: tokens, base, header/footer, reading pages, About, LeetCode, scene, lo-fi.
+   Colours live only in the token blocks (paper = light, night = dark) and in the scene art. */
+:root {
+  --bg: #f7f5f0; --fg: #1f2130; --muted: #5d6070; --line: #e2ded4; --card: #fffdf8;
+  --accent: #c2410c; --link: #1d4ed8; --signal: #0e7490; --tower: #dc2626;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light dark;
 }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1020; --fg: #e8e6f0; --muted: #9ba0b8; --line: #262b45; --card: #141933;
+    --accent: #f5b14c; --link: #8ab4ff; --signal: #5eead4; --tower: #f87171;
+  }
+}
+
+/* Base */
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.65 var(--font-body); -webkit-text-size-adjust: 100%; }
 .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
-a { color: var(--link); text-decoration: none; }
+a { color: var(--link); text-decoration: none; text-underline-offset: .15em; }
 a:hover { text-decoration: underline; }
-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; }
-header .home { font-weight: 700; color: var(--fg); font-size: 1.1rem; }
-header nav { display: flex; gap: 18px; }
-@media (max-width: 420px) { header nav { gap: 12px; } header nav a { font-size: .95em; } }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 2px; }
+.label { font: 600 .78rem/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* Header and footer, shared by every page */
+header.site { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding: 18px 0; }
+header.site .home { font: 700 .95rem/1 var(--font-mono); letter-spacing: .08em; color: var(--fg); display: inline-flex; align-items: center; gap: .55em; }
+header.site .home::before { content: ""; width: .55em; height: .55em; border-radius: 50%; background: var(--tower); }   /* the tower's beacon */
+header.site .home:hover { text-decoration: none; }
+header.site nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+header.site nav a { color: var(--muted); }
+header.site nav a:hover, header.site nav [aria-current="page"] { color: var(--fg); }
+header.site nav [aria-current="page"] { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+@media (max-width: 480px) { header.site nav { gap: 4px 14px; font-size: .95em; } }
+footer.site { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .85em; padding: 40px 0 32px; }
+footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted); opacity: .45; }
+
+/* Lists of posts: the home (until the scene), the posts index, the series page */
 .intro { padding: 40px 0 24px; }
 .intro h1 { font-size: 2rem; margin: 0 0 .3em; }
 .intro p { color: var(--muted); margin: 0; }
@@ -20,8 +45,31 @@ header nav { display: flex; gap: 18px; }
 .post h2 { font-size: 1.3rem; margin: 0 0 .4em; line-height: 1.3; }
 .post p { margin: 0 0 .7em; color: var(--muted); }
 .post .meta { font-size: .85em; color: var(--muted); }
-footer { color: var(--muted); font-size: .85em; padding: 40px 0 32px; }
-header nav [aria-current="page"] { color: var(--fg); }
+
+/* Reading pages: long-form posts and LeetCode posts */
+.post-head { padding: 40px 0 8px; }
+.post-head h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 .4em; }
+.post-head .meta, .post .tags { color: var(--muted); font-size: .9em; }
+.post-body h2 { font-size: 1.4rem; margin: 2em 0 .5em; }
+.post-body h3 { font-size: 1.1rem; margin: 1.5em 0 .4em; }
+.post-body h4 { font-size: 1rem; margin: 1.4em 0 .3em; }
+.post-body li { margin: .35em 0; }
+.toc { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin: 24px 0; }
+.toc h2 { font-size: 1rem; margin: 0 0 .4em; }
+.toc ol { margin: 0; padding-left: 1.3em; }
+.post-body pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-x: auto; font-size: .85em; line-height: 1.5; }
+.post-body pre code.hljs { background: none; padding: 0; }
+.post-body code { font-family: var(--font-mono); }
+.post-body :not(pre) > code { background: var(--card); padding: .1em .35em; border-radius: 4px; font-size: .9em; }
+.post-body table { border-collapse: collapse; width: 100%; font-size: .9em; margin: 1em 0; display: block; overflow-x: auto; }
+.post-body th, .post-body td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.post-body th { background: var(--card); }
+.post-body .caption { color: var(--muted); font-size: .9em; margin-top: -.4em; }
+.post-body .note { background: var(--card); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: .92em; }
+.post-body .tag { font-family: var(--font-mono); font-size: .8em; color: var(--muted); white-space: nowrap; }
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+.refs { font-size: .9em; padding-left: 1.6em; }
+.refs li:target { background: var(--card); }
 
 /* About page: roles as a heading row (name · dates) over a subheading row (title · place). */
 .about h2 { font-size: 1.3rem; margin: 40px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
@@ -34,31 +82,6 @@ header nav [aria-current="page"] { color: var(--fg); }
 .role ul, .plain { padding-left: 1.2em; margin: .6em 0 0; }
 .role li, .plain li { margin: .5em 0; }
 .plain { list-style: disc; }
-
-/* Posts: long-form reading column, TOC, tables, code, references. */
-.post-head { display: block; padding: 40px 0 8px; }   /* not the flex site header */
-.post-head h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 .4em; }
-.post-head .meta, .post .tags { color: var(--muted); font-size: .9em; }
-.post-body h2 { font-size: 1.4rem; margin: 2em 0 .5em; }
-.post-body h3 { font-size: 1.1rem; margin: 1.5em 0 .4em; }
-.post-body li { margin: .35em 0; }
-.toc { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin: 24px 0; }
-.toc h2 { font-size: 1rem; margin: 0 0 .4em; }
-.toc ol { margin: 0; padding-left: 1.3em; }
-.post-body pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-x: auto; font-size: .85em; line-height: 1.5; }
-.post-body pre code.hljs { background: none; padding: 0; }
-.post-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.post-body :not(pre) > code { background: var(--card); padding: .1em .35em; border-radius: 4px; font-size: .9em; }
-.post-body table { border-collapse: collapse; width: 100%; font-size: .9em; margin: 1em 0; display: block; overflow-x: auto; }
-.post-body th, .post-body td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
-.post-body th { background: var(--card); }
-.post-body .caption { color: var(--muted); font-size: .9em; margin-top: -.4em; }
-.katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
-.refs { font-size: .9em; padding-left: 1.6em; }
-.refs li:target { background: var(--card); }
-.post-body h4 { font-size: 1rem; margin: 1.4em 0 .3em; }
-.post-body .note { background: var(--card); border-left: 3px solid var(--link); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: .92em; }
-.post-body .tag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8em; color: var(--muted); white-space: nowrap; }
 
 /* LeetCode series: breadcrumb on posts, a compact list on the series page. */
 .crumb { font-size: .85em; color: var(--muted); margin: 32px 0 -24px; }
