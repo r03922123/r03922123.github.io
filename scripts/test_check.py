@@ -29,6 +29,7 @@ class CheckTest(unittest.TestCase):
     def test_clean_site_passes(self):
         files = {
             "index.html": PAGE.format(body='<a href="posts/a/">a</a> <a href="https://x.org">x</a>'),
+            "posts/index.html": PAGE.format(body='<a href="a/">a</a>'),
             "posts/a/index.html": PAGE.format(body='<a href="../../">home</a>'),
             "style.css": "body{}",
         }
@@ -91,6 +92,12 @@ class CheckTest(unittest.TestCase):
                  "leetcode/heap/index.html": PAGE.format(body="")}
         out = self.findings(files)
         self.assertEqual(out, ["leetcode/index.html: leetcode/heap/ is not listed"])
+
+    def test_post_must_be_listed_on_posts_index_not_just_home(self):
+        files = {"index.html": PAGE.format(body='<a href="posts/a/">a</a>'),
+                 "posts/index.html": PAGE.format(body=""),
+                 "posts/a/index.html": PAGE.format(body="")}
+        self.assertEqual(self.findings(files), ["posts/index.html: posts/a/ is not listed"])
 
     def test_post_not_listed_on_home(self):
         out = self.findings({"index.html": PAGE.format(body=""), "posts/a/index.html": PAGE.format(body="")})

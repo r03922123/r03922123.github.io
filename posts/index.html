@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Posts · r03922123</title>
+<meta name="description" content="Long-form technical posts on machine learning: generative audio, ranking, fine-tuning and evaluation, each with the code and numbers behind it.">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Desk</a><a href="/posts/" aria-current="page">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<section class="intro">
+  <h1>Posts</h1>
+  <p>Long-form technical notes on machine learning, each with the code and numbers behind it.</p>
+</section>
+<!-- One entry per in-repo post, newest first. The MusicGen posts are deployed by their own repo. -->
+<a class="post" href="evaluating-ml-systems/">
+  <h2>Evaluating ML systems: classification, ranking, search and generative models</h2>
+  <p>A reference that follows business value down to model metrics for four kinds of system, then covers
+  offline tests, online experiments and the ways each step tends to break.</p>
+  <div class="meta">October 31, 2026 · 8 min read · evaluation · experimentation · reference</div>
+</a>
+<a class="post" href="lora-from-scratch/">
+  <h2>LoRA from scratch, proven with asserts</h2>
+  <p>Build a tiny GPT, freeze it, add LoRA adapters, fine-tune only those and fuse them back, checking every claim
+  with an assert. Runs on a laptop CPU in seconds.</p>
+  <div class="meta">October 31, 2026 · 7 min read · fine-tuning · LLM · PyTorch</div>
+</a>
+<a class="post" href="text-to-music-2026/">
+  <h2>Text-to-music in 2026: models, reward models and DPO</h2>
+  <p>Building text-to-music from parts, with a tensor shape at every step: codec language models from MusicGen
+  to HeartMuLa, scoring from CLAP to the CMI reward model, and DPO derived from its objective.</p>
+  <div class="meta">October 31, 2026 · 16 min read · music generation · alignment · reward models</div>
+</a>
+<a class="post" href="position-bias/">
+  <h2>Position bias: why click logs lie and how to correct them</h2>
+  <p>A ranker trained on raw clicks learns position, not relevance. The examination model, a simulation of how
+  far raw CTR misleads, and the corrections: inverse propensity weighting, dual learning, position features
+  and interleaving.</p>
+  <div class="meta">October 31, 2026 · 6 min read · ranking · recommendation · evaluation</div>
+</a>
+
+<section id="musicgen" class="group">
+  <h2>MusicGen</h2>
+  <p>Two posts on generating music with MusicGen and choosing the best take, with interactive figures.</p>
+</section>
+<a class="post" href="/musicgen-prune-inference/">
+  <h2>Judging text-to-music: CLAP best-of-N, then and now</h2>
+  <p>How generated music is judged, from FID and CLIP score to FAD, CLAP and learned music judges; why picking the
+  best of N takes by CLAP is legitimate; and four ways to extend it, including pruning weak takes early.</p>
+  <div class="meta">October 24, 2026 · 10 min read · 1 interactive figure · MusicGen · evaluation</div>
+</a>
+<a class="post" href="/musicgen-prune-inference/decoding/">
+  <h2>Inside MusicGen decoding: tokens, guidance and exact pruning</h2>
+  <p>RVQ and the delay pattern, classifier-free guidance, where a decoding step's time goes on a T4, pruning a
+  running batch without changing the survivors, and the design of a best-of-N music service.</p>
+  <div class="meta">October 24, 2026 · 8 min read · 1 interactive figure · MusicGen · inference · systems</div>
+</a>
+
+<p class="aside">Looking for algorithms? The <a href="/leetcode/">LeetCode patterns</a> series has 31 short posts,
+one per pattern, with code that runs.</p>
+</main>
+<footer class="site"><svg class="skyline" viewBox="0 0 96 20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 20V8h8v12zM9 20v-8h5v8zM15 20V5h6v15zM26 20l3-11h-.6v-1h.8L30 2l.8 6h.8v1h-.6l3 11zM36 20V10h8v10zM45 20V6h4v14zM50 20v-7h8v7zM62 20l1-17 .5-3 .5 3 1 17zM67 20V9h8v11zM76 20v-6h5v6zM82 20V7h8v13zM91 20v-9h5v9z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>
