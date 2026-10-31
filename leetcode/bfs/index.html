@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BFS: shortest paths by layers, and from both ends · r03922123</title>
+<meta name="description" content="Breadth-first search finds shortest paths when every step costs the same. The layer-by-layer template, BFS over a state space larger than the grid, 0-1 BFS for two edge costs, and bidirectional search.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Graphs</p>
+<header class="post-head">
+  <h1>BFS: shortest paths by layers, and from both ends</h1>
+  <div class="meta">October 31, 2026 · 4 min read · BFS · shortest path · graphs</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#layer-by-layer">Layer by layer</a></li><li><a href="#the-state-is-more-than-the-position">The state is more than the position</a></li><li><a href="#0-1-bfs-two-edge-costs">0-1 BFS: two edge costs</a></li><li><a href="#bidirectional-bfs">Bidirectional BFS</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Breadth-first search explores a graph in rings: everything one step from the source, then everything two steps away, and so on. The first time it reaches a node is therefore along a shortest path, provided every edge costs the same. For weighted edges, see <a href="../dijkstra/">Dijkstra</a>.</p>
+<h2 id="layer-by-layer">Layer by layer</h2>
+<p>Processing one whole frontier at a time makes the distance explicit, which is convenient when the answer is "the number of steps". Mark nodes as seen when they are <b>added</b>, not when they are popped, or the same node can enter the queue many times.</p>
+<pre><code class="language-python">from collections import deque
+
+
+def bfs_layers(start, neighbors, goal):
+    if start == goal:
+        return 0
+    seen, frontier, steps = {start}, [start], 0
+    while frontier:
+        steps += 1
+        nxt = []
+        for node in frontier:
+            for nb in neighbors(node):
+                if nb == goal:
+                    return steps
+                if nb not in seen:
+                    seen.add(nb)                # mark on enqueue
+                    nxt.append(nb)
+        frontier = nxt
+    return -1
+
+
+grid = ["..#", ".#.", "..."]
+def grid_neighbors(cell):
+    r, c = cell
+    for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+        if 0 &lt;= nr &lt; 3 and 0 &lt;= nc &lt; 3 and grid[nr][nc] == ".":
+            yield nr, nc
+
+
+assert bfs_layers((0, 0), grid_neighbors, (1, 2)) == 5
+assert bfs_layers((0, 0), grid_neighbors, (0, 0)) == 0</code></pre>
+<h2 id="the-state-is-more-than-the-position">The state is more than the position</h2>
+<p>When the rules depend on something besides where you are, put it in the node. <a href="https://leetcode.com/problems/shortest-path-in-a-grid-with-obstacles-elimination/">1293. Shortest Path in a Grid with Obstacles Elimination</a> lets you remove up to <code>k</code> walls, so the state is <code>(row, col, walls_left)</code>: the same cell reached with more removals left is a different, better state.</p>
+<pre><code class="language-python">def shortest_path_with_removals(grid, k):
+    rows, cols = len(grid), len(grid[0])
+    if k &gt;= rows + cols - 2:                    # enough removals to walk straight there
+        return rows + cols - 2
+    start = (0, 0, k)
+    seen, q = {start}, deque([(start, 0)])
+    while q:
+        (r, c, left), dist = q.popleft()
+        if (r, c) == (rows - 1, cols - 1):
+            return dist
+        for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+            if 0 &lt;= nr &lt; rows and 0 &lt;= nc &lt; cols:
+                state = (nr, nc, left - grid[nr][nc])
+                if state[2] &gt;= 0 and state not in seen:
+                    seen.add(state)
+                    q.append((state, dist + 1))
+    return -1
+
+
+assert shortest_path_with_removals([[0, 0, 0], [1, 1, 0], [0, 0, 0], [0, 1, 1], [0, 0, 0]], 1) == 6
+assert shortest_path_with_removals([[0, 1, 1], [1, 1, 1], [1, 0, 0]], 1) == -1</code></pre>
+<p>The state space is \(rows \times cols \times (k+1)\), and BFS visits each state once.</p>
+<h2 id="0-1-bfs-two-edge-costs">0-1 BFS: two edge costs</h2>
+<p>If edges cost either 0 or 1, a deque replaces Dijkstra's heap: push 0-cost neighbors to the <b>front</b> and 1-cost ones to the back, and nodes still come out in distance order. <a href="https://leetcode.com/problems/minimum-cost-to-make-at-least-one-valid-path-in-a-grid/">1368. Minimum Cost to Make at Least One Valid Path in a Grid</a>: following a cell's arrow is free, going any other way costs 1.</p>
+<pre><code class="language-python">def min_cost(grid):
+    rows, cols = len(grid), len(grid[0])
+    moves = {1: (0, 1), 2: (0, -1), 3: (1, 0), 4: (-1, 0)}
+    dist = [[float("inf")] * cols for _ in range(rows)]
+    dist[0][0], dq = 0, deque([(0, 0)])
+    while dq:
+        r, c = dq.popleft()
+        for sign, (dr, dc) in moves.items():
+            nr, nc = r + dr, c + dc
+            cost = 0 if grid[r][c] == sign else 1
+            if 0 &lt;= nr &lt; rows and 0 &lt;= nc &lt; cols and dist[r][c] + cost &lt; dist[nr][nc]:
+                dist[nr][nc] = dist[r][c] + cost
+                if cost == 0:
+                    dq.appendleft((nr, nc))
+                else:
+                    dq.append((nr, nc))
+    return dist[-1][-1]
+
+
+assert min_cost([[1, 1, 1, 1], [2, 2, 2, 2], [1, 1, 1, 1], [2, 2, 2, 2]]) == 3
+assert min_cost([[1, 1, 3], [3, 2, 2], [1, 1, 4]]) == 0</code></pre>
+<h2 id="bidirectional-bfs">Bidirectional BFS</h2>
+<p>With branching factor \(b\) and answer depth \(L\), BFS explores about \(b^L\) nodes. Searching from both ends and stopping when the frontiers meet explores about \(2 b^{L/2}\), an enormous saving. Always expand the <b>smaller</b> frontier. <a href="https://leetcode.com/problems/word-ladder/">127. Word Ladder</a>: words are nodes, one changed letter is an edge, and wildcard patterns like <code>h*t</code> index the neighbors.</p>
+<pre><code class="language-python">from collections import defaultdict
+
+
+def ladder_length(begin, end, word_list):
+    words = set(word_list)
+    if end not in words:
+        return 0
+    buckets = defaultdict(list)
+    for w in words | {begin}:
+        for i in range(len(w)):
+            buckets[w[:i] + "*" + w[i + 1:]].append(w)
+    front, back, seen, length = {begin}, {end}, {begin, end}, 1
+    while front and back:
+        if len(front) &gt; len(back):
+            front, back = back, front           # expand the smaller side
+        length += 1
+        nxt = set()
+        for w in front:
+            for i in range(len(w)):
+                for nb in buckets[w[:i] + "*" + w[i + 1:]]:
+                    if nb in back:
+                        return length
+                    if nb not in seen:
+                        seen.add(nb)
+                        nxt.add(nb)
+        front = nxt
+    return 0
+
+
+assert ladder_length("hit", "cog", ["hot", "dot", "dog", "lot", "log", "cog"]) == 5
+assert ladder_length("hit", "cog", ["hot", "dot", "dog", "lot", "log"]) == 0</code></pre>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/minimum-jumps-to-reach-home/">1654. Minimum Jumps to Reach Home</a></li><li><a href="https://leetcode.com/problems/parallel-courses-ii/">1494. Parallel Courses II</a> (BFS over bitmask states)</li><li><a href="https://leetcode.com/problems/open-the-lock/">752. Open the Lock</a></li><li><a href="https://leetcode.com/problems/path-with-maximum-minimum-value/">1102. Path With Maximum Minimum Value</a></li><li><a href="https://leetcode.com/problems/minimum-obstacle-removal-to-reach-corner/">2290. Minimum Obstacle Removal to Reach Corner</a> (0-1 BFS)</li></ul>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

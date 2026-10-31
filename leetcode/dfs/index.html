@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DFS: reachability, components and connectivity · r03922123</title>
+<meta name="description" content="Depth-first search as the tool for &quot;what can I reach?&quot;. An iterative template, counting components, testing whether a directed graph is strongly connected with one reversed pass, and finding bridges with low-link values.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Graphs</p>
+<header class="post-head">
+  <h1>DFS: reachability, components and connectivity</h1>
+  <div class="meta">October 31, 2026 · 3 min read · DFS · connectivity · graphs</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#an-iterative-template">An iterative template</a></li><li><a href="#counting-components">Counting components</a></li><li><a href="#is-a-directed-graph-strongly-connected">Is a directed graph strongly connected?</a></li><li><a href="#bridges-edges-whose-removal-disconnects-the-graph">Bridges: edges whose removal disconnects the graph</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Depth-first search follows one path as far as it goes before backing up. It does not find shortest paths (that is <a href="../bfs/">BFS</a>), but it answers <b>reachability</b> questions: what can I reach from here, is everything connected, which edges are essential. Its other gift is structure: the order in which DFS finishes nodes underlies topological sorting, strongly connected components and bridges.</p>
+<h2 id="an-iterative-template">An iterative template</h2>
+<p>Recursion is the natural way to write DFS, but Python's recursion limit (1000 by default) makes it fragile on large graphs. An explicit stack has no such limit.</p>
+<pre><code class="language-python">def reachable(graph, start):
+    seen, stack = {start}, [start]
+    while stack:
+        node = stack.pop()
+        for nb in graph.get(node, ()):
+            if nb not in seen:
+                seen.add(nb)
+                stack.append(nb)
+    return seen
+
+
+g = {0: [1], 1: [2], 2: [0], 3: [2]}
+assert reachable(g, 0) == {0, 1, 2}
+assert reachable(g, 3) == {0, 1, 2, 3}</code></pre>
+<h2 id="counting-components">Counting components</h2>
+<p>Start a DFS from every node not yet seen; each start finds one component. <a href="https://leetcode.com/problems/number-of-islands/">200. Number of Islands</a>:</p>
+<pre><code class="language-python">def num_islands(grid):
+    rows, cols = len(grid), len(grid[0])
+    seen, count = set(), 0
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == "1" and (r, c) not in seen:
+                count += 1
+                seen.add((r, c))
+                stack = [(r, c)]
+                while stack:
+                    cr, cc = stack.pop()
+                    for nr, nc in ((cr + 1, cc), (cr - 1, cc), (cr, cc + 1), (cr, cc - 1)):
+                        if 0 &lt;= nr &lt; rows and 0 &lt;= nc &lt; cols and grid[nr][nc] == "1" and (nr, nc) not in seen:
+                            seen.add((nr, nc))
+                            stack.append((nr, nc))
+    return count
+
+
+assert num_islands(["11000", "11000", "00100", "00011"]) == 3</code></pre>
+<p>For components that grow over time, <a href="../union-find/">union–find</a> is the better tool.</p>
+<h2 id="is-a-directed-graph-strongly-connected">Is a directed graph strongly connected?</h2>
+<p>In an undirected graph, one DFS from any node that reaches everything proves the graph connected. A directed graph needs more: every node must reach every other. Two passes suffice. From any node \(s\), DFS must reach every node (so \(s\) reaches all); then DFS on the graph with <b>every edge reversed</b> must also reach every node (so all reach \(s\)). Any \(u\) can then reach any \(v\) through \(s\).</p>
+<pre><code class="language-python">def strongly_connected(n, edges):
+    forward, backward = {}, {}
+    for a, b in edges:
+        forward.setdefault(a, []).append(b)
+        backward.setdefault(b, []).append(a)
+    return len(reachable(forward, 0)) == n and len(reachable(backward, 0)) == n
+
+
+assert strongly_connected(3, [(0, 1), (1, 2), (2, 0)])
+assert not strongly_connected(3, [(0, 1), (1, 2)])</code></pre>
+<h2 id="bridges-edges-whose-removal-disconnects-the-graph">Bridges: edges whose removal disconnects the graph</h2>
+<p><a href="https://leetcode.com/problems/critical-connections-in-a-network/">1192. Critical Connections in a Network</a>. Number nodes in DFS order (<code>disc</code>), and let <code>low[v]</code> be the smallest number reachable from <code>v</code>'s subtree using at most one non-tree edge. A tree edge <code>(u, v)</code> is a bridge exactly when <code>low[v] &gt; disc[u]</code>: nothing under <code>v</code> can get back to <code>u</code> or above without it. The iterative version keeps, for each stack frame, an iterator over the remaining neighbors.</p>
+<pre><code class="language-python">def critical_connections(n, connections):
+    graph = [[] for _ in range(n)]
+    for a, b in connections:
+        graph[a].append(b)
+        graph[b].append(a)
+    disc, low, bridges, clock = [-1] * n, [0] * n, [], 0
+    for root in range(n):
+        if disc[root] != -1:
+            continue
+        disc[root] = low[root] = clock
+        clock += 1
+        stack = [(root, -1, iter(graph[root]))]
+        while stack:
+            node, parent, it = stack[-1]
+            nb = next(it, None)
+            if nb is None:                      # node finished: report to its parent
+                stack.pop()
+                if parent != -1:
+                    low[parent] = min(low[parent], low[node])
+                    if low[node] &gt; disc[parent]:
+                        bridges.append(sorted((parent, node)))
+            elif nb == parent:
+                continue
+            elif disc[nb] == -1:                # tree edge: descend
+                disc[nb] = low[nb] = clock
+                clock += 1
+                stack.append((nb, node, iter(graph[nb])))
+            else:                               # back edge
+                low[node] = min(low[node], disc[nb])
+    return sorted(bridges)
+
+
+def brute(n, connections):
+    out = []
+    for skip in connections:
+        rest = {}
+        for e in connections:
+            if e is not skip:
+                rest.setdefault(e[0], []).append(e[1])
+                rest.setdefault(e[1], []).append(e[0])
+        if len(reachable(rest, 0)) &lt; n:
+            out.append(sorted(skip))
+    return sorted(out)
+
+
+assert critical_connections(4, [[0, 1], [1, 2], [2, 0], [1, 3]]) == [[1, 3]]
+import random
+for _ in range(200):
+    n = random.randint(2, 7)
+    edges = [[i, random.randrange(i)] for i in range(1, n)]          # a random tree keeps it connected
+    edges += [list(e) for e in {tuple(sorted(random.sample(range(n), 2))) for _ in range(random.randint(0, 4))}
+              if list(e) not in edges and list(e)[::-1] not in edges]
+    assert critical_connections(n, edges) == brute(n, edges)</code></pre>
+<p><code>skip</code> is a parent <b>node</b>, which is wrong for graphs with parallel edges; LeetCode's inputs have none.</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/shortest-path-in-a-hidden-grid/">1778. Shortest Path in a Hidden Grid</a> (DFS to map, BFS to measure)</li><li><a href="https://leetcode.com/problems/count-ways-to-build-rooms-in-an-ant-colony/">1916. Count Ways to Build Rooms in an Ant Colony</a></li><li><a href="https://leetcode.com/problems/tiling-a-rectangle-with-the-fewest-squares/">1240. Tiling a Rectangle with the Fewest Squares</a> (DFS with pruning)</li><li><a href="https://leetcode.com/problems/minimum-cost-to-make-at-least-one-valid-path-in-a-grid/">1368. Minimum Cost to Make at Least One Valid Path in a Grid</a></li><li><a href="https://leetcode.com/problems/path-with-maximum-minimum-value/">1102. Path With Maximum Minimum Value</a></li></ul>
+<p>Bridge finding with low-link values is due to R. E. Tarjan, "A note on finding the bridges of a graph" (1974).</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

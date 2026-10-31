@@ -23,7 +23,7 @@
 <main>
 <section class="intro">
   <h1>LeetCode patterns</h1>
-  <p>20 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
+  <p>23 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
   asserts pass.</p>
 </section>
@@ -58,6 +58,12 @@
   <li><a href="trie/">Tries: prefix trees for word search and autocomplete</a><span>A tree keyed by characters, where every path from the root spells a prefix. Insert and search in O(word length), then the two places tries pay off — searching a grid for many words at once, and top-k autocomplete.</span></li>
   <li><a href="segment-tree/">Range queries: Fenwick trees, segment trees, lazy propagation</a><span>Three structures for arrays that change while you query them. A Fenwick tree for prefix sums, an iterative segment tree for any associative operation, and lazy propagation for updating whole ranges, each checked against brute force.</span></li>
   <li><a href="union-find/">Union–find: merging groups in nearly constant time</a><span>A forest of parent pointers that merges sets and answers "same group?" in amortized near-O(1). Path halving and union by size, then connectivity, cycle detection, and processing events in reverse.</span></li>
+</ul>
+<h2 id="graphs">Graphs</h2>
+<ul class="series">
+  <li><a href="bfs/">BFS: shortest paths by layers, and from both ends</a><span>Breadth-first search finds shortest paths when every step costs the same. The layer-by-layer template, BFS over a state space larger than the grid, 0-1 BFS for two edge costs, and bidirectional search.</span></li>
+  <li><a href="dfs/">DFS: reachability, components and connectivity</a><span>Depth-first search as the tool for "what can I reach?". An iterative template, counting components, testing whether a directed graph is strongly connected with one reversed pass, and finding bridges with low-link values.</span></li>
+  <li><a href="dijkstra/">Dijkstra's algorithm, three ways</a><span>Single-source shortest paths with non-negative weights. Why settling the closest node is safe, the heap version with lazy deletion, the O(n²) array version for dense graphs, and variants that change what "distance" means.</span></li>
 </ul>
 </main>
 <footer>Personal site. Not affiliated with any company.</footer>
