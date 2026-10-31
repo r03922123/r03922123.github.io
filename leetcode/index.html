@@ -23,7 +23,7 @@
 <main>
 <section class="intro">
   <h1>LeetCode patterns</h1>
-  <p>16 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
+  <p>20 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
   asserts pass.</p>
 </section>
@@ -51,6 +51,13 @@
   <li><a href="monotonic-queue/">Monotonic queue: the window maximum in O(1)</a><span>A deque kept in sorted order gives the maximum of a sliding window at every step in amortized O(1). Sliding window maximum, then the harder use, shortest subarray with sum at least k over prefix sums.</span></li>
   <li><a href="heap/">Heaps: from an array to four patterns</a><span>A binary heap built from scratch on a plain list, then the four ways heaps show up in problems — top k, two heaps for a running median, greedy with a heap of options, and k-way merging.</span></li>
   <li><a href="hash-table/">Hash tables from scratch: chaining, hash functions, resizing</a><span>Build a hash map with separate chaining. The division, multiplication and universal hash functions, an operator-precedence bug that quietly changes which bits you keep, and why doubling keeps operations O(1) on average.</span></li>
+</ul>
+<h2 id="trees-and-range-queries">Trees and range queries</h2>
+<ul class="series">
+  <li><a href="tree-traversal/">Binary tree traversal without recursion</a><span>Preorder, inorder and postorder with an explicit stack, one template that does all three, Morris traversal in O(1) space, and the traversals behind validating a BST and vertical order.</span></li>
+  <li><a href="trie/">Tries: prefix trees for word search and autocomplete</a><span>A tree keyed by characters, where every path from the root spells a prefix. Insert and search in O(word length), then the two places tries pay off — searching a grid for many words at once, and top-k autocomplete.</span></li>
+  <li><a href="segment-tree/">Range queries: Fenwick trees, segment trees, lazy propagation</a><span>Three structures for arrays that change while you query them. A Fenwick tree for prefix sums, an iterative segment tree for any associative operation, and lazy propagation for updating whole ranges, each checked against brute force.</span></li>
+  <li><a href="union-find/">Union–find: merging groups in nearly constant time</a><span>A forest of parent pointers that merges sets and answers "same group?" in amortized near-O(1). Path halving and union by size, then connectivity, cycle detection, and processing events in reverse.</span></li>
 </ul>
 </main>
 <footer>Personal site. Not affiliated with any company.</footer>

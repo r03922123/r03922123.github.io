@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary tree traversal without recursion · r03922123</title>
+<meta name="description" content="Preorder, inorder and postorder with an explicit stack, one template that does all three, Morris traversal in O(1) space, and the traversals behind validating a BST and vertical order.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Trees and range queries</p>
+<header class="post-head">
+  <h1>Binary tree traversal without recursion</h1>
+  <div class="meta">October 31, 2026 · 4 min read · trees · stack · traversal</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#preorder-root-left-right">Preorder: root, left, right</a></li><li><a href="#inorder-left-root-right">Inorder: left, root, right</a></li><li><a href="#postorder-and-one-template-for-all-three">Postorder, and one template for all three</a></li><li><a href="#morris-inorder-in-o-1-space">Morris inorder in O(1) space</a></li><li><a href="#applications">Applications</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Recursive tree traversal is three lines. The iterative versions matter because recursion depth equals tree height, and a degenerate tree of \(10^5\) nodes overflows Python's default recursion limit. They also make the order of visits explicit, which is what most tree problems are really about.</p>
+<p>The examples share a small helper that builds a tree from LeetCode's level-order notation.</p>
+<pre><code class="language-python">from collections import deque, defaultdict
+
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val, self.left, self.right = val, left, right
+
+
+def build(values):                              # LeetCode level order, None for a gap
+    if not values or values[0] is None:
+        return None
+    root = TreeNode(values[0])
+    q, i = deque([root]), 1
+    while q and i &lt; len(values):
+        node = q.popleft()
+        for side in ("left", "right"):
+            if i &lt; len(values) and values[i] is not None:
+                setattr(node, side, TreeNode(values[i]))
+                q.append(getattr(node, side))
+            i += 1
+    return root
+
+
+tree = build([1, 2, 3, 4, 5, None, 6])          #       1
+                                                #     2   3
+                                                #    4 5    6</code></pre>
+<h2 id="preorder-root-left-right">Preorder: root, left, right</h2>
+<p>Pop a node, visit it, push its right child then its left child, so the left is popped first.</p>
+<pre><code class="language-python">def preorder(root):
+    out, stack = [], [root] if root else []
+    while stack:
+        node = stack.pop()
+        out.append(node.val)
+        if node.right:
+            stack.append(node.right)
+        if node.left:
+            stack.append(node.left)
+    return out
+
+
+assert preorder(tree) == [1, 2, 4, 5, 3, 6]</code></pre>
+<h2 id="inorder-left-root-right">Inorder: left, root, right</h2>
+<p>Walk left as far as possible, pushing every node on the way. When you cannot go further, pop: that node's left subtree is done, so visit it and continue from its right child.</p>
+<pre><code class="language-python">def inorder(root):
+    out, stack, node = [], [], root
+    while node or stack:
+        while node:                             # descend left, remembering the path
+            stack.append(node)
+            node = node.left
+        node = stack.pop()
+        out.append(node.val)
+        node = node.right
+    return out
+
+
+assert inorder(tree) == [4, 2, 5, 1, 3, 6]</code></pre>
+<h2 id="postorder-and-one-template-for-all-three">Postorder, and one template for all three</h2>
+<p>Postorder is hardest because a node is visited after <b>both</b> children. The cleanest general fix is to push each node twice: once to expand it, once flagged as ready to visit. Changing the push order gives any of the three orders.</p>
+<pre><code class="language-python">def traverse(root, order):
+    out, stack = [], [(root, False)]
+    while stack:
+        node, ready = stack.pop()
+        if not node:
+            continue
+        if ready:
+            out.append(node.val)
+            continue
+        steps = {"pre": [(node.right, False), (node.left, False), (node, True)],
+                 "in": [(node.right, False), (node, True), (node.left, False)],
+                 "post": [(node, True), (node.right, False), (node.left, False)]}[order]
+        stack.extend(steps)                     # pushed in reverse of the visit order
+    return out
+
+
+assert traverse(tree, "pre") == preorder(tree)
+assert traverse(tree, "in") == inorder(tree)
+assert traverse(tree, "post") == [4, 5, 2, 6, 3, 1]</code></pre>
+<h2 id="morris-inorder-in-o-1-space">Morris inorder in O(1) space</h2>
+<p>The stack versions use \(O(h)\) memory. Morris traversal uses none, by temporarily threading the tree: before descending into a left subtree, point its rightmost node back at the current node, so you can return without a stack. When you arrive back through the thread, remove it.</p>
+<pre><code class="language-python">def morris_inorder(root):
+    out, node = [], root
+    while node:
+        if not node.left:
+            out.append(node.val)
+            node = node.right
+            continue
+        pred = node.left                        # rightmost node of the left subtree
+        while pred.right and pred.right is not node:
+            pred = pred.right
+        if pred.right is None:                  # first visit: thread back and go left
+            pred.right = node
+            node = node.left
+        else:                                   # returned via the thread: unthread, visit, go right
+            pred.right = None
+            out.append(node.val)
+            node = node.right
+    return out
+
+
+assert morris_inorder(tree) == inorder(tree)
+assert preorder(tree) == [1, 2, 4, 5, 3, 6]     # the tree is restored afterwards</code></pre>
+<p>Each edge is walked at most a constant number of times, so it is still \(O(n)\).</p>
+<h2 id="applications">Applications</h2>
+<p><b>Validate a binary search tree</b> (<a href="https://leetcode.com/problems/validate-binary-search-tree/">98</a>): an inorder traversal of a BST is strictly increasing, so check each value against the previous one.</p>
+<pre><code class="language-python">def is_valid_bst(root):
+    prev, stack, node = None, [], root
+    while node or stack:
+        while node:
+            stack.append(node)
+            node = node.left
+        node = stack.pop()
+        if prev is not None and node.val &lt;= prev:
+            return False
+        prev, node = node.val, node.right
+    return True
+
+
+assert is_valid_bst(build([2, 1, 3]))
+assert not is_valid_bst(build([5, 1, 4, None, None, 3, 6]))</code></pre>
+<p><b>Vertical order</b> (<a href="https://leetcode.com/problems/vertical-order-traversal-of-a-binary-tree/">987</a>): give each node a (row, column), with children at column ±1. Collect by column, then sort each column by row and value, as the problem requires for ties.</p>
+<pre><code class="language-python">def vertical_traversal(root):
+    columns, q = defaultdict(list), deque([(root, 0, 0)])
+    while q:
+        node, row, col = q.popleft()
+        if node:
+            columns[col].append((row, node.val))
+            q.append((node.left, row + 1, col - 1))
+            q.append((node.right, row + 1, col + 1))
+    return [[v for _, v in sorted(columns[c])] for c in sorted(columns)]
+
+
+assert vertical_traversal(build([3, 9, 20, None, None, 15, 7])) == [[9], [3, 15], [20], [7]]
+assert vertical_traversal(build([1, 2, 3, 4, 6, 5, 7])) == [[4], [2], [1, 5, 6], [3], [7]]</code></pre>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/flatten-binary-tree-to-linked-list/">114. Flatten Binary Tree to Linked List</a> (Morris-style threading)</li><li><a href="https://leetcode.com/problems/binary-search-tree-iterator/">173. Binary Search Tree Iterator</a> (the inorder loop, paused)</li><li><a href="https://leetcode.com/problems/recover-binary-search-tree/">99. Recover Binary Search Tree</a></li><li><a href="https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-tree/">236. Lowest Common Ancestor of a Binary Tree</a></li><li><a href="https://leetcode.com/problems/binary-tree-maximum-path-sum/">124. Binary Tree Maximum Path Sum</a></li></ul>
+<p>Morris traversal is from J. M. Morris, "Traversing binary trees simply and cheaply" (1979).</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

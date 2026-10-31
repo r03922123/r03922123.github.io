@@ -66,7 +66,7 @@ for _ in range(400):
     assert reverse_pairs(xs) == brute(xs)</code></pre>
 <p>The counting pass is separate from the merge because the condition (<code>&gt; 2x</code>) is not the sort order. For plain inversions they coincide and you can count inside the merge.</p>
 <h2 id="a-sorted-structure-over-the-prefix">A sorted structure over the prefix</h2>
-<p>Alternatively, scan left to right and keep every earlier value in a sorted list; for each new value, binary search how many earlier values pair with it. With a plain Python list, insertion is \(O(n)\), so this is only fast with a balanced structure, such as <code>sortedcontainers.SortedList</code> (available on LeetCode) or a Fenwick tree over compressed values. Here is the shape with the standard library, correct but quadratic in the worst case because of <code>insort</code>:</p>
+<p>Alternatively, scan left to right and keep every earlier value in a sorted list; for each new value, binary search how many earlier values pair with it. With a plain Python list, insertion is \(O(n)\), so this is only fast with a balanced structure, such as <code>sortedcontainers.SortedList</code> (available on LeetCode) or a <a href="../segment-tree/">Fenwick tree</a> over compressed values. Here is the shape with the standard library, correct but quadratic in the worst case because of <code>insort</code>:</p>
 <pre><code class="language-python">from bisect import bisect_right, insort
 
 

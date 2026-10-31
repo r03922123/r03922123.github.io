@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Union–find: merging groups in nearly constant time · r03922123</title>
+<meta name="description" content="A forest of parent pointers that merges sets and answers &quot;same group?&quot; in amortized near-O(1). Path halving and union by size, then connectivity, cycle detection, and processing events in reverse.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Trees and range queries</p>
+<header class="post-head">
+  <h1>Union–find: merging groups in nearly constant time</h1>
+  <div class="meta">October 31, 2026 · 3 min read · union find · disjoint sets · graphs</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#the-structure">The structure</a></li><li><a href="#counting-components">Counting components</a></li><li><a href="#detecting-a-cycle">Detecting a cycle</a></li><li><a href="#running-time-backwards">Running time backwards</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Union–find (a disjoint-set forest) maintains a partition of items into groups under two operations: <b>union</b> two groups, and <b>find</b> which group an item is in. It cannot split groups, but it does the two things it does almost in constant time, which makes it the tool for incremental connectivity.</p>
+<h2 id="the-structure">The structure</h2>
+<p>Each item points to a parent; a group is a tree, identified by its root. Two refinements keep the trees flat:</p>
+<ul><li><b>Union by size:</b> hang the smaller tree under the larger, so a tree of size \(s\) has height at most \(\log_2 s\).</li><li><b>Path halving:</b> during <code>find</code>, point every other node on the path at its grandparent, flattening the path for next time.</li></ul>
+<p>Together they give an amortized cost of \(O(\alpha(n))\) per operation, where \(\alpha\) is the inverse Ackermann function, below 5 for any \(n\) that fits in the universe.</p>
+<pre><code class="language-python">class UnionFind:
+    def __init__(self, n):
+        self.parent = list(range(n))
+        self.size = [1] * n
+        self.groups = n
+
+    def find(self, x):
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]   # path halving
+            x = self.parent[x]
+        return x
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra == rb:
+            return False                        # already in the same group
+        if self.size[ra] &lt; self.size[rb]:
+            ra, rb = rb, ra
+        self.parent[rb] = ra                    # smaller tree under the larger
+        self.size[ra] += self.size[rb]
+        self.groups -= 1
+        return True
+
+
+import random
+n = 200
+uf, label = UnionFind(n), list(range(n))        # label: a naive reference partition
+for _ in range(400):
+    a, b = random.randrange(n), random.randrange(n)
+    uf.union(a, b)
+    la, lb = label[a], label[b]
+    label = [la if x == lb else x for x in label]
+    x, y = random.randrange(n), random.randrange(n)
+    assert (uf.find(x) == uf.find(y)) == (label[x] == label[y])
+assert uf.groups == len(set(label))</code></pre>
+<p><code>union</code> returning whether it merged anything is the trick behind the next two problems.</p>
+<h2 id="counting-components">Counting components</h2>
+<p><a href="https://leetcode.com/problems/number-of-provinces/">547. Number of Provinces</a>: union every connected pair; the remaining group count is the answer.</p>
+<pre><code class="language-python">def find_circle_num(is_connected):
+    n = len(is_connected)
+    uf = UnionFind(n)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if is_connected[i][j]:
+                uf.union(i, j)
+    return uf.groups
+
+
+assert find_circle_num([[1, 1, 0], [1, 1, 0], [0, 0, 1]]) == 2
+assert find_circle_num([[1, 0, 0], [0, 1, 0], [0, 0, 1]]) == 3</code></pre>
+<h2 id="detecting-a-cycle">Detecting a cycle</h2>
+<p><a href="https://leetcode.com/problems/redundant-connection/">684. Redundant Connection</a>: adding edges one by one, the first edge whose endpoints are already connected closes a cycle. That is exactly when <code>union</code> returns <code>False</code>. Kruskal's minimum spanning tree uses the same test to skip edges (see graphs).</p>
+<pre><code class="language-python">def find_redundant_connection(edges):
+    uf = UnionFind(len(edges) + 1)
+    for a, b in edges:
+        if not uf.union(a, b):
+            return [a, b]
+
+
+assert find_redundant_connection([[1, 2], [1, 3], [2, 3]]) == [2, 3]
+assert find_redundant_connection([[1, 2], [2, 3], [3, 4], [1, 4], [1, 5]]) == [1, 4]</code></pre>
+<h2 id="running-time-backwards">Running time backwards</h2>
+<p>Union–find cannot delete. When a problem <b>removes</b> things over time, reverse it: start from the final state and add them back. <a href="https://leetcode.com/problems/last-day-where-you-can-still-cross/">1970. Last Day Where You Can Still Cross</a> floods one cell per day and asks for the last day you can walk from the top row to the bottom row. Backwards, it un-floods cells one by one; the first moment two virtual nodes, <code>TOP</code> and <code>BOTTOM</code>, become connected answers the question.</p>
+<pre><code class="language-python">def latest_day_to_cross(row, col, cells):
+    TOP, BOTTOM = row * col, row * col + 1
+    uf, land = UnionFind(row * col + 2), [[False] * col for _ in range(row)]
+    for day in range(len(cells) - 1, -1, -1):
+        r, c = cells[day][0] - 1, cells[day][1] - 1
+        land[r][c] = True
+        cell = r * col + c
+        if r == 0:
+            uf.union(cell, TOP)
+        if r == row - 1:
+            uf.union(cell, BOTTOM)
+        for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+            if 0 &lt;= nr &lt; row and 0 &lt;= nc &lt; col and land[nr][nc]:
+                uf.union(cell, nr * col + nc)
+        if uf.find(TOP) == uf.find(BOTTOM):
+            return day                          # cells[day] is still water on that day
+    return 0
+
+
+assert latest_day_to_cross(2, 2, [[1, 1], [2, 1], [1, 2], [2, 2]]) == 2
+assert latest_day_to_cross(2, 2, [[1, 1], [1, 2], [2, 1], [2, 2]]) == 1
+assert latest_day_to_cross(3, 3, [[1, 2], [2, 1], [3, 3], [2, 2], [1, 1], [1, 3], [2, 3], [3, 2], [3, 1]]) == 3</code></pre>
+<p>Forward, the same problem is a <a href="../binary-search/">binary search</a> over days with a BFS per check, \(O(rc \log(rc))\); backwards with union–find it is one pass.</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/maximum-segment-sum-after-removals/">2382. Maximum Segment Sum After Removals</a> (reverse time again)</li><li><a href="https://leetcode.com/problems/find-all-people-with-secret/">2092. Find All People With Secret</a></li><li><a href="https://leetcode.com/problems/path-with-maximum-minimum-value/">1102. Path With Maximum Minimum Value</a></li><li><a href="https://leetcode.com/problems/rank-transform-of-a-matrix/">1632. Rank Transform of a Matrix</a></li><li><a href="https://leetcode.com/problems/accounts-merge/">721. Accounts Merge</a></li></ul>
+<p>The \(O(\alpha(n))\) bound is due to R. E. Tarjan, "Efficiency of a Good But Not Linear Set Union Algorithm" (1975).</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>
