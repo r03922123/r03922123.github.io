@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rolling hash (Rabin–Karp) · r03922123</title>
 <meta name="description" content="Hash every length-m window of a string in O(1) per step by sliding a polynomial hash. Substring search, then the real use, comparing many substrings at once, with binary search on length.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -18,7 +19,7 @@
 <div class="wrap">
 <header class="site">
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="page">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
 </header>
 <main>
 <article class="post-body">
@@ -27,7 +28,7 @@
   <h1>Rolling hash (Rabin–Karp)</h1>
   <div class="meta">October 31, 2026 · 3 min read · hashing · strings · binary search</div>
 </header>
-<nav class="toc"><h2>Contents</h2><ol><li><a href="#the-polynomial-hash">The polynomial hash</a></li><li><a href="#substring-search">Substring search</a></li><li><a href="#where-it-shines-many-substrings-at-once">Where it shines: many substrings at once</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-polynomial-hash">The polynomial hash</a></li><li><a href="#substring-search">Substring search</a></li><li><a href="#where-it-shines-many-substrings-at-once">Where it shines: many substrings at once</a></li><li><a href="#practice">Practice</a></li></ol></nav>
 <p>Comparing two strings of length \(m\) costs \(O(m)\). A rolling hash makes comparing two <b>substrings</b> cost \(O(1)\), after \(O(n)\) preprocessing, by giving every window a number that can be updated as the window slides. Equal strings always have equal hashes; unequal ones collide only with small probability, and a collision can be ruled out with a direct comparison.</p>
 <h2 id="the-polynomial-hash">The polynomial hash</h2>
 <p>Treat the string as digits in base \(B\), modulo a large prime \(M\):</p>

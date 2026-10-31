@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spanning trees, Euler paths and matchings · r03922123</title>
 <meta name="description" content="Three classic graph algorithms beyond shortest paths. Minimum spanning trees from the cut and cycle properties (Kruskal, Prim, and the O(n²) dense Prim), Hierholzer&#x27;s algorithm for Euler paths, and Kuhn&#x27;s augmenting paths for bipartite matching.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -18,7 +19,7 @@
 <div class="wrap">
 <header class="site">
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="page">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
 </header>
 <main>
 <article class="post-body">
@@ -27,7 +28,7 @@
   <h1>Spanning trees, Euler paths and matchings</h1>
   <div class="meta">October 31, 2026 · 12 min read · minimum spanning tree · Euler path · bipartite matching</div>
 </header>
-<nav class="toc"><h2>Contents</h2><ol><li><a href="#minimum-spanning-trees">Minimum spanning trees</a></li><li><a href="#euler-paths-every-edge-exactly-once">Euler paths: every edge exactly once</a></li><li><a href="#bipartite-matching-with-augmenting-paths">Bipartite matching with augmenting paths</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#minimum-spanning-trees">Minimum spanning trees</a></li><li><a href="#euler-paths-every-edge-exactly-once">Euler paths: every edge exactly once</a></li><li><a href="#bipartite-matching-with-augmenting-paths">Bipartite matching with augmenting paths</a></li><li><a href="#practice">Practice</a></li></ol></nav>
 <p>Shortest paths get their own posts (<a href="../bfs/">BFS</a>, <a href="../dijkstra/">Dijkstra</a>, <a href="../shortest-paths/">the rest</a>). This one collects three other questions that come up again and again on graphs, each with a short, greedy-looking algorithm whose correctness rests on one clean idea:</p>
 <ul><li><b>Minimum spanning tree:</b> the cheapest set of edges that connects every node. The idea is the cut property.</li><li><b>Euler path:</b> a walk that uses every edge exactly once. The idea is that you can splice detours into a path after the fact.</li><li><b>Bipartite matching:</b> the largest set of pairs with nobody in two pairs. The idea is the augmenting path.</li></ul>
 <h2 id="minimum-spanning-trees">Minimum spanning trees</h2>

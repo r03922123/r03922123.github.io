@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Topological sort: ordering a DAG · r03922123</title>
 <meta name="description" content="Why a directed graph can be lined up so every edge points forward exactly when it has no cycle, then the two standard algorithms (Kahn&#x27;s queue of ready nodes and DFS finishing order), each detecting cycles for free, and two harder uses: two-level ordering and longest paths in a DAG.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -18,7 +19,7 @@
 <div class="wrap">
 <header class="site">
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="page">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
 </header>
 <main>
 <article class="post-body">
@@ -27,7 +28,7 @@
   <h1>Topological sort: ordering a DAG</h1>
   <div class="meta">October 31, 2026 · 10 min read · topological sort · DAG · graphs</div>
 </header>
-<nav class="toc"><h2>Contents</h2><ol><li><a href="#when-does-an-order-exist">When does an order exist?</a></li><li><a href="#kahn-s-algorithm">Kahn's algorithm</a></li><li><a href="#dfs-finishing-order">DFS finishing order</a></li><li><a href="#two-levels-of-order-1203">Two levels of order: 1203</a></li><li><a href="#longest-path-in-a-dag">Longest path in a DAG</a></li><li><a href="#peeling-leaves-of-a-tree">Peeling leaves of a tree</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#when-does-an-order-exist">When does an order exist?</a></li><li><a href="#kahn-s-algorithm">Kahn's algorithm</a></li><li><a href="#dfs-finishing-order">DFS finishing order</a></li><li><a href="#two-levels-of-order-1203">Two levels of order: 1203</a></li><li><a href="#longest-path-in-a-dag">Longest path in a DAG</a></li><li><a href="#peeling-leaves-of-a-tree">Peeling leaves of a tree</a></li><li><a href="#practice">Practice</a></li></ol></nav>
 <p>Dependencies make a directed graph: an edge \(u \to v\) says "\(u\) must come before \(v\)". A <b>topological order</b> lists the nodes so that every edge points forward. Course plans, build systems and spreadsheet recalculation all need one. This post shows when such an order exists and how to find one in linear time. Both algorithms also detect a cycle, the one case in which no order exists.</p>
 <h2 id="when-does-an-order-exist">When does an order exist?</h2>
 <p>A <b>DAG</b> is a directed graph with no directed cycle. Number the nodes \(v_1, \dots, v_n\) in some order; the order is topological if every edge \((v_i, v_j)\) has \(i &lt; j\).</p>

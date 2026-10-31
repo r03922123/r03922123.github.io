@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Text-to-music in 2026 · r03922123</title>
 <meta name="description" content="Building up text-to-music from parts: codec language models (MusicGen to HeartMuLa), reward models (CLAP to CMI-RM), and DPO alignment, with tensor shapes at every step.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -18,7 +19,7 @@
 <div class="wrap">
 <header class="site">
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/" aria-current="page">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <nav><a href="/">Desk</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
 </header>
 <main>
 <article class="post-body">
@@ -36,7 +37,7 @@ reward model, and best-of-N to DPO.</p>
 <span class="tag">[illustrative]</span> marks a number or structure chosen to explain an idea, not the model's
 actual setting. The code is shape-annotated pseudocode, not a runnable implementation.</p>
 
-<nav class="toc"><h2>Contents</h2><ol>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
   <li><a href="#parts">The parts</a></li>
   <li><a href="#models">Models: codec language models, MusicGen to HeartMuLa</a></li>
   <li><a href="#scoring">Scoring: from CLAP to reward models</a></li>
@@ -231,7 +232,8 @@ pairs:</p>
         "label": 1}               # 1 = A is better, 0 = B is better</code></pre>
 <p>The <b>Bradley–Terry model</b> assumes each clip has a hidden score \(r\), and that the chance A beats B
 depends only on the difference:</p>
-\[ P(A \succ B) = \sigma(r_A - r_B), \qquad \mathcal{L} = -\big[y \log \sigma(r_A - r_B) + (1-y) \log\big(1 - \sigma(r_A - r_B)\big)\big]. \]
+\[ P(A \succ B) = \sigma(r_A - r_B), \]
+\[ \mathcal{L} = -\big[y \log \sigma(r_A - r_B) + (1-y) \log\big(1 - \sigma(r_A - r_B)\big)\big]. \]
 <p>Equal scores give 0.5; a gap of 3 gives about 0.95. Adding a constant to every score changes nothing, so a
 reward has <b>no absolute unit and is only meaningful in comparison</b>. Section 4 depends on this.</p>
 

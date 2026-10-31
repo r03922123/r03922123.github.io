@@ -24,22 +24,25 @@ HEAD = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title} · r03922123</title>
 <meta name="description" content="{summary}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+{assets}</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="{current}">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+"""
+# Math and code rendering, only on pattern posts: the series page has neither.
+POST_ASSETS = """<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
 <script defer src="/post.js"></script>
-</head>
-<body>
-<div class="wrap">
-<header class="site">
-  <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="page">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
-</header>
-<main>
 """
 FOOT = """</main>
 <footer class="site"><svg class="skyline" viewBox="0 0 96 20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 20V8h8v12zM9 20v-8h5v8zM15 20V5h6v15zM26 20l3-11h-.6v-1h.8L30 2l.8 6h.8v1h-.6l3 11zM36 20V10h8v10zM45 20V6h4v14zM50 20v-7h8v7zM62 20l1-17 .5-3 .5 3 1 17zM67 20V9h8v11zM76 20v-6h5v6zM82 20V7h8v13zM91 20v-9h5v9z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
@@ -176,13 +179,14 @@ def build(site, slug):
     words = len(re.sub(r"<[^>]+>", " ", content).split())
     minutes = max(1, round(words / 230))
     toc_html = "".join(f'<li><a href="#{h}">{inline(t)}</a></li>' for h, t in toc)
-    page = HEAD.format(title=html.escape(meta["title"]), summary=html.escape(meta["summary"])) + f"""<article class="post-body">
+    page = HEAD.format(title=html.escape(meta["title"]), summary=html.escape(meta["summary"]),
+                       assets=POST_ASSETS, current="true") + f"""<article class="post-body">
 <p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · {html.escape(meta["group"])}</p>
 <header class="post-head">
   <h1>{inline(meta["title"])}</h1>
   <div class="meta">{DATE} · {minutes} min read · {html.escape(meta["tags"])}</div>
 </header>
-<nav class="toc"><h2>Contents</h2><ol>{toc_html}</ol></nav>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>{toc_html}</ol></nav>
 {content}
 </article>
 """ + FOOT
@@ -206,7 +210,8 @@ def series(site):
             continue
         lis = "\n".join(f'  <li><a href="{slug}/">{inline(m["title"])}</a><span>{inline(m["summary"])}</span></li>' for m, slug in items)
         sections.append(f'<h2 id="{slugify(group)}">{html.escape(group)}</h2>\n<ul class="series">\n{lis}\n</ul>')
-    page = HEAD.format(title="LeetCode patterns", summary="Short posts on the algorithm patterns behind LeetCode problems: the idea, a reusable Python template, worked problems and practice links.") + f"""<section class="intro">
+    page = HEAD.format(title="LeetCode patterns", summary="Short posts on the algorithm patterns behind LeetCode problems: the idea, a reusable Python template, worked problems and practice links.",
+                       assets="", current="page") + f"""<section class="intro">
   <h1>LeetCode patterns</h1>
   <p>{len(posts)} short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its

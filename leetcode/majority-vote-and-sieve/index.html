@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Majority vote and the sieve of Eratosthenes · r03922123</title>
 <meta name="description" content="Two small classics. Boyer–Moore voting finds a majority element in one pass and O(1) space, and generalizes to elements above n/3. The sieve finds every prime below n in O(n log log n).">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -18,7 +19,7 @@
 <div class="wrap">
 <header class="site">
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="page">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
 </header>
 <main>
 <article class="post-body">
@@ -27,7 +28,7 @@
   <h1>Majority vote and the sieve of Eratosthenes</h1>
   <div class="meta">October 31, 2026 · 3 min read · arrays · counting · number theory</div>
 </header>
-<nav class="toc"><h2>Contents</h2><ol><li><a href="#boyer-moore-majority-vote">Boyer–Moore majority vote</a></li><li><a href="#sieve-of-eratosthenes">Sieve of Eratosthenes</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#boyer-moore-majority-vote">Boyer–Moore majority vote</a></li><li><a href="#sieve-of-eratosthenes">Sieve of Eratosthenes</a></li><li><a href="#practice">Practice</a></li></ol></nav>
 <p>Two short algorithms that come up often enough to know by heart. Both replace an obvious approach (count everything, test every number) with an argument that makes most of the work unnecessary.</p>
 <h2 id="boyer-moore-majority-vote">Boyer–Moore majority vote</h2>
 <p>Given an array where one value appears more than \(n/2\) times, find it in one pass with \(O(1)\) extra space (<a href="https://leetcode.com/problems/majority-element/">169. Majority Element</a>). Keep a candidate and a counter. A matching element adds one vote, a different one cancels one. When the counter hits zero, the next element becomes the candidate.</p>

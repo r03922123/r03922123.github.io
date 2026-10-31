@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monotonic queue: the window maximum in O(1) · r03922123</title>
 <meta name="description" content="A deque kept in sorted order gives the maximum of a sliding window at every step in amortized O(1). Sliding window maximum, then the harder use, shortest subarray with sum at least k over prefix sums.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -18,7 +19,7 @@
 <div class="wrap">
 <header class="site">
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="page">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
 </header>
 <main>
 <article class="post-body">
@@ -27,7 +28,7 @@
   <h1>Monotonic queue: the window maximum in O(1)</h1>
   <div class="meta">October 31, 2026 · 3 min read · deque · sliding window · prefix sum</div>
 </header>
-<nav class="toc"><h2>Contents</h2><ol><li><a href="#why-it-works">Why it works</a></li><li><a href="#sliding-window-maximum">Sliding window maximum</a></li><li><a href="#shortest-subarray-with-sum-at-least-k">Shortest subarray with sum at least k</a></li><li><a href="#when-to-reach-for-it">When to reach for it</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-it-works">Why it works</a></li><li><a href="#sliding-window-maximum">Sliding window maximum</a></li><li><a href="#shortest-subarray-with-sum-at-least-k">Shortest subarray with sum at least k</a></li><li><a href="#when-to-reach-for-it">When to reach for it</a></li><li><a href="#practice">Practice</a></li></ol></nav>
 <p>A <a href="../monotonic-stack/">monotonic stack</a> finds the nearest larger element. Add the ability to drop elements from the <b>front</b> when they fall out of a window, and you get a monotonic queue: a deque whose values decrease from front to back, so the front is always the current window's maximum.</p>
 <h2 id="why-it-works">Why it works</h2>
 <p>When a new element arrives, every element behind it in the deque that is <b>smaller</b> can never be a window maximum again: the new element is larger and will stay in the window longer. So pop them from the back. What remains is a decreasing sequence of candidates, each of which could still be the maximum of some future window. Each index enters and leaves once, so a window of any size costs amortized \(O(1)\) per step.</p>

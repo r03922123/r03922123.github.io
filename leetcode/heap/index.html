@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Heaps: from an array to four patterns · r03922123</title>
 <meta name="description" content="A binary heap built from scratch on a plain list, then the four ways heaps show up in problems — top k, two heaps for a running median, greedy with a heap of options, and k-way merging.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
@@ -18,7 +19,7 @@
 <div class="wrap">
 <header class="site">
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="page">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <nav><a href="/">Desk</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
 </header>
 <main>
 <article class="post-body">
@@ -27,7 +28,7 @@
   <h1>Heaps: from an array to four patterns</h1>
   <div class="meta">October 31, 2026 · 4 min read · heap · priority queue · greedy</div>
 </header>
-<nav class="toc"><h2>Contents</h2><ol><li><a href="#a-heap-is-a-list">A heap is a list</a></li><li><a href="#pattern-1-top-k">Pattern 1: top k</a></li><li><a href="#pattern-2-two-heaps-for-a-running-median">Pattern 2: two heaps for a running median</a></li><li><a href="#pattern-3-greedy-with-a-heap-of-unlocked-options">Pattern 3: greedy with a heap of unlocked options</a></li><li><a href="#pattern-4-k-way-merge">Pattern 4: k-way merge</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#a-heap-is-a-list">A heap is a list</a></li><li><a href="#pattern-1-top-k">Pattern 1: top k</a></li><li><a href="#pattern-2-two-heaps-for-a-running-median">Pattern 2: two heaps for a running median</a></li><li><a href="#pattern-3-greedy-with-a-heap-of-unlocked-options">Pattern 3: greedy with a heap of unlocked options</a></li><li><a href="#pattern-4-k-way-merge">Pattern 4: k-way merge</a></li><li><a href="#practice">Practice</a></li></ol></nav>
 <p>A heap gives you the smallest item in \(O(1)\) and removes or inserts in \(O(\log n)\). That is all it does, and it is exactly what a surprising number of greedy algorithms need: "repeatedly take the best available option".</p>
 <h2 id="a-heap-is-a-list">A heap is a list</h2>
 <p>A binary min-heap is a complete binary tree stored level by level in a list, with each parent no larger than its children. With 0-based indices, the node at <code>i</code> has children <code>2i + 1</code> and <code>2i + 2</code> and parent <code>(i - 1) // 2</code>, so no pointers are needed.</p>

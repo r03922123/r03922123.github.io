@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Posts · r03922123</title>
 <meta name="description" content="Long-form technical posts on machine learning: generative audio, ranking, fine-tuning and evaluation, each with the code and numbers behind it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -48,19 +49,19 @@
 <section id="musicgen" class="group">
   <h2>MusicGen</h2>
   <p>Two posts on generating music with MusicGen and choosing the best take, with interactive figures.</p>
+  <a class="post" href="/musicgen-prune-inference/">
+    <h3>Judging text-to-music: CLAP best-of-N, then and now</h3>
+    <p>How generated music is judged, from FID and CLIP score to FAD, CLAP and learned music judges; why picking the
+    best of N takes by CLAP is legitimate; and four ways to extend it, including pruning weak takes early.</p>
+    <div class="meta">October 24, 2026 · 10 min read · 1 interactive figure · MusicGen · evaluation</div>
+  </a>
+  <a class="post" href="/musicgen-prune-inference/decoding/">
+    <h3>Inside MusicGen decoding: tokens, guidance and exact pruning</h3>
+    <p>RVQ and the delay pattern, classifier-free guidance, where a decoding step's time goes on a T4, pruning a
+    running batch without changing the survivors, and the design of a best-of-N music service.</p>
+    <div class="meta">October 24, 2026 · 8 min read · 1 interactive figure · MusicGen · inference · systems</div>
+  </a>
 </section>
-<a class="post" href="/musicgen-prune-inference/">
-  <h2>Judging text-to-music: CLAP best-of-N, then and now</h2>
-  <p>How generated music is judged, from FID and CLIP score to FAD, CLAP and learned music judges; why picking the
-  best of N takes by CLAP is legitimate; and four ways to extend it, including pruning weak takes early.</p>
-  <div class="meta">October 24, 2026 · 10 min read · 1 interactive figure · MusicGen · evaluation</div>
-</a>
-<a class="post" href="/musicgen-prune-inference/decoding/">
-  <h2>Inside MusicGen decoding: tokens, guidance and exact pruning</h2>
-  <p>RVQ and the delay pattern, classifier-free guidance, where a decoding step's time goes on a T4, pruning a
-  running batch without changing the survivors, and the design of a best-of-N music service.</p>
-  <div class="meta">October 24, 2026 · 8 min read · 1 interactive figure · MusicGen · inference · systems</div>
-</a>
 
 <p class="aside">Looking for algorithms? The <a href="/leetcode/">LeetCode patterns</a> series has 31 short posts,
 one per pattern, with code that runs.</p>
