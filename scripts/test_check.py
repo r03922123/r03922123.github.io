@@ -50,6 +50,10 @@ class CheckTest(unittest.TestCase):
         out = self.findings({"index.html": PAGE.format(body="see [[note]]\n> [!tip] x")})
         self.assertEqual(len(out), 2)
 
+    def test_nested_lists_in_code_are_not_wikilinks(self):
+        body = "grid = [[1, 2], [3, 4]]\nmrr([[0, 1, 0], [1, 0, 0]])\nmatrix[[i]]\ndf[[\"col\"]]"
+        self.assertEqual(self.findings({"index.html": PAGE.format(body=body)}), [])
+
     def test_internal_hosts_in_html(self):
         out = self.findings({"index.html": PAGE.format(body="s3://bucket/x\na.confluence.example")})
         self.assertEqual(len(out), 2)

@@ -13,7 +13,8 @@ DENYLIST = Path(__file__).with_name("denylist.local.txt")
 # Leak markers that only make sense to look for in rendered pages.
 HTML_PATTERNS = {
     "phone number": re.compile(r"\+\d{1,3}[ -]?\d{2,4}[ -]?\d{3}[ -]?\d{3,4}"),
-    "vault wikilink": re.compile(r"\[\["),
+    # a note name such as [[LoRA]]; nested lists like [[1, 2], [3]] or df[["col"]] are not wikilinks
+    "vault wikilink": re.compile(r"""\[\[[^\[\]\n"']*[A-Za-z]{2}[^\[\]\n"']*\]\]"""),
     "vault callout": re.compile(r">\s?\[!"),
     "internal host": re.compile(r"s3://|confluence|\.azure\.|azurewebsites", re.I),
 }
