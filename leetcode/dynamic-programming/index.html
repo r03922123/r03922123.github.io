@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic programming: SRTBOT, subsequences and stock state machines · r03922123</title>
+<meta name="description" content="A six-step recipe for writing any DP, then four classics built with it — longest common subsequence, palindromic subsequences, the whole stock-trading family as one state machine, and Kadane&#x27;s maximum subarray.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Dynamic programming, bits and games</p>
+<header class="post-head">
+  <h1>Dynamic programming: SRTBOT, subsequences and stock state machines</h1>
+  <div class="meta">October 31, 2026 · 10 min read · dynamic programming · memoization · state machine</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#the-srtbot-recipe">The SRTBOT recipe</a></li><li><a href="#longest-common-subsequence">Longest common subsequence</a></li><li><a href="#palindromes-subproblems-on-substrings">Palindromes: subproblems on substrings</a></li><li><a href="#the-stock-family-as-a-state-machine">The stock family as a state machine</a></li><li><a href="#kadane-s-maximum-subarray">Kadane's maximum subarray</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Dynamic programming is recursion that refuses to solve the same problem twice. You describe the answer in terms of answers to smaller versions of the same question, then either cache the recursive calls (<b>top-down</b>, memoization) or fill a table in an order where every entry's dependencies are already known (<b>bottom-up</b>). Both compute the same numbers; the hard part is never the caching, it is choosing the smaller questions.</p>
+<h2 id="the-srtbot-recipe">The SRTBOT recipe</h2>
+<p>MIT's 6.006 breaks the design of a DP into six checks, abbreviated SRTBOT:</p>
+<ol><li><b>Subproblems:</b> a family of questions, usually indexed by a prefix, a suffix, or a substring of the input, plus whatever extra state the problem needs.</li><li><b>Relation:</b> how one subproblem's answer is built from strictly smaller ones. A good habit is to "guess" the first decision (take this item or not, match these characters or not) and take the best over all guesses.</li><li><b>Topological order:</b> the dependencies must form a DAG, and the bottom-up loops must visit it in that order.</li><li><b>Base cases:</b> the subproblems with no smaller ones beneath them.</li><li><b>Original problem:</b> which subproblem (or combination of them) is the answer.</li><li><b>Time:</b> number of subproblems times work per subproblem.</li></ol>
+<p>Writing the six lines down before any code catches most DP bugs: a relation that refers to a larger subproblem, a base case that is missing, or an answer read from the wrong cell.</p>
+<h2 id="longest-common-subsequence">Longest common subsequence</h2>
+<p><a href="https://leetcode.com/problems/longest-common-subsequence/">1143. Longest Common Subsequence</a>. Run the recipe on strings <code>s</code> (length \(m\)) and <code>t</code> (length \(n\)).</p>
+<ul><li><b>S:</b> \(L(i, j)\) is the LCS length of the suffixes <code>s[i:]</code> and <code>t[j:]</code>.</li><li><b>R:</b> if the first characters match, using them is never worse; otherwise one of them is not in the answer, so drop either and keep the better:</li></ul>
+\[ L(i, j) = \begin{cases} 1 + L(i+1, j+1) &amp; s_i = t_j \\ \max\bigl(L(i+1, j),\ L(i, j+1)\bigr) &amp; \text{otherwise.} \end{cases} \]
+<ul><li><b>T:</b> every call increases \(i\) or \(j\), so loop \(i\) and \(j\) downward.</li><li><b>B:</b> \(L(m, j) = L(i, n) = 0\): an empty suffix has nothing in common.</li><li><b>O:</b> \(L(0, 0)\).</li><li><b>T:</b> \((m+1)(n+1)\) subproblems at \(O(1)\) each, so \(O(mn)\).</li></ul>
+<p>The top-down version is the recurrence typed in, with a cache in front of it:</p>
+<pre><code class="language-python">import random
+from functools import lru_cache
+from itertools import combinations, product
+
+
+def lcs_top_down(s, t):
+    @lru_cache(maxsize=None)
+    def L(i, j):
+        if i == len(s) or j == len(t):
+            return 0
+        if s[i] == t[j]:
+            return 1 + L(i + 1, j + 1)
+        return max(L(i + 1, j), L(i, j + 1))
+    return L(0, 0)
+
+
+assert lcs_top_down("abcde", "ace") == 3
+assert lcs_top_down("abc", "abc") == 3
+assert lcs_top_down("abc", "def") == 0</code></pre>
+<p>It recurses up to \(m + n\) deep, which overflows Python's default limit at the problem's 1000-character inputs. The bottom-up table avoids that, and because row <code>i</code> only reads row <code>i + 1</code>, one row is enough. The single subtle cell is the diagonal \(L(i+1, j+1)\), which the row has already overwritten by the time we need it, so it is saved in a variable first:</p>
+<pre><code class="language-python">def lcs(s, t):
+    n = len(t)
+    row = [0] * (n + 1)                  # row[j] = L(i + 1, j) before the update, L(i, j) after
+    for i in range(len(s) - 1, -1, -1):
+        diag = 0                         # L(i + 1, n)
+        for j in range(n - 1, -1, -1):
+            below = row[j]               # L(i + 1, j), about to be overwritten
+            row[j] = 1 + diag if s[i] == t[j] else max(below, row[j + 1])
+            diag = below
+    return row[0]
+
+
+def is_subsequence(sub, s):
+    it = iter(s)
+    return all(c in it for c in sub)
+
+
+def lcs_brute(s, t):
+    for size in range(min(len(s), len(t)), -1, -1):
+        if any(is_subsequence(c, t) for c in combinations(s, size)):
+            return size
+
+
+assert lcs("abcde", "ace") == 3 and lcs("abc", "abc") == 3 and lcs("abc", "def") == 0
+for _ in range(300):
+    s = "".join(random.choices("abc", k=random.randint(0, 8)))
+    t = "".join(random.choices("abc", k=random.randint(0, 8)))
+    assert lcs(s, t) == lcs_top_down(s, t) == lcs_brute(s, t)</code></pre>
+<p>Space drops to \(O(n)\); time stays \(O(mn)\). The same table, with "match" meaning equal characters and "mismatch" resetting to zero, gives longest common <b>substring</b> (<a href="https://leetcode.com/problems/maximum-length-of-repeated-subarray/">718. Maximum Length of Repeated Subarray</a>), and with three choices per cell gives edit distance (<a href="https://leetcode.com/problems/edit-distance/">72. Edit Distance</a>).</p>
+<h2 id="palindromes-subproblems-on-substrings">Palindromes: subproblems on substrings</h2>
+<p>When an answer depends on both ends of the string, the subproblem is a substring <code>s[lo..hi]</code> instead of a suffix. <a href="https://leetcode.com/problems/longest-palindromic-subsequence/">516. Longest Palindromic Subsequence</a>:</p>
+<ul><li><b>S:</b> \(P(lo, hi)\) is the answer for <code>s[lo..hi]</code> inclusive.</li><li><b>R:</b> if the end characters match, both belong to the palindrome, \(P = 2 + P(lo+1, hi-1)\); otherwise drop one end, \(P = \max(P(lo+1, hi), P(lo, hi-1))\).</li><li><b>T:</b> a substring depends only on shorter ones, so iterate <code>lo</code> downward and <code>hi</code> upward from <code>lo</code>.</li><li><b>B:</b> \(P(lo, lo) = 1\), and an empty range is 0.</li><li><b>O:</b> \(P(0, n-1)\). <b>Time:</b> \(O(n^2)\).</li></ul>
+<p>(It is also the LCS of <code>s</code> with its reverse, a nice check on both functions.)</p>
+<pre><code class="language-python">def longest_palindrome_subseq(s):
+    n = len(s)
+    P = [[0] * n for _ in range(n)]
+    for lo in range(n - 1, -1, -1):
+        P[lo][lo] = 1
+        for hi in range(lo + 1, n):
+            if s[lo] == s[hi]:
+                P[lo][hi] = 2 + P[lo + 1][hi - 1]      # an empty middle is the 0 below the diagonal
+            else:
+                P[lo][hi] = max(P[lo + 1][hi], P[lo][hi - 1])
+    return P[0][n - 1]
+
+
+def lps_brute(s):
+    return max(len(c) for size in range(len(s) + 1) for c in combinations(s, size) if c == c[::-1])
+
+
+assert longest_palindrome_subseq("bbbab") == 4
+assert longest_palindrome_subseq("cbbd") == 2
+for _ in range(300):
+    s = "".join(random.choices("ab", k=random.randint(1, 10)))
+    assert longest_palindrome_subseq(s) == lps_brute(s) == lcs(s, s[::-1])</code></pre>
+<p>For contiguous palindromes (<a href="https://leetcode.com/problems/longest-palindromic-substring/">5. Longest Palindromic Substring</a>) the table holds booleans: <code>s[lo..hi]</code> is a palindrome when its ends match and its inside, of length below 2 or already known, is one. The same loop order applies.</p>
+<pre><code class="language-python">def longest_palindrome(s):
+    n, best = len(s), (0, 0)
+    pal = [[False] * n for _ in range(n)]
+    for lo in range(n - 1, -1, -1):
+        for hi in range(lo, n):
+            pal[lo][hi] = s[lo] == s[hi] and (hi - lo &lt; 3 or pal[lo + 1][hi - 1])
+            if pal[lo][hi] and hi - lo &gt; best[1] - best[0]:
+                best = (lo, hi)
+    return s[best[0]:best[1] + 1]
+
+
+assert longest_palindrome("babad") in ("bab", "aba")
+assert longest_palindrome("cbbd") == "bb"
+assert longest_palindrome("a") == "a"
+for _ in range(300):
+    s = "".join(random.choices("ab", k=random.randint(1, 12)))
+    got = longest_palindrome(s)
+    assert got in s and got == got[::-1]
+    assert len(got) == max(j - i for i in range(len(s)) for j in range(i + 1, len(s) + 1)
+                           if s[i:j] == s[i:j][::-1])</code></pre>
+<p>\(O(n^2)\) time and space; expanding around each of the \(2n - 1\) centres is the same time in \(O(1)\) space, and Manacher's algorithm is linear.</p>
+<h2 id="the-stock-family-as-a-state-machine">The stock family as a state machine</h2>
+<p>Six problems ask for the best profit from a price list under different rules: one trade (121), unlimited trades (122), at most two (123) or \(k\) (188), a one-day cooldown after selling (309), or a fee per trade (714). They are one DP. On each day you are in a state, and the subproblem is "the best cash you can have at the end of day \(i\) in that state":</p>
+<ul><li>\(\text{cash}_i[t]\): not holding a share, having bought at most \(t\) times;</li><li>\(\text{hold}_i[t]\): holding a share, having bought at most \(t\) times.</li></ul>
+<p>Each day you rest, sell, or buy:</p>
+\[ \text{cash}_i[t] = \max\bigl(\text{cash}_{i-1}[t],\ \text{hold}_{i-1}[t] + p_i - \text{fee}\bigr), \qquad \text{hold}_i[t] = \max\bigl(\text{hold}_{i-1}[t],\ \text{cash}_{i-1-c}[t-1] - p_i\bigr) \]
+<p>where \(c\) is the cooldown length: a buy may only follow a state from \(c\) days earlier. Base cases: before day 0, all cash states are 0 and holding is impossible (\(-\infty\)). The answer is \(\text{cash}[k]\) on the last day. Unlimited trades are just \(k = \lfloor n/2 \rfloor\), since a buy and its sell use two different days.</p>
+<pre><code class="language-python">NEG = float("-inf")
+
+
+def stock_profit(prices, k=None, fee=0, cooldown=0):
+    n = len(prices)
+    k = n // 2 if k is None else min(k, n // 2)
+    past = [[0] * (k + 1) for _ in range(cooldown + 1)]   # cash arrays of the last few days
+    hold = [NEG] * (k + 1)
+    for p in prices:
+        cash, buy_from = past[-1], past[-1 - cooldown]
+        hold = [NEG] + [max(hold[t], buy_from[t - 1] - p) for t in range(1, k + 1)]
+        new_cash = [max(cash[t], hold[t] + p - fee) for t in range(k + 1)]
+        past = past[1:] + [new_cash]
+    return past[-1][k]</code></pre>
+<p>That is \(O(nk)\) time and \(O((c+1)k)\) space, which for unlimited trades means \(O(n^2)\) time because \(k\) becomes \(n/2\); the specialisations below bring that back to \(O(n)\). One subtlety: <code>hold</code> is computed before <code>new_cash</code>, so a sale on day \(i\) uses a share bought on day \(i\) at worst, which is a no-op with zero fee and a loss with a fee, so it never changes the answer.</p>
+<p>To trust it, compare with honest brute force: try every string of actions (buy, sell, rest) and simulate the rules.</p>
+<pre><code class="language-python">def stock_brute(prices, k=None, fee=0, cooldown=0):
+    best = 0
+    for plan in product("bsr", repeat=len(prices)):
+        cash, holding, buys, wait, ok = 0, False, 0, 0, True
+        for p, a in zip(prices, plan):
+            if a == "b":
+                if holding or wait or (k is not None and buys == k):
+                    ok = False
+                    break
+                cash, holding, buys = cash - p, True, buys + 1
+            elif a == "s":
+                if not holding:
+                    ok = False
+                    break
+                cash, holding, wait = cash + p - fee, False, cooldown + 1
+            wait = max(0, wait - 1)
+        if ok and not holding:
+            best = max(best, cash)
+    return best
+
+
+assert stock_profit([7, 1, 5, 3, 6, 4], k=1) == 5                    # 121
+assert stock_profit([7, 6, 4, 3, 1], k=1) == 0
+assert stock_profit([7, 1, 5, 3, 6, 4]) == 7                         # 122
+assert stock_profit([1, 2, 3, 4, 5]) == 4
+assert stock_profit([7, 6, 4, 3, 1]) == 0
+assert stock_profit([3, 3, 5, 0, 0, 3, 1, 4], k=2) == 6              # 123
+assert stock_profit([1, 2, 3, 4, 5], k=2) == 4
+assert stock_profit([7, 6, 4, 3, 1], k=2) == 0
+assert stock_profit([2, 4, 1], k=2) == 2                             # 188
+assert stock_profit([3, 2, 6, 5, 0, 3], k=2) == 7
+assert stock_profit([1, 2, 3, 0, 2], cooldown=1) == 3                # 309
+assert stock_profit([1], cooldown=1) == 0
+assert stock_profit([1, 3, 2, 8, 4, 9], fee=2) == 8                  # 714
+assert stock_profit([1, 3, 7, 5, 10, 3], fee=3) == 6
+
+for _ in range(150):
+    prices = [random.randint(0, 9) for _ in range(random.randint(0, 7))]
+    for args in ({"k": 1}, {"k": 2}, {}, {"cooldown": 1}, {"fee": 2}):
+        assert stock_profit(prices, **args) == stock_brute(prices, **args), (prices, args)</code></pre>
+<p>Each special case then shrinks to a couple of variables. With \(k = 1\), \(\text{cash}[0]\) is always 0, so the buy is simply \(-p\). With unlimited trades the \(t\) index disappears altogether (\(t\) and \(t-1\) are the same "unlimited"), leaving one <code>cash</code> and one <code>hold</code>; cooldown keeps one extra day of <code>cash</code> around:</p>
+<pre><code class="language-python">def max_profit_one(prices):                  # 121
+    cash, hold = 0, NEG
+    for p in prices:
+        cash, hold = max(cash, hold + p), max(hold, -p)
+    return cash
+
+
+def max_profit_unlimited(prices, fee=0):     # 122, 714
+    cash, hold = 0, NEG
+    for p in prices:
+        cash = max(cash, hold + p - fee)
+        hold = max(hold, cash - p)           # today's cash: selling and rebuying today never helps
+    return cash
+
+
+def max_profit_cooldown(prices):             # 309
+    cash, prev_cash, hold = 0, 0, NEG
+    for p in prices:
+        cash, prev_cash, hold = max(cash, hold + p), cash, max(hold, prev_cash - p)
+    return cash
+
+
+for _ in range(300):
+    prices = [random.randint(0, 20) for _ in range(random.randint(0, 12))]
+    assert max_profit_one(prices) == stock_profit(prices, k=1)
+    assert max_profit_unlimited(prices) == stock_profit(prices)
+    assert max_profit_unlimited(prices, fee=3) == stock_profit(prices, fee=3)
+    assert max_profit_cooldown(prices) == stock_profit(prices, cooldown=1)</code></pre>
+<p>All three are \(O(n)\) time and \(O(1)\) space.</p>
+<h2 id="kadane-s-maximum-subarray">Kadane's maximum subarray</h2>
+<p><a href="https://leetcode.com/problems/maximum-subarray/">53. Maximum Subarray</a> is a one-state DP. <b>S:</b> \(E(i)\), the best sum of a subarray <b>ending</b> at \(i\). <b>R:</b> either extend the best one ending at \(i-1\) or start fresh, \(E(i) = \max(x_i, E(i-1) + x_i)\). <b>O:</b> \(\max_i E(i)\), because the best subarray ends somewhere. \(O(n)\) time, \(O(1)\) space.</p>
+<p>The answer must be seeded with the first element, not 0: the subarray is non-empty, so an all-negative array's answer is its largest element. (Seeding with 0 instead solves the variant that allows the empty subarray.)</p>
+<pre><code class="language-python">def max_subarray(nums):
+    best = cur = nums[0]
+    for x in nums[1:]:
+        cur = max(x, cur + x)
+        best = max(best, cur)
+    return best
+
+
+assert max_subarray([-2, 1, -3, 4, -1, 2, 1, -5, 4]) == 6
+assert max_subarray([1]) == 1
+assert max_subarray([5, 4, -1, 7, 8]) == 23
+assert max_subarray([-3, -1, -2]) == -1      # all negative: not 0
+for _ in range(300):
+    nums = [random.randint(-10, 10) for _ in range(random.randint(1, 15))]
+    assert max_subarray(nums) == max(sum(nums[i:j]) for i in range(len(nums)) for j in range(i + 1, len(nums) + 1))</code></pre>
+<p>"Best ending here" is the subproblem behind many one-pass DPs: <a href="https://leetcode.com/problems/best-sightseeing-pair/">1014. Best Sightseeing Pair</a> keeps the best <code>values[i] + i</code> seen so far, and <a href="https://leetcode.com/problems/maximum-sum-circular-subarray/">918. Maximum Sum Circular Subarray</a> runs Kadane for both the maximum and the minimum. When the extra state is a capacity, the DP becomes a <a href="../knapsack/">knapsack</a>; when it is a set, it becomes <a href="../bitmask-dp/">bitmask DP</a>.</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/best-sightseeing-pair/">1014. Best Sightseeing Pair</a></li><li><a href="https://leetcode.com/problems/maximum-sum-of-two-non-overlapping-subarrays/">1031. Maximum Sum of Two Non-Overlapping Subarrays</a></li><li><a href="https://leetcode.com/problems/minimum-score-triangulation-of-polygon/">1039. Minimum Score Triangulation of Polygon</a> (interval DP, like 516)</li><li><a href="https://leetcode.com/problems/shortest-way-to-form-string/">1055. Shortest Way to Form String</a></li><li><a href="https://leetcode.com/problems/longest-repeating-substring/">1062. Longest Repeating Substring</a> (the substring table of <code>s</code> against itself, keeping only cells with \(i &lt; j\))</li><li><a href="https://leetcode.com/problems/edit-distance/">72. Edit Distance</a></li><li><a href="https://leetcode.com/problems/palindromic-substrings/">647. Palindromic Substrings</a></li><li><a href="https://leetcode.com/problems/minimum-insertion-steps-to-make-a-string-palindrome/">1312. Minimum Insertion Steps to Make a String Palindrome</a></li><li><a href="https://leetcode.com/problems/best-time-to-buy-and-sell-stock-iii/">123. Best Time to Buy and Sell Stock III</a> and <a href="https://leetcode.com/problems/best-time-to-buy-and-sell-stock-iv/">188. Best Time to Buy and Sell Stock IV</a></li><li><a href="https://leetcode.com/problems/best-time-to-buy-and-sell-stock-with-cooldown/">309. Best Time to Buy and Sell Stock with Cooldown</a> and <a href="https://leetcode.com/problems/best-time-to-buy-and-sell-stock-with-transaction-fee/">714. Best Time to Buy and Sell Stock with Transaction Fee</a></li><li><a href="https://leetcode.com/problems/maximum-product-subarray/">152. Maximum Product Subarray</a> (Kadane with two states)</li></ul>
+<p>The SRTBOT framework is from MIT 6.006 Introduction to Algorithms, Spring 2020 (E. Demaine, J. Ku, J. Solomon). Dynamic programming itself is from R. Bellman, "Dynamic Programming", Princeton University Press (1957); Kadane's algorithm was popularised by J. Bentley, "Programming Pearls: Algorithm Design Techniques", Communications of the ACM (1984).</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

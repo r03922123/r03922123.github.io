@@ -107,7 +107,7 @@ assert hm.n == len(ref) and hm.n &lt;= 0.75 * hm.m
 assert max(len(s) for s in hm.slots) &lt;= 10     # chains stay short</code></pre>
 <p>The final asserts are the point: after twenty thousand random operations the map agrees with <code>dict</code> on every lookup, the load factor is bounded, and no chain grew long.</p>
 <h2 id="chaining-versus-open-addressing">Chaining versus open addressing</h2>
-<p>Python's own <code>dict</code> uses <b>open addressing</b>: no lists, collisions probe other slots in the same array. It is more cache-friendly, but deletion needs tombstones and performance falls off sharply as the table fills, so it resizes earlier. Chaining degrades gracefully and is the easier one to get right in an interview.</p>
+<p>Python's own <code>dict</code> uses <b>open addressing</b>: no lists, collisions probe other slots in the same array. It is more cache-friendly, but deletion needs tombstones and performance falls off sharply as the table fills, so it resizes earlier. Chaining degrades gracefully and is the easier one to implement correctly.</p>
 <h2 id="practice">Practice</h2>
 <ul><li><a href="https://leetcode.com/problems/design-hashset/">705. Design HashSet</a></li><li><a href="https://leetcode.com/problems/design-hashmap/">706. Design HashMap</a></li><li><a href="https://leetcode.com/problems/design-hit-counter/">362. Design Hit Counter</a></li><li><a href="https://leetcode.com/problems/design-a-text-editor/">2296. Design a Text Editor</a></li><li><a href="https://leetcode.com/problems/design-excel-sum-formula/">631. Design Excel Sum Formula</a></li></ul>
 <p>The hash functions follow the presentation in MIT 6.006 (Fall 2011), lecture 8, "Hashing with Chaining".</p>

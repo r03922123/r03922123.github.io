@@ -84,7 +84,7 @@ assert uf.groups == len(set(label))</code></pre>
 assert find_circle_num([[1, 1, 0], [1, 1, 0], [0, 0, 1]]) == 2
 assert find_circle_num([[1, 0, 0], [0, 1, 0], [0, 0, 1]]) == 3</code></pre>
 <h2 id="detecting-a-cycle">Detecting a cycle</h2>
-<p><a href="https://leetcode.com/problems/redundant-connection/">684. Redundant Connection</a>: adding edges one by one, the first edge whose endpoints are already connected closes a cycle. That is exactly when <code>union</code> returns <code>False</code>. Kruskal's minimum spanning tree uses the same test to skip edges (see graphs).</p>
+<p><a href="https://leetcode.com/problems/redundant-connection/">684. Redundant Connection</a>: adding edges one by one, the first edge whose endpoints are already connected closes a cycle. That is exactly when <code>union</code> returns <code>False</code>. Kruskal's minimum spanning tree uses the same test to skip edges (see <a href="../graph-algorithms/">graphs</a>).</p>
 <pre><code class="language-python">def find_redundant_connection(edges):
     uf = UnionFind(len(edges) + 1)
     for a, b in edges:

@@ -23,7 +23,7 @@
 <main>
 <section class="intro">
   <h1>LeetCode patterns</h1>
-  <p>23 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
+  <p>31 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
   asserts pass.</p>
 </section>
@@ -64,6 +64,17 @@
   <li><a href="bfs/">BFS: shortest paths by layers, and from both ends</a><span>Breadth-first search finds shortest paths when every step costs the same. The layer-by-layer template, BFS over a state space larger than the grid, 0-1 BFS for two edge costs, and bidirectional search.</span></li>
   <li><a href="dfs/">DFS: reachability, components and connectivity</a><span>Depth-first search as the tool for "what can I reach?". An iterative template, counting components, testing whether a directed graph is strongly connected with one reversed pass, and finding bridges with low-link values.</span></li>
   <li><a href="dijkstra/">Dijkstra's algorithm, three ways</a><span>Single-source shortest paths with non-negative weights. Why settling the closest node is safe, the heap version with lazy deletion, the O(n²) array version for dense graphs, and variants that change what "distance" means.</span></li>
+  <li><a href="shortest-paths/">Shortest paths beyond Dijkstra: Bellman–Ford, Floyd–Warshall and A*</a><span>Three shortest-path algorithms for when Dijkstra is the wrong tool. Bellman–Ford as a DP over edge counts (negative edges, negative cycles, at most k stops), Floyd–Warshall as a DP over allowed middle nodes, and A* with a heuristic that never overestimates.</span></li>
+  <li><a href="topological-sort/">Topological sort: ordering a DAG</a><span>Why a directed graph can be lined up so every edge points forward exactly when it has no cycle, then the two standard algorithms (Kahn's queue of ready nodes and DFS finishing order), each detecting cycles for free, and two harder uses: two-level ordering and longest paths in a DAG.</span></li>
+  <li><a href="graph-algorithms/">Spanning trees, Euler paths and matchings</a><span>Three classic graph algorithms beyond shortest paths. Minimum spanning trees from the cut and cycle properties (Kruskal, Prim, and the O(n²) dense Prim), Hierholzer's algorithm for Euler paths, and Kuhn's augmenting paths for bipartite matching.</span></li>
+</ul>
+<h2 id="dynamic-programming-bits-and-games">Dynamic programming, bits and games</h2>
+<ul class="series">
+  <li><a href="dynamic-programming/">Dynamic programming: SRTBOT, subsequences and stock state machines</a><span>A six-step recipe for writing any DP, then four classics built with it — longest common subsequence, palindromic subsequences, the whole stock-trading family as one state machine, and Kadane's maximum subarray.</span></li>
+  <li><a href="knapsack/">Knapsack: choosing items under a budget</a><span>0/1 and unbounded knapsack written three ways (memoized recursion, a full table, one rolling row), why the inner loop runs backwards for one and forwards for the other, how to read the chosen items back out, and four LeetCode problems that are knapsack in disguise.</span></li>
+  <li><a href="bitmask-dp/">Bitmask DP: dynamic programming over subsets</a><span>When n is around 20, a subset fits in one integer and "which items are used" becomes a DP index. Three archetypes (ordering, grouping, assignment), Held–Karp for the travelling salesman, BFS over (node, mask), and submask enumeration in O(3^n).</span></li>
+  <li><a href="bit-manipulation/">Bit manipulation: identities, XOR tricks and counting bits</a><span>The handful of two's-complement identities that power most bit tricks (lowest set bit, clearing it, popcount, parity, rounding to powers of two, reversing bits, Gosper's hack), then XOR for the Single Number family and a DP for counting bits.</span></li>
+  <li><a href="game-theory/">Game theory: minimax on the score difference</a><span>Two players, perfect information, both playing their best. One recurrence on "my score minus yours" solves the stone-game family (877, 486, 1406, 1140), and a win/lose labelling of positions explains Nim, with a short look at Sprague–Grundy numbers.</span></li>
 </ul>
 </main>
 <footer>Personal site. Not affiliated with any company.</footer>

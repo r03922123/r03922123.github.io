@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitmask DP: dynamic programming over subsets · r03922123</title>
+<meta name="description" content="When n is around 20, a subset fits in one integer and &quot;which items are used&quot; becomes a DP index. Three archetypes (ordering, grouping, assignment), Held–Karp for the travelling salesman, BFS over (node, mask), and submask enumeration in O(3^n).">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Dynamic programming, bits and games</p>
+<header class="post-head">
+  <h1>Bitmask DP: dynamic programming over subsets</h1>
+  <div class="meta">October 31, 2026 · 13 min read · dynamic programming · bitmask · subsets · TSP</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#subsets-as-integers">Subsets as integers</a></li><li><a href="#archetype-1-orderings">Archetype 1: orderings</a></li><li><a href="#archetype-2-grouping-into-equal-parts">Archetype 2: grouping into equal parts</a></li><li><a href="#archetype-3-assignment">Archetype 3: assignment</a></li><li><a href="#held-karp-the-travelling-salesman">Held–Karp: the travelling salesman</a></li><li><a href="#shortest-path-visiting-all-nodes">Shortest path visiting all nodes</a></li><li><a href="#enumerating-submasks-in-o-3-n">Enumerating submasks in O(3^n)</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Some problems ask for the best way to order, group or match a small set of things, and the only honest description of "where you are" is <b>which items have been used so far</b>. Trying every permutation costs \(n!\); remembering only the set of used items costs \(2^n\). At \(n = 15\) that is \(1.3 \times 10^{12}\) against about 33,000, and the second number is the one that fits in a DP table.</p>
+<p>The trick is that a subset of \(\{0, \dots, n-1\}\) is just an \(n\)-bit integer, so the table can be a plain list indexed by masks. The constraint that tells you to reach for this is a suspiciously small bound: \(n \le 12\), \(16\) or \(20\).</p>
+<h2 id="subsets-as-integers">Subsets as integers</h2>
+<p>Bit \(i\) of <code>mask</code> says whether item \(i\) is in the set. Every set operation becomes one machine operation:</p>
+<table><thead><tr><th>Operation</th><th>Expression</th></tr></thead><tbody><tr><td>empty set, full set</td><td><code>0</code>, <code>(1 &lt;&lt; n) - 1</code></td></tr><tr><td>is <code>i</code> in the set?</td><td><code>mask &gt;&gt; i &amp; 1</code></td></tr><tr><td>remove <code>i</code></td><td><code>mask &amp; ~(1 &lt;&lt; i)</code></td></tr><tr><td>size of the set</td><td><code>mask.bit_count()</code> (Python 3.10+), or <code>bin(mask).count("1")</code></td></tr><tr><td>lowest set bit (as a one-bit mask)</td><td><code>mask &amp; -mask</code></td></tr></tbody></table>
+<p>Adding <code>i</code> is the bitwise OR, <code>mask | 1 &lt;&lt; i</code>.</p>
+<p>Counting masks upward from <code>0</code> to <code>2^n - 1</code> visits every subset <b>after all of its proper subsets</b>, because removing a bit always makes the number smaller. That single fact means a bottom-up loop <code>for mask in range(1 &lt;&lt; n)</code> is already in a valid topological order for any recurrence that goes from a set to a smaller one.</p>
+<pre><code class="language-python">import random
+from functools import cache
+from itertools import permutations, product
+
+
+def popcount(x):
+    return bin(x).count("1")
+
+
+def members(mask):
+    return [i for i in range(mask.bit_length()) if mask &gt;&gt; i &amp; 1]
+
+
+assert members(0b1011) == [0, 1, 3]
+assert 0b1011 &amp; -0b1011 == 0b0001 and popcount(0b1011) == 3</code></pre>
+<p>The rest of the post is three shapes of problem that all use <code>mask</code> as "items already consumed", then two classic applications and a counting trick.</p>
+<h2 id="archetype-1-orderings">Archetype 1: orderings</h2>
+<p>When the answer is a permutation, build it one position at a time. If the mask holds the items already placed, the next position is simply <code>popcount(mask)</code>, so the mask alone is the whole state.</p>
+<p><a href="https://leetcode.com/problems/beautiful-arrangement/">526. Beautiful Arrangement</a> counts permutations of \(1..n\) where, at every 1-based position \(i\), the value divides \(i\) or \(i\) divides the value. Let <code>ways[mask]</code> be the number of valid ways to fill positions \(1..|mask|\) using exactly the values in <code>mask</code>. To extend, choose a value not yet used that is compatible with the next position.</p>
+<pre><code class="language-python">def count_arrangement(n):
+    ways = [0] * (1 &lt;&lt; n)
+    ways[0] = 1
+    for mask in range(1 &lt;&lt; n):
+        if not ways[mask]:
+            continue
+        pos = popcount(mask) + 1                     # next 1-based position to fill
+        for v in range(n):                           # bit v stands for the value v + 1
+            if not mask &gt;&gt; v &amp; 1 and (pos % (v + 1) == 0 or (v + 1) % pos == 0):
+                ways[mask | 1 &lt;&lt; v] += ways[mask]
+    return ways[-1]
+
+
+assert count_arrangement(2) == 2
+assert count_arrangement(1) == 1
+
+
+def count_arrangement_brute(n):
+    return sum(all(p % i == 0 or i % p == 0 for i, p in enumerate(perm, 1))
+               for perm in permutations(range(1, n + 1)))
+
+
+for n in range(1, 9):
+    assert count_arrangement(n) == count_arrangement_brute(n)</code></pre>
+<p>There are \(2^n\) states and \(n\) choices from each: \(O(n \cdot 2^n)\) time, \(O(2^n)\) space. A permutation search would revisit the same set of used values once for every order in which they were placed; the table collapses those orders into one entry.</p>
+<h2 id="archetype-2-grouping-into-equal-parts">Archetype 2: grouping into equal parts</h2>
+<p><a href="https://leetcode.com/problems/partition-to-k-equal-sum-subsets/">698. Partition to K Equal Sum Subsets</a> asks whether <code>nums</code> splits into <code>k</code> groups of equal sum \(T = \text{sum} / k\). Fill the groups one after another, never leaving a group half-done before starting the next. Then for any set of used numbers, the total is fixed, so the current group's fill level is just <code>total(mask) % T</code>. The state is again only the mask.</p>
+<p><code>fill[mask]</code> is that fill level when <code>mask</code> can be reached legally, and <code>-1</code> otherwise. A number may be added only if it does not overflow the current group.</p>
+<pre><code class="language-python">def can_partition_k_subsets(nums, k):
+    total = sum(nums)
+    if total % k:
+        return False
+    target, n = total // k, len(nums)
+    fill = [-1] * (1 &lt;&lt; n)
+    fill[0] = 0
+    for mask in range(1 &lt;&lt; n):
+        if fill[mask] &lt; 0:
+            continue
+        for i in range(n):
+            if not mask &gt;&gt; i &amp; 1 and fill[mask] + nums[i] &lt;= target:
+                fill[mask | 1 &lt;&lt; i] = (fill[mask] + nums[i]) % target
+    return fill[-1] == 0
+
+
+assert can_partition_k_subsets([4, 3, 2, 3, 5, 2, 1], 4) is True
+assert can_partition_k_subsets([1, 2, 3, 4], 3) is False
+assert can_partition_k_subsets([7], 1) is True
+assert can_partition_k_subsets([2, 2, 2, 2, 3, 3], 2) is True        # 2+2+3 twice
+assert can_partition_k_subsets([5, 1, 1, 1], 2) is False            # 5 cannot share a group
+
+
+def can_partition_brute(nums, k):
+    for labels in product(range(k), repeat=len(nums)):
+        sums = [0] * k
+        for x, g in zip(nums, labels):
+            sums[g] += x
+        if len(set(sums)) == 1:
+            return True
+    return False
+
+
+for _ in range(300):
+    nums = [random.randint(1, 6) for _ in range(random.randint(1, 7))]
+    k = random.randint(1, 3)
+    assert can_partition_k_subsets(nums, k) == can_partition_brute(nums, k)</code></pre>
+<p>\(O(n \cdot 2^n)\). The modulo is what makes the archetype work: a group that reaches exactly \(T\) wraps to \(0\), and the next number starts the next group. Sorting the numbers or pruning duplicates helps a backtracking solution, but the DP needs neither.</p>
+<h2 id="archetype-3-assignment">Archetype 3: assignment</h2>
+<p>Here two sets meet: people and hats, workers and bikes, jobs and machines. Iterate over the <b>larger</b> side one item at a time, and keep the <b>smaller</b> side as the mask. The DP is then a 0/1 knapsack in disguise: for each item, either skip it or give it to one still-free member of the mask.</p>
+<p><a href="https://leetcode.com/problems/number-of-ways-to-wear-different-hats-to-each-other/">1434. Number of Ways to Wear Different Hats to Each Other</a> has at most 10 people and 40 hats, and asks for the number of ways to give every person a distinct hat they like. Indexing by hats with a 10-bit mask of people who already have one gives \(40 \cdot 2^{10}\) states; the other way round would need \(2^{40}\).</p>
+<p><code>ways[mask]</code> counts ways to dress exactly the people in <code>mask</code> using the hats seen so far. Processing a new hat, each state either ignores it or hands it to a person in the mask who likes it. Walking masks <b>downward</b> reads only entries that have not yet been updated for this hat, so no hat is used twice (the same reason a 0/1 knapsack loops capacity downward; see <a href="../knapsack/">knapsack</a>).</p>
+<pre><code class="language-python">def number_ways(hats):
+    mod, n = 10**9 + 7, len(hats)
+    likers = [[] for _ in range(41)]
+    for person, liked in enumerate(hats):
+        for h in liked:
+            likers[h].append(person)
+    ways = [0] * (1 &lt;&lt; n)
+    ways[0] = 1
+    for h in range(1, 41):
+        for mask in range((1 &lt;&lt; n) - 1, 0, -1):       # downward: hat h used at most once
+            for person in likers[h]:
+                if mask &gt;&gt; person &amp; 1:
+                    ways[mask] = (ways[mask] + ways[mask ^ 1 &lt;&lt; person]) % mod
+    return ways[-1]
+
+
+assert number_ways([[3, 4], [4, 5], [5]]) == 1
+assert number_ways([[3, 5, 1], [3, 5]]) == 4
+assert number_ways([[1, 2, 3, 4]] * 4) == 24
+
+
+def number_ways_brute(hats):
+    return sum(len(set(pick)) == len(pick) for pick in product(*hats))
+
+
+for _ in range(200):
+    hats = [random.sample(range(1, 9), random.randint(1, 4)) for _ in range(random.randint(1, 5))]
+    assert number_ways(hats) == number_ways_brute(hats)</code></pre>
+<p>\(O(H \cdot 2^n \cdot n)\) for \(H = 40\) hats and \(n\) people.</p>
+<p>When every item on one side must be matched, the outer counter disappears again: hand out that side in a fixed order and let the mask record what has been taken from the other side. In <a href="https://leetcode.com/problems/campus-bikes-ii/">1066. Campus Bikes II</a> there are \(m \le n \le 10\) workers and bikes and every worker gets a bike, so the mask holds the bikes already taken, and worker number <code>popcount(mask)</code> is the one choosing next, exactly as in archetype 1:</p>
+<pre><code class="language-python">def assign_bikes(workers, bikes):
+    m, n = len(workers), len(bikes)
+
+    def dist(w, b):
+        return abs(workers[w][0] - bikes[b][0]) + abs(workers[w][1] - bikes[b][1])
+
+    INF = float("inf")
+    best = [INF] * (1 &lt;&lt; n)
+    best[0] = 0
+    answer = INF
+    for mask in range(1 &lt;&lt; n):
+        if best[mask] == INF:
+            continue
+        w = popcount(mask)                           # the next worker to receive a bike
+        if w == m:
+            answer = min(answer, best[mask])
+            continue
+        for b in range(n):
+            if not mask &gt;&gt; b &amp; 1:
+                nxt = mask | 1 &lt;&lt; b
+                best[nxt] = min(best[nxt], best[mask] + dist(w, b))
+    return answer
+
+
+assert assign_bikes([[0, 0], [2, 1]], [[1, 2], [3, 3]]) == 6
+assert assign_bikes([[0, 0], [1, 1], [2, 0]], [[1, 0], [2, 2], [2, 1]]) == 4
+assert assign_bikes([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]],
+                    [[0, 999], [1, 999], [2, 999], [3, 999], [4, 999]]) == 4995
+assert assign_bikes([[0, 0]], [[5, 5], [1, 0], [9, 9]]) == 1         # fewer workers than bikes
+
+
+for _ in range(200):
+    n = random.randint(1, 6)
+    m = random.randint(1, n)
+    pts = lambda c: [[random.randint(0, 20), random.randint(0, 20)] for _ in range(c)]
+    workers, bikes = pts(m), pts(n)
+    brute = min(sum(abs(workers[w][0] - bikes[b][0]) + abs(workers[w][1] - bikes[b][1])
+                    for w, b in enumerate(choice))
+                for choice in permutations(range(n), m))
+    assert assign_bikes(workers, bikes) == brute</code></pre>
+<p>\(O(n \cdot 2^n)\), against \(n! / (n - m)!\) for trying every choice. The same template solves <a href="https://leetcode.com/problems/minimum-xor-sum-of-two-arrays/">1879. Minimum XOR Sum of Two Arrays</a> with <code>nums1[i] ^ nums2[j]</code> as the cost and \(m = n\).</p>
+<h2 id="held-karp-the-travelling-salesman">Held–Karp: the travelling salesman</h2>
+<p>Sometimes the set of used items is not enough, because the cost of the next step depends on <b>where you are standing</b>. In the travelling salesman problem, the cost of adding city \(v\) depends on the last city visited, so the state becomes a pair: <code>cost[mask][v]</code> is the cheapest path that starts at city 0, visits exactly the cities in <code>mask</code>, and ends at \(v \in\) <code>mask</code>.</p>
+\[
+\text{cost}[S][v] = \min_{u \in S \setminus \{v\}} \big( \text{cost}[S \setminus \{v\}][u] + d(u, v) \big) \quad (0 \in S,\ v \ne 0), \qquad \text{cost}[\{0\}][0] = 0
+\]
+<p>The tour closes with \(\min_v \text{cost}[\text{all}][v] + d(v, 0)\). Fixing city 0 as the start is free, since a tour is a cycle. To recover the tour itself, walk backwards from the best final city, at each step finding the predecessor that achieves the minimum.</p>
+<pre><code class="language-python">def held_karp(d):
+    n = len(d)
+    INF = float("inf")
+    cost = [[INF] * n for _ in range(1 &lt;&lt; n)]
+    cost[1][0] = 0
+    for mask in range(1, 1 &lt;&lt; n, 2):                 # odd masks: city 0 is always included
+        for u in range(n):
+            if cost[mask][u] == INF:
+                continue
+            for v in range(n):
+                if not mask &gt;&gt; v &amp; 1:
+                    nxt = mask | 1 &lt;&lt; v
+                    cost[nxt][v] = min(cost[nxt][v], cost[mask][u] + d[u][v])
+    full = (1 &lt;&lt; n) - 1
+    if n == 1:
+        return 0, [0, 0]
+    last = min(range(1, n), key=lambda v: cost[full][v] + d[v][0])
+    best = cost[full][last] + d[last][0]
+
+    tour, mask, v = [0], full, last                  # walk back through the table
+    while v:
+        tour.append(v)
+        prev = mask ^ 1 &lt;&lt; v
+        v = next(u for u in range(n) if prev &gt;&gt; u &amp; 1 and cost[prev][u] + d[u][v] == cost[mask][v])
+        mask = prev
+    tour.append(0)
+    return best, tour[::-1]
+
+
+def tour_length(d, tour):
+    return sum(d[a][b] for a, b in zip(tour, tour[1:]))
+
+
+assert held_karp([[0]]) == (0, [0, 0])
+assert held_karp([[0, 3], [5, 0]]) == (8, [0, 1, 0])
+assert held_karp([[0, 1, 9], [9, 0, 1], [1, 9, 0]])[0] == 3            # asymmetric: 0 -&gt; 1 -&gt; 2 -&gt; 0
+
+
+for _ in range(100):
+    n = random.randint(2, 7)
+    d = [[0 if i == j else random.randint(1, 30) for j in range(n)] for i in range(n)]   # may be asymmetric
+    best, tour = held_karp(d)
+    brute = min(tour_length(d, (0,) + p + (0,)) for p in permutations(range(1, n)))
+    assert best == brute and tour_length(d, tour) == best and sorted(tour[1:]) == list(range(n))</code></pre>
+<p>This is \(O(n^2 2^n)\) time and \(O(n 2^n)\) space. At \(n = 20\) that is about \(4 \times 10^8\) basic steps, slow in Python but feasible in a compiled language, while \(19!\) is about \(1.2 \times 10^{17}\). It remains the best known exact worst-case bound for general TSP, though the problem is NP-hard, so nobody expects a polynomial one.</p>
+<h2 id="shortest-path-visiting-all-nodes">Shortest path visiting all nodes</h2>
+<p><a href="https://leetcode.com/problems/shortest-path-visiting-all-nodes/">847. Shortest Path Visiting All Nodes</a> is the unweighted cousin: start anywhere, end anywhere, revisits allowed, and find the fewest edges that touch every node. Because every edge costs 1, the Held–Karp table can be filled by <a href="../bfs/">BFS</a> over states <code>(node, visited_mask)</code>. Start from all \(n\) states <code>(v, 1 &lt;&lt; v)</code> at once; the first time any state with a full mask comes off the queue, its distance is the answer.</p>
+<pre><code class="language-python">from collections import deque
+
+
+def shortest_path_length(graph):
+    n = len(graph)
+    full = (1 &lt;&lt; n) - 1
+    seen = [[False] * (1 &lt;&lt; n) for _ in range(n)]
+    queue = deque()
+    for v in range(n):
+        seen[v][1 &lt;&lt; v] = True
+        queue.append((v, 1 &lt;&lt; v, 0))
+    while queue:
+        v, mask, steps = queue.popleft()
+        if mask == full:
+            return steps
+        for u in graph[v]:
+            nxt = mask | 1 &lt;&lt; u
+            if not seen[u][nxt]:
+                seen[u][nxt] = True
+                queue.append((u, nxt, steps + 1))
+
+
+assert shortest_path_length([[1, 2, 3], [0], [0], [0]]) == 4
+assert shortest_path_length([[1], [0, 2, 4], [1, 3, 4], [2], [1, 2]]) == 4
+assert shortest_path_length([[]]) == 0                                # a single node is already covered
+assert shortest_path_length([[1], [0, 2], [1, 3], [2]]) == 3          # a path: walk it end to end</code></pre>
+<p>There are \(n 2^n\) states and each scans the adjacency list, so \(O(n^2 2^n)\) in the worst case. As a cross-check, revisiting means "walk from \(a\) to \(b\)" really costs the shortest-path distance between them, so the answer equals the best ordering of the nodes under all-pairs distances:</p>
+<pre><code class="language-python">def shortest_path_brute(graph):
+    n = len(graph)
+    dist = [[0 if i == j else float("inf") for j in range(n)] for i in range(n)]
+    for v in range(n):
+        for u in graph[v]:
+            dist[v][u] = 1
+    for k in range(n):                                # Floyd–Warshall
+        for i in range(n):
+            for j in range(n):
+                dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j])
+    return min(sum(dist[a][b] for a, b in zip(p, p[1:])) for p in permutations(range(n)))
+
+
+for _ in range(150):
+    n = random.randint(1, 7)
+    order = list(range(n))
+    random.shuffle(order)
+    edges = {(order[i - 1], order[i]) for i in range(1, n)}    # a random spanning tree keeps it connected
+    edges |= {(i, j) for i in range(n) for j in range(i + 1, n) if random.random() &lt; 0.3}
+    graph = [[] for _ in range(n)]
+    for a, b in edges:
+        if a != b and b not in graph[a]:
+            graph[a].append(b)
+            graph[b].append(a)
+    assert shortest_path_length(graph) == shortest_path_brute(graph)</code></pre>
+<h2 id="enumerating-submasks-in-o-3-n">Enumerating submasks in O(3^n)</h2>
+<p>Partitioning problems with <b>unequal</b> parts need a different move: "the last group is some subset of what remains". That requires looping over every submask of a mask. The idiom <code>sub = (sub - 1) &amp; mask</code> steps through them in decreasing order: subtracting 1 clears the lowest set bit and sets every bit below it, and the <code>&amp; mask</code> throws away the bits outside the mask.</p>
+<p>Looping over the submasks of every mask costs much less than \(4^n\). Each element is, independently, outside the mask, in the mask but not the submask, or in both, so the number of (mask, submask) pairs is exactly</p>
+\[
+\sum_{k=0}^{n} \binom{n}{k} 2^k = 3^n.
+\]
+<pre><code class="language-python">def submasks(mask):
+    sub = mask
+    while True:
+        yield sub
+        if sub == 0:
+            return
+        sub = (sub - 1) &amp; mask
+
+
+assert list(submasks(0b101)) == [0b101, 0b100, 0b001, 0]
+assert sum(1 for m in range(1 &lt;&lt; 8) for _ in submasks(m)) == 3 ** 8</code></pre>
+<p><a href="https://leetcode.com/problems/find-minimum-time-to-finish-all-jobs/">1723. Find Minimum Time to Finish All Jobs</a> splits <code>jobs</code> among <code>k</code> workers to minimize the busiest worker's total. Precompute <code>load[mask]</code>, the total of the jobs in <code>mask</code> (one addition per mask using the lowest bit). Then <code>best[mask]</code> is the minimum possible maximum load when the jobs in <code>mask</code> go to the workers handled so far; adding one more worker means giving them some submask:</p>
+<pre><code class="language-python">def minimum_time_required(jobs, k):
+    n = len(jobs)
+    load = [0] * (1 &lt;&lt; n)
+    for mask in range(1, 1 &lt;&lt; n):
+        low = mask &amp; -mask
+        load[mask] = load[mask ^ low] + jobs[low.bit_length() - 1]
+    best = load[:]                                    # one worker takes everything
+    for _ in range(k - 1):
+        nxt = best[:]
+        for mask in range(1, 1 &lt;&lt; n):
+            for sub in submasks(mask):                # sub goes to the new worker
+                nxt[mask] = min(nxt[mask], max(best[mask ^ sub], load[sub]))
+        best = nxt
+    return best[-1]
+
+
+assert minimum_time_required([3, 2, 3], 3) == 3
+assert minimum_time_required([1, 2, 4, 7, 8], 2) == 11
+assert minimum_time_required([5], 1) == 5
+assert minimum_time_required([4, 4, 4], 3) == 4                      # one job each
+
+
+for _ in range(200):
+    jobs = [random.randint(1, 10) for _ in range(random.randint(1, 6))]
+    k = random.randint(1, 4)
+    brute = min(max(sum(j for j, w in zip(jobs, who) if w == g) for g in range(k))
+                for who in product(range(k), repeat=len(jobs)))
+    assert minimum_time_required(jobs, k) == brute</code></pre>
+<p>\(O(k \cdot 3^n)\). At \(n = 12\) that is about half a million submask steps per worker, which is why the constraint is 12 here rather than 20.</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/parallel-courses-ii/">1494. Parallel Courses II</a> (submasks of the currently available courses)</li><li><a href="https://leetcode.com/problems/shopping-offers/">638. Shopping Offers</a> (the state is a vector of small counts, the same idea in a mixed radix)</li><li><a href="https://leetcode.com/problems/maximum-and-sum-of-array/">2172. Maximum AND Sum of Array</a> (each slot holds two numbers: use a base-3 mask, or duplicate every slot)</li><li><a href="https://leetcode.com/problems/minimum-xor-sum-of-two-arrays/">1879. Minimum XOR Sum of Two Arrays</a></li><li><a href="https://leetcode.com/problems/find-the-shortest-superstring/">943. Find the Shortest Superstring</a> (Held–Karp with overlap costs)</li><li><a href="https://leetcode.com/problems/minimum-number-of-work-sessions-to-finish-the-tasks/">1986. Minimum Number of Work Sessions to Finish the Tasks</a></li><li><a href="https://leetcode.com/problems/fair-distribution-of-cookies/">2305. Fair Distribution of Cookies</a></li><li><a href="https://leetcode.com/problems/maximum-students-taking-exam/">1349. Maximum Students Taking Exam</a> (a mask per row, see also <a href="../bit-manipulation/">bit manipulation</a>)</li></ul>
+<p>The subset recurrence for the travelling salesman is due independently to R. Bellman, "Dynamic Programming Treatment of the Travelling Salesman Problem", Journal of the ACM (1962), and M. Held and R. M. Karp, "A Dynamic Programming Approach to Sequencing Problems", Journal of SIAM (1962). The split into ordering, grouping and assignment archetypes follows the LeetCode Discuss article "Dynamic programming on subsets with examples explained".</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>
