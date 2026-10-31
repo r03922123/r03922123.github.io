@@ -33,3 +33,25 @@ header nav [aria-current="page"] { color: var(--fg); }
 .role ul, .plain { padding-left: 1.2em; margin: .6em 0 0; }
 .role li, .plain li { margin: .5em 0; }
 .plain { list-style: disc; }
+
+/* Posts: long-form reading column, TOC, tables, code, references. */
+.post-head { padding: 40px 0 8px; }
+.post-head h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 .4em; }
+.post-head .meta, .post .tags { color: var(--muted); font-size: .9em; }
+.post-body h2 { font-size: 1.4rem; margin: 2em 0 .5em; }
+.post-body h3 { font-size: 1.1rem; margin: 1.5em 0 .4em; }
+.post-body li { margin: .35em 0; }
+.toc { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin: 24px 0; }
+.toc h2 { font-size: 1rem; margin: 0 0 .4em; }
+.toc ol { margin: 0; padding-left: 1.3em; }
+.post-body pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-x: auto; font-size: .85em; line-height: 1.5; }
+.post-body pre code.hljs { background: none; padding: 0; }
+.post-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.post-body :not(pre) > code { background: var(--card); padding: .1em .35em; border-radius: 4px; font-size: .9em; }
+.post-body table { border-collapse: collapse; width: 100%; font-size: .9em; margin: 1em 0; display: block; overflow-x: auto; }
+.post-body th, .post-body td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.post-body th { background: var(--card); }
+.post-body .caption { color: var(--muted); font-size: .9em; margin-top: -.4em; }
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+.refs { font-size: .9em; padding-left: 1.6em; }
+.refs li:target { background: var(--card); }

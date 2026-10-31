@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Position bias: why click logs lie · r03922123</title>
+<meta name="description" content="Why a ranker trained on raw clicks learns position instead of relevance, and how inverse propensity weighting, dual learning, position features and interleaving correct it.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<header class="post-head">
+  <h1>Position bias: why click logs lie and how to correct them</h1>
+  <div class="meta">October 31, 2026 · 6 min read · ranking · recommendation · evaluation</div>
+</header>
+
+<p>Every ranking system that learns from its own clicks has the same blind spot. People click what they
+see, and they see what is on top. Train a model on raw clicks and it learns that the top slot is good,
+not which items are good. This post sets out the problem as a simple model of clicking, shows with a small
+simulation how badly raw click-through rate misleads, then walks through the standard corrections and when
+each one fits.</p>
+
+<nav class="toc"><h2>Contents</h2><ol>
+  <li><a href="#loop">The feedback loop</a></li>
+  <li><a href="#examination">A model of a click</a></li>
+  <li><a href="#ips">Inverse propensity weighting</a></li>
+  <li><a href="#propensity">Estimating the propensities</a></li>
+  <li><a href="#variance">Variance and clipping</a></li>
+  <li><a href="#dla">Learning propensities and relevance together</a></li>
+  <li><a href="#feature">Position as a feature</a></li>
+  <li><a href="#interleaving">Comparing rankers: interleaving</a></li>
+  <li><a href="#choose">Which correction to use</a></li>
+  <li><a href="#refs">References</a></li>
+</ol></nav>
+
+<h2 id="loop">The feedback loop</h2>
+<p>A ranker shows a list. Users click mostly near the top. Those clicks become the next training set, in
+which the items that were on top look best, so they stay on top. An excellent item that first appeared at
+rank 9 collects few clicks, looks mediocre, and stays at rank 9. The system confirms its own past choices
+and cannot find better ones.</p>
+<p>The bias is not only "people are lazy". In an eye-tracking study of web search, Joachims et al.
+<a href="#ref-1">[1]</a> swapped the top two results without telling users. People still clicked the
+first slot more often, even when it now held the less relevant result. Position carries trust as well as
+visibility.</p>
+
+<h2 id="examination">A model of a click</h2>
+<p>The standard way to separate the two effects is the <em>examination hypothesis</em>
+<a href="#ref-2">[2]</a>: a user clicks an item only if they examined it <em>and</em> found it relevant,
+and whether they examine it depends only on its rank \(k\):</p>
+\[ P(c = 1 \mid d, k) \;=\; \underbrace{P(e = 1 \mid k)}_{\text{propensity } p_k} \cdot \underbrace{P(r = 1 \mid d)}_{\text{relevance } \rho_d} \]
+<p>Raw click-through rate estimates the product \(p_k \rho_d\), not \(\rho_d\). Two items with the same
+relevance at ranks 1 and 8 can differ in CTR by whatever factor separates \(p_1\) from \(p_8\).</p>
+
+<h2 id="ips">Inverse propensity weighting</h2>
+<p>If we knew \(p_k\), the fix would be one line: divide each click by the probability that its position
+was examined <a href="#ref-3">[3]</a>. The weighted click is an unbiased estimate of relevance:</p>
+\[ \mathbb{E}\!\left[\frac{c}{p_k}\right] = \frac{p_k\,\rho_d}{p_k} = \rho_d . \]
+<p>For learning to rank the same weight goes on each clicked item's loss term, so a model trained on logged
+clicks optimizes, in expectation, the loss it would have had with true relevance labels:</p>
+\[ \mathcal{L}_{\text{IPS}} = \sum_{(d,\,k)\,:\,c_d = 1} \frac{\ell(d)}{p_k} . \]
+<p>A small simulation makes the size of the problem concrete. Ten items with known relevance are shown in
+a fixed order, examination falls off as \(p_k = 1/k\), and we compare raw CTR with the IPS estimate:</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+n_items, n_sessions, eta = 10, 200_000, 1.0
+relevance = rng.uniform(0.05, 0.6, n_items)           # P(click | examined), unknown to us
+propensity = (1 / np.arange(1, n_items + 1)) ** eta   # P(examined | rank k)
+
+ranking = rng.permutation(n_items)                    # ranking[k] = item shown at rank k
+rank_of = np.argsort(ranking)                         # rank_of[i] = rank of item i
+
+examined = rng.random((n_sessions, n_items)) &lt; propensity          # columns are ranks
+clicked = examined &amp; (rng.random((n_sessions, n_items)) &lt; relevance[ranking])
+
+naive = clicked.mean(0)[rank_of]                      # raw CTR per item
+ips = (clicked / propensity).mean(0)[rank_of]         # each click weighted by 1 / p_k</code></pre>
+<table>
+  <thead><tr><th>Item</th><th>Shown at rank</th><th>True relevance</th><th>Raw CTR</th><th>IPS estimate</th></tr></thead>
+  <tbody>
+    <tr><td>9</td><td>8</td><td>0.564</td><td>0.070</td><td>0.561</td></tr>
+    <tr><td>5</td><td>5</td><td>0.552</td><td>0.110</td><td>0.550</td></tr>
+    <tr><td>4</td><td>1</td><td>0.497</td><td>0.496</td><td>0.496</td></tr>
+    <tr><td>7</td><td>2</td><td>0.451</td><td>0.225</td><td>0.450</td></tr>
+    <tr><td>0</td><td>10</td><td>0.400</td><td>0.041</td><td>0.408</td></tr>
+  </tbody>
+</table>
+<p class="caption">Top five items by true relevance. Raw CTR names item 4 the best because it sits at rank 1;
+the actual best item, at rank 8, has a seventh of its CTR. IPS recovers every item's relevance to within
+0.008.</p>
+
+<h2 id="propensity">Estimating the propensities</h2>
+<p>Everything above assumes \(p_k\) is known. It has to be measured, and there are three common routes.</p>
+<ul>
+  <li><b>Randomize on a small slice of traffic.</b> Shuffle the top results, or swap the item at rank \(k\)
+  with the one at rank 1, for a small fraction of requests. Because relevance is now independent of rank,
+  the click rate at each rank is proportional to \(p_k\) <a href="#ref-3">[3]</a><a href="#ref-4">[4]</a>.
+  The cost is a worse experience for the users who see shuffled lists.</li>
+  <li><b>Fit a parametric curve.</b> A power law \(p_k = (1/k)^{\eta}\) is a common choice
+  <a href="#ref-3">[3]</a>; the exponent depends on the surface. A search results page, a feed and a
+  horizontal carousel decay very differently.</li>
+  <li><b>Estimate without intervention.</b> Treat examination and relevance as latent variables and fit both
+  from regular logs with expectation–maximization <a href="#ref-5">[5]</a>, using the fact that the same
+  query–item pair appears at different ranks over time.</li>
+</ul>
+
+<h2 id="variance">Variance and clipping</h2>
+<p>IPS is unbiased but can be very noisy. A click at rank 50 with \(p_{50} = 0.02\) counts fifty times as
+much as a click at rank 1, so a handful of deep clicks can dominate a training batch. The usual remedy is to
+cap the weight at some \(\tau\):</p>
+\[ w_k = \min\!\left(\frac{1}{p_k},\; \tau\right). \]
+<p>Clipping deliberately reintroduces some bias, since deep items are now under-credited, in exchange for a
+large cut in variance. It is the same bias–variance trade-off as capping importance weights in
+counterfactual evaluation <a href="#ref-6">[6]</a>, and \(\tau\) is best chosen on held-out randomized
+traffic, not by convention.</p>
+
+<h2 id="dla">Learning propensities and relevance together</h2>
+<p>Randomization costs user experience, and a hand-fit curve may be wrong. The dual learning algorithm
+<a href="#ref-7">[7]</a> avoids both by noticing a symmetry in the examination hypothesis: if you knew
+relevance, you could estimate propensity by inverse <em>relevance</em> weighting, just as IPS estimates
+relevance by inverse propensity weighting. DLA trains a ranking model and a propensity model jointly, each
+using the other's current estimates as its correction, and both improve together. The cost is a harder
+optimization problem with two coupled models to debug.</p>
+
+<h2 id="feature">Position as a feature</h2>
+<p>A simpler and very common approach is to give the model the position it was shown at during training,
+and to fix that input to one constant at serving time, so every candidate is scored as if it sat in the same
+slot. Done naively, the position input can get tangled up with other features. Two published designs keep
+it separate by construction:</p>
+<ul>
+  <li><b>PAL</b> <a href="#ref-8">[8]</a> factors the predicted click probability into
+  \(P(\text{seen} \mid k) \cdot P(\text{click} \mid \text{seen}, d)\), with a separate module for each. At
+  serving time only the second module is used.</li>
+  <li><b>A shallow tower</b> <a href="#ref-9">[9]</a>: position and other bias features feed a small
+  separate network whose output is added to the main model's logit during training and dropped at
+  serving time.</li>
+</ul>
+<p>Both are forms of the examination hypothesis built into the architecture. Neither removes the need to
+check that the "bias" side really learns only bias: if position is correlated with item quality in the
+logs, which it is by design, some quality signal can leak into the position side.</p>
+
+<h2 id="interleaving">Comparing rankers: interleaving</h2>
+<p>Position bias also distorts evaluation. To compare ranker A with ranker B, <em>team-draft
+interleaving</em> <a href="#ref-10">[10]</a> merges their lists into one: the two rankers take turns picking
+their highest remaining item, with a coin flip deciding who picks first each round. A click credits the
+ranker that contributed the item. Across many requests both rankers fill every position equally often, so
+position bias cancels out by design rather than being corrected statistically.</p>
+<p>Because every user sees both rankers at once, interleaving reaches a confident verdict with far less
+traffic than splitting users into two arms: in large-scale comparisons, Chapelle et al.
+<a href="#ref-11">[11]</a> found it one to two orders of magnitude more sensitive. Its limit is that it tells
+you which ranker is better, not by how much on business metrics, and it produces no training signal.</p>
+
+<h2 id="choose">Which correction to use</h2>
+<table>
+  <thead><tr><th>Method</th><th>Use it for</th><th>Watch out for</th></tr></thead>
+  <tbody>
+    <tr><td>IPS</td><td>Training on logged clicks when propensities are known</td><td>High variance from deep clicks</td></tr>
+    <tr><td>Clipped IPS</td><td>The same, with bounded variance</td><td>Bias toward the top; choose \(\tau\) on data</td></tr>
+    <tr><td>Randomization</td><td>Measuring propensities directly</td><td>Costs user experience on the randomized slice</td></tr>
+    <tr><td>EM / DLA</td><td>Propensities without a randomization budget</td><td>Harder to optimize and debug</td></tr>
+    <tr><td>Position as a feature</td><td>A quick, architecture-level correction</td><td>Quality signal leaking into the position input</td></tr>
+    <tr><td>Interleaving</td><td>Deciding which of two rankers is better</td><td>No effect size, no training signal</td></tr>
+  </tbody>
+</table>
+<p>In practice these combine: a little randomized traffic to estimate and audit propensities, a
+position-aware model or IPS-weighted loss for training, and interleaving to decide which model ships.</p>
+
+<h2 id="refs">References</h2>
+<ol class="refs">
+  <li id="ref-1">T. Joachims, L. Granka, B. Pan, H. Hembrooke, G. Gay. <i>Accurately Interpreting Clickthrough Data as Implicit Feedback.</i> SIGIR 2005.</li>
+  <li id="ref-2">N. Craswell, O. Zoeter, M. Taylor, B. Ramsey. <i>An Experimental Comparison of Click Position-Bias Models.</i> WSDM 2008.</li>
+  <li id="ref-3">T. Joachims, A. Swaminathan, T. Schnabel. <i>Unbiased Learning-to-Rank with Biased Feedback.</i> WSDM 2017.</li>
+  <li id="ref-4">X. Wang, M. Bendersky, D. Metzler, M. Najork. <i>Learning to Rank with Selection Bias in Personal Search.</i> SIGIR 2016.</li>
+  <li id="ref-5">X. Wang, N. Golbandi, M. Bendersky, D. Metzler, M. Najork. <i>Position Bias Estimation for Unbiased Learning to Rank in Personal Search.</i> WSDM 2018.</li>
+  <li id="ref-6">L. Bottou et al. <i>Counterfactual Reasoning and Learning Systems: The Example of Computational Advertising.</i> JMLR 14, 2013.</li>
+  <li id="ref-7">Q. Ai, K. Bi, C. Luo, J. Guo, W. B. Croft. <i>Unbiased Learning to Rank with Unbiased Propensity Estimation.</i> SIGIR 2018.</li>
+  <li id="ref-8">H. Guo, J. Yu, Q. Liu, R. Tang, Y. Zhang. <i>PAL: A Position-bias Aware Learning Framework for CTR Prediction in Live Recommender Systems.</i> RecSys 2019.</li>
+  <li id="ref-9">Z. Zhao et al. <i>Recommending What Video to Watch Next: A Multitask Ranking System.</i> RecSys 2019.</li>
+  <li id="ref-10">F. Radlinski, M. Kurup, T. Joachims. <i>How Does Clickthrough Data Reflect Retrieval Quality?</i> CIKM 2008.</li>
+  <li id="ref-11">O. Chapelle, T. Joachims, F. Radlinski, Y. Yue. <i>Large-Scale Validation and Analysis of Interleaved Search Evaluation.</i> ACM TOIS 30(1), 2012.</li>
+</ol>
+
+<h2 id="cite">Cite as</h2>
+<pre class="cite"><code class="language-plaintext">@article{lin2026positionbias,
+  title   = {Position bias: why click logs lie and how to correct them},
+  author  = {Lin, Jie-Hong},
+  journal = {r03922123.github.io},
+  year    = {2026},
+  month   = {Oct},
+  url     = {https://r03922123.github.io/posts/position-bias/}
+}</code></pre>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

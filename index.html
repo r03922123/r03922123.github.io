@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>r03922123</title>
-<meta name="description" content="Long-form technical posts on generative audio and ML systems, each with reproducible code.">
+<meta name="description" content="Long-form technical posts on machine learning: generative audio, ranking and ML systems.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,9 +16,16 @@
 <main>
 <section class="intro">
   <h1>Posts</h1>
-  <p>Long-form technical notes on generative audio and ML systems. Every number traces to committed code and results.</p>
+  <p>Long-form technical notes on machine learning: generative audio, ranking, and ML systems. Every number traces to committed code and results.</p>
 </section>
-<!-- One entry per post. Each post is built and deployed by its own project repo. -->
+<!-- One entry per post, newest first. In-repo posts live under posts/; others are deployed by their own repo. -->
+<a class="post" href="posts/position-bias/">
+  <h2>Position bias: why click logs lie and how to correct them</h2>
+  <p>A ranker trained on raw clicks learns position, not relevance. The examination model, a simulation of how
+  far raw CTR misleads, and the corrections: inverse propensity weighting, dual learning, position features
+  and interleaving.</p>
+  <div class="meta">October 31, 2026 · 6 min read · ranking · recommendation · evaluation</div>
+</a>
 <a class="post" href="/musicgen-prune-inference/">
   <h2>Judging text-to-music: CLAP best-of-N, then and now</h2>
   <p>How generated music is judged, from FID and CLIP score to FAD, CLAP and learned music judges; why picking the

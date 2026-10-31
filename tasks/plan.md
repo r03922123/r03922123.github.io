@@ -49,7 +49,7 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 - [ ] `check.py` exits 0; About page reviewed against résumé + `Never claim:` lines
 
 ### Phase 2: Posts
-- [ ] Task 3: Post template + post 1 (position bias)
+- [x] Task 3: Post template + post 1 (position bias)
 - [ ] Task 4: Post 2 (text-to-music 2026)
 
 ### Checkpoint B — after Tasks 3–4 (review with you)
