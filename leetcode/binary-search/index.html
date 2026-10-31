@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary search on the answer · r03922123</title>
+<meta name="description" content="What bisect_left and bisect_right count, and two loop templates — the first k where a predicate turns true, the last k where it is still true — applied to problems that never mention sorting.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Sorting, searching and strings</p>
+<header class="post-head">
+  <h1>Binary search on the answer</h1>
+  <div class="meta">October 31, 2026 · 3 min read · binary search · bisect · monotone predicates</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#what-bisect-counts">What bisect counts</a></li><li><a href="#template-1-the-first-k-where-f-k-is-true">Template 1: the first k where f(k) is true</a></li><li><a href="#template-2-the-last-k-where-f-k-is-still-true">Template 2: the last k where f(k) is still true</a></li><li><a href="#checklist">Checklist</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Binary search is usually taught as "find x in a sorted array". Its more useful form is: given a <b>monotone predicate</b> \(f(k)\), one that is false up to some point and true after it, find the boundary in \(O(\log n)\) evaluations. The array never has to exist. If you can ask "is \(k\) enough?" and the answer only flips once, you can binary search \(k\).</p>
+<h2 id="what-bisect-counts">What bisect counts</h2>
+<p>Python's <code>bisect</code> module is the cleanest way to think about boundaries in sorted data:</p>
+<ul><li><code>bisect_left(a, x)</code> is the number of items <b>less than</b> <code>x</code>, which is also the first index where <code>x</code> could go.</li><li><code>bisect_right(a, x)</code> is the number of items <b>less than or equal to</b> <code>x</code>.</li></ul>
+<pre><code class="language-python">from bisect import bisect_left, bisect_right
+
+a = [1, 3, 3, 3, 7]
+assert bisect_left(a, 3) == 1 and bisect_right(a, 3) == 4    # three 3s occupy a[1:4]
+assert bisect_right(a, 3) - bisect_left(a, 3) == a.count(3)
+assert bisect_left(a, 5) == bisect_right(a, 5) == 4            # absent: both give the insertion point</code></pre>
+<p>So "first and last position of x" (<a href="https://leetcode.com/problems/find-first-and-last-position-of-element-in-sorted-array/">34</a>) is two calls, and "how many values fall in [lo, hi]" is <code>bisect_right(a, hi) - bisect_left(a, lo)</code>.</p>
+<h2 id="template-1-the-first-k-where-f-k-is-true">Template 1: the first k where f(k) is true</h2>
+<p>The search space is <code>[lo, hi]</code> and looks like <code>F F F T T T</code>. Keep the invariant that the answer is inside <code>[lo, hi]</code>; when <code>f(mid)</code> is true, <code>mid</code> might be the answer, so keep it.</p>
+<pre><code class="language-python">def first_true(lo, hi, f):
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if f(mid):
+            hi = mid              # mid could be the answer
+        else:
+            lo = mid + 1          # mid is definitely not
+    return lo</code></pre>
+<p><a href="https://leetcode.com/problems/koko-eating-bananas/">875. Koko Eating Bananas</a>: the smallest eating speed that finishes all piles within <code>h</code> hours. Faster is never worse, so "speed k is enough" is monotone:</p>
+<pre><code class="language-python">def min_eating_speed(piles, h):
+    return first_true(1, max(piles), lambda k: sum((p + k - 1) // k for p in piles) &lt;= h)
+
+
+assert min_eating_speed([3, 6, 7, 11], 8) == 4
+assert min_eating_speed([30, 11, 23, 4, 20], 5) == 30</code></pre>
+<h2 id="template-2-the-last-k-where-f-k-is-still-true">Template 2: the last k where f(k) is still true</h2>
+<p>Now the space looks like <code>T T T F F F</code>. The midpoint must round <b>up</b>, or <code>lo = mid</code> would loop forever when <code>hi = lo + 1</code>.</p>
+<pre><code class="language-python">def last_true(lo, hi, f):
+    while lo &lt; hi:
+        mid = (lo + hi + 1) // 2  # round up so the range always shrinks
+        if f(mid):
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo</code></pre>
+<p><a href="https://leetcode.com/problems/maximum-value-at-a-given-index-in-a-bounded-array/">1802. Maximum Value at a Given Index in a Bounded Array</a>: build an array of positive integers, adjacent values differing by at most 1, total at most <code>max_sum</code>; maximize <code>nums[index]</code>. For a peak value <code>v</code>, the cheapest array slopes down by 1 on each side and stays at 1 once it gets there, and a bigger peak never costs less, so "peak v fits" is monotone:</p>
+<pre><code class="language-python">def max_value(n, index, max_sum):
+    def side(v, length):          # cheapest sum of `length` values sloping down from v - 1, floored at 1
+        if v - 1 &gt;= length:
+            return (v - 1 + v - length) * length // 2
+        return (v - 1) * v // 2 + (length - (v - 1))
+    return last_true(1, max_sum, lambda v: v + side(v, index) + side(v, n - index - 1) &lt;= max_sum)
+
+
+def brute(n, index, max_sum):
+    best = 0
+    for v in range(1, max_sum + 1):
+        if sum(max(v - abs(i - index), 1) for i in range(n)) &lt;= max_sum:
+            best = v
+    return best
+
+
+assert max_value(4, 2, 6) == 2
+assert max_value(6, 1, 10) == 3
+for n in range(1, 7):
+    for index in range(n):
+        for s in range(n, 25):
+            assert max_value(n, index, s) == brute(n, index, s)</code></pre>
+<h2 id="checklist">Checklist</h2>
+<ol><li>Name the predicate and argue it flips only once.</li><li>Choose bounds that surely contain the answer.</li><li>First-true rounds down and keeps <code>hi = mid</code>; last-true rounds up and keeps <code>lo = mid</code>.</li><li>The cost is \(O(\log(\text{range}) \times \text{cost of } f)\), which is why \(f\) can afford an \(O(n)\) scan, or even a BFS as in <a href="https://leetcode.com/problems/last-day-where-you-can-still-cross/">1970. Last Day Where You Can Still Cross</a>.</li></ol>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/kth-missing-positive-number/">1539. Kth Missing Positive Number</a></li><li><a href="https://leetcode.com/problems/last-day-where-you-can-still-cross/">1970. Last Day Where You Can Still Cross</a></li><li><a href="https://leetcode.com/problems/path-with-maximum-minimum-value/">1102. Path With Maximum Minimum Value</a></li><li><a href="https://leetcode.com/problems/shortest-way-to-form-string/">1055. Shortest Way to Form String</a></li><li><a href="https://leetcode.com/problems/split-array-largest-sum/">410. Split Array Largest Sum</a></li></ul>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

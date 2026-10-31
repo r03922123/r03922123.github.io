@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rolling hash (Rabin–Karp) · r03922123</title>
+<meta name="description" content="Hash every length-m window of a string in O(1) per step by sliding a polynomial hash. Substring search, then the real use, comparing many substrings at once, with binary search on length.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Sorting, searching and strings</p>
+<header class="post-head">
+  <h1>Rolling hash (Rabin–Karp)</h1>
+  <div class="meta">October 31, 2026 · 3 min read · hashing · strings · binary search</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#the-polynomial-hash">The polynomial hash</a></li><li><a href="#substring-search">Substring search</a></li><li><a href="#where-it-shines-many-substrings-at-once">Where it shines: many substrings at once</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>Comparing two strings of length \(m\) costs \(O(m)\). A rolling hash makes comparing two <b>substrings</b> cost \(O(1)\), after \(O(n)\) preprocessing, by giving every window a number that can be updated as the window slides. Equal strings always have equal hashes; unequal ones collide only with small probability, and a collision can be ruled out with a direct comparison.</p>
+<h2 id="the-polynomial-hash">The polynomial hash</h2>
+<p>Treat the string as digits in base \(B\), modulo a large prime \(M\):</p>
+\[ h(s_0 s_1 \ldots s_{m-1}) = \left(s_0 B^{m-1} + s_1 B^{m-2} + \cdots + s_{m-1}\right) \bmod M. \]
+<p>Sliding one step right removes the leading digit and appends a new one:</p>
+\[ h_{\text{next}} = \left((h - s_{\text{out}} B^{m-1}) \cdot B + s_{\text{in}}\right) \bmod M. \]
+<p>Precompute \(B^{m-1} \bmod M\) once, and each step is a few multiplications. Use a large prime \(M\) (here \(2^{61} - 1\)) and a random base, so no fixed input can be built to force collisions.</p>
+<h2 id="substring-search">Substring search</h2>
+<p><a href="https://leetcode.com/problems/find-the-index-of-the-first-occurrence-in-a-string/">28. Find the Index of the First Occurrence in a String</a>: compare the pattern's hash with each window's, and confirm matches directly.</p>
+<pre><code class="language-python">import random
+
+MOD = (1 &lt;&lt; 61) - 1
+BASE = random.randrange(256, MOD - 1)
+
+
+def find(text, pattern):
+    m, n = len(pattern), len(text)
+    if m == 0:
+        return 0
+    if m &gt; n:
+        return -1
+    top = pow(BASE, m - 1, MOD)                     # weight of the leading character
+    hp = hw = 0
+    for i in range(m):
+        hp = (hp * BASE + ord(pattern[i])) % MOD
+        hw = (hw * BASE + ord(text[i])) % MOD
+    for i in range(n - m + 1):
+        if hw == hp and text[i:i + m] == pattern:   # confirm: rules out a collision
+            return i
+        if i + m &lt; n:
+            hw = ((hw - ord(text[i]) * top) * BASE + ord(text[i + m])) % MOD
+    return -1
+
+
+assert find("sadbutsad", "sad") == 0
+assert find("leetcode", "leeto") == -1
+for _ in range(500):
+    t = "".join(random.choice("ab") for _ in range(random.randint(0, 12)))
+    p = "".join(random.choice("ab") for _ in range(random.randint(0, 4)))
+    assert find(t, p) == t.find(p)</code></pre>
+<p>Expected \(O(n + m)\). For one pattern, <a href="../string-matching/">KMP</a> gives the same bound with no probability involved; the rolling hash earns its place when many substrings must be compared.</p>
+<h2 id="where-it-shines-many-substrings-at-once">Where it shines: many substrings at once</h2>
+<p>With prefix hashes, the hash of <b>any</b> substring is \(O(1)\):</p>
+\[ h(s[i:j]) = \left(P_j - P_i \cdot B^{j-i}\right) \bmod M, \qquad P_{k+1} = (P_k \cdot B + s_k) \bmod M. \]
+<p><a href="https://leetcode.com/problems/longest-duplicate-substring/">1044. Longest Duplicate Substring</a>: if a repeated substring of length \(L\) exists, one of length \(L - 1\) does too, so the length can be <a href="../binary-search/">binary searched</a>, and each check hashes all windows of that length into a set.</p>
+<pre><code class="language-python">def longest_dup_substring(s):
+    n = len(s)
+    prefix, power = [0] * (n + 1), [1] * (n + 1)
+    for i, ch in enumerate(s):
+        prefix[i + 1] = (prefix[i] * BASE + ord(ch)) % MOD
+        power[i + 1] = power[i] * BASE % MOD
+
+    def repeated(length):                            # start of a repeated substring, or -1
+        seen = {}
+        for i in range(n - length + 1):
+            h = (prefix[i + length] - prefix[i] * power[length]) % MOD
+            if h in seen and s[seen[h]:seen[h] + length] == s[i:i + length]:
+                return i
+            seen.setdefault(h, i)
+        return -1
+
+    lo, hi, best = 1, n - 1, ""
+    while lo &lt;= hi:
+        mid = (lo + hi) // 2
+        start = repeated(mid)
+        if start &gt;= 0:
+            best, lo = s[start:start + mid], mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
+def brute(s):
+    return max((s[i:j] for i in range(len(s)) for j in range(i + 1, len(s) + 1) if s.find(s[i:j], i + 1) != -1),
+               key=len, default="")
+
+
+assert longest_dup_substring("banana") == "ana"
+assert longest_dup_substring("abcd") == ""
+for _ in range(300):
+    t = "".join(random.choice("ab") for _ in range(random.randint(1, 10)))
+    assert len(longest_dup_substring(t)) == len(brute(t))</code></pre>
+<p>\(O(n \log n)\) expected; a suffix array solves it deterministically but is far more code.</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/repeated-dna-sequences/">187. Repeated DNA Sequences</a></li><li><a href="https://leetcode.com/problems/strings-differ-by-one-character/">1554. Strings Differ by One Character</a></li><li><a href="https://leetcode.com/problems/k-divisible-elements-subarrays/">2261. K Divisible Elements Subarrays</a></li><li><a href="https://leetcode.com/problems/longest-common-subpath/">1923. Longest Common Subpath</a></li></ul>
+<p>Rabin–Karp is from R. M. Karp and M. O. Rabin, "Efficient randomized pattern-matching algorithms" (1987).</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

@@ -23,7 +23,7 @@
 <main>
 <section class="intro">
   <h1>LeetCode patterns</h1>
-  <p>5 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
+  <p>12 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
   asserts pass.</p>
 </section>
@@ -34,6 +34,16 @@
   <li><a href="prefix-state-map/">Prefix state map: subarrays as differences of prefixes</a><span>Store each prefix's state in a hash map, and a subarray becomes a pair of prefixes. Counting subarrays with sum k, nice subarrays, and the longest substring with even vowel counts using a bitmask.</span></li>
   <li><a href="sweep-line/">Sweep line: turn intervals into events</a><span>Replace each interval with a +change at its start and a −change at its end, then sweep in order. Difference arrays, sorted events, and answering point queries with binary search.</span></li>
   <li><a href="majority-vote-and-sieve/">Majority vote and the sieve of Eratosthenes</a><span>Two small classics. Boyer–Moore voting finds a majority element in one pass and O(1) space, and generalizes to elements above n/3. The sieve finds every prime below n in O(n log log n).</span></li>
+</ul>
+<h2 id="sorting-searching-and-strings">Sorting, searching and strings</h2>
+<ul class="series">
+  <li><a href="binary-search/">Binary search on the answer</a><span>What bisect_left and bisect_right count, and two loop templates — the first k where a predicate turns true, the last k where it is still true — applied to problems that never mention sorting.</span></li>
+  <li><a href="sorting/">Merge sort, quicksort and the Dutch flag partition</a><span>The two comparison sorts worth writing from memory, what each guarantees, and the three-way partition that keeps quicksort fast when values repeat.</span></li>
+  <li><a href="quick-select/">Quickselect: the kth element in linear expected time</a><span>Partition like quicksort but recurse into one side only. Why that is O(n) on average, why repeated values break the naive version, and how it compares with a heap.</span></li>
+  <li><a href="bucket-sort/">Bucket sort by frequency</a><span>When the sort key is a count bounded by n, index buckets by the key instead of comparing. Top k frequent elements and sorting characters by frequency in linear time.</span></li>
+  <li><a href="reverse-pairs/">Counting pairs with i &lt; j: merge sort and sorted containers</a><span>Problems that count pairs (i, j) with i &lt; j and some inequality between values. Counting during merge sort, and the sorted-list alternative, applied to reverse pairs and a shifted-difference variant.</span></li>
+  <li><a href="rolling-hash/">Rolling hash (Rabin–Karp)</a><span>Hash every length-m window of a string in O(1) per step by sliding a polynomial hash. Substring search, then the real use, comparing many substrings at once, with binary search on length.</span></li>
+  <li><a href="string-matching/">String matching with KMP and the Z-function</a><span>Two linear-time tools that reuse what a failed comparison already revealed. The KMP failure table, the Z-array, and how each finds a pattern or scores a string against its own prefixes.</span></li>
 </ul>
 </main>
 <footer>Personal site. Not affiliated with any company.</footer>

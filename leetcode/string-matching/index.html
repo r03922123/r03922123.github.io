@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>String matching with KMP and the Z-function · r03922123</title>
+<meta name="description" content="Two linear-time tools that reuse what a failed comparison already revealed. The KMP failure table, the Z-array, and how each finds a pattern or scores a string against its own prefixes.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Sorting, searching and strings</p>
+<header class="post-head">
+  <h1>String matching with KMP and the Z-function</h1>
+  <div class="meta">October 31, 2026 · 3 min read · strings · KMP · Z-function</div>
+</header>
+<nav class="toc"><h2>Contents</h2><ol><li><a href="#kmp-the-failure-table">KMP: the failure table</a></li><li><a href="#the-z-function">The Z-function</a></li><li><a href="#which-to-use">Which to use</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<p>The naive way to find a pattern of length \(m\) in a text of length \(n\) restarts after every mismatch, \(O(nm)\) in the worst case (try finding <code>aaab</code> in <code>aaaa…a</code>). Both algorithms here are \(O(n + m)\), and both win the same way: when a comparison fails, they already know how much of the pattern still matches, so they never re-read the text.</p>
+<h2 id="kmp-the-failure-table">KMP: the failure table</h2>
+<p>For each prefix <code>p[:i+1]</code> of the pattern, let <code>lps[i]</code> be the length of its longest proper prefix that is also a suffix. If we have matched <code>j</code> characters and the next one fails, the last <code>lps[j-1]</code> characters we matched are also the pattern's first <code>lps[j-1]</code> characters, so we can continue from there instead of from zero.</p>
+<pre><code class="language-plaintext">pattern  a b a b a c a
+lps      0 0 1 2 3 0 1</code></pre>
+<p>Building the table is the same algorithm run on the pattern against itself:</p>
+<pre><code class="language-python">def build_lps(p):
+    lps, j = [0] * len(p), 0                # j = length of the current matched prefix
+    for i in range(1, len(p)):
+        while j and p[i] != p[j]:
+            j = lps[j - 1]                  # fall back to the next shorter border
+        if p[i] == p[j]:
+            j += 1
+        lps[i] = j
+    return lps
+
+
+def kmp_find(text, p):
+    if not p:
+        return 0
+    lps, j = build_lps(p), 0
+    for i, ch in enumerate(text):
+        while j and ch != p[j]:
+            j = lps[j - 1]
+        if ch == p[j]:
+            j += 1
+        if j == len(p):
+            return i - len(p) + 1
+    return -1
+
+
+assert build_lps("ababaca") == [0, 0, 1, 2, 3, 0, 1]
+assert kmp_find("sadbutsad", "sad") == 0
+assert kmp_find("aaaaaaaab", "aaab") == 5
+import random
+for _ in range(500):
+    t = "".join(random.choice("ab") for _ in range(random.randint(0, 14)))
+    p = "".join(random.choice("ab") for _ in range(random.randint(0, 4)))
+    assert kmp_find(t, p) == t.find(p)</code></pre>
+<p>Why linear: <code>j</code> increases at most once per text character, and every fallback decreases it, so the total number of fallbacks is at most \(n\).</p>
+<h2 id="the-z-function">The Z-function</h2>
+<p><code>z[i]</code> is the length of the longest substring starting at <code>i</code> that matches a <b>prefix</b> of the string. The algorithm keeps the rightmost window <code>[lo, hi)</code> known to match a prefix; for a position inside it, the mirrored position <code>i - lo</code> already tells us a lower bound, and only characters beyond <code>hi</code> are compared fresh.</p>
+<pre><code class="language-python">def z_function(s):
+    n = len(s)
+    z, lo, hi = [0] * n, 0, 0               # s[lo:hi] matches the prefix s[0:hi-lo]
+    for i in range(1, n):
+        if i &lt; hi:
+            z[i] = min(hi - i, z[i - lo])   # reuse the mirrored value, capped at the window's end
+        while i + z[i] &lt; n and s[z[i]] == s[i + z[i]]:
+            z[i] += 1
+        if i + z[i] &gt; hi:
+            lo, hi = i, i + z[i]
+    return z
+
+
+def z_brute(s):
+    out = [0] * len(s)
+    for i in range(1, len(s)):
+        while i + out[i] &lt; len(s) and s[out[i]] == s[i + out[i]]:
+            out[i] += 1
+    return out
+
+
+assert z_function("aabxaab") == [0, 1, 0, 0, 3, 1, 0]
+for _ in range(500):
+    t = "".join(random.choice("ab") for _ in range(random.randint(0, 14)))
+    assert z_function(t) == z_brute(t)</code></pre>
+<p>To search, run it on <code>pattern + sep + text</code> with a separator that occurs in neither: a match is any position where <code>z[i]</code> equals the pattern length.</p>
+<p><a href="https://leetcode.com/problems/sum-of-scores-of-built-strings/">2223. Sum of Scores of Built Strings</a> asks, for every suffix, the length of its common prefix with the whole string. That is the Z-array by definition, plus \(n\) for the string itself:</p>
+<pre><code class="language-python">def sum_scores(s):
+    return sum(z_function(s)) + len(s)
+
+
+assert sum_scores("babab") == 9
+assert sum_scores("azbazbzaz") == 14</code></pre>
+<h2 id="which-to-use">Which to use</h2>
+<p>Both are linear and equally short. KMP streams over the text without storing it, which suits online matching. The Z-array answers "how much of the prefix matches here" for every position at once, which suits scoring problems like 2223. For comparing many substrings, a <a href="../rolling-hash/">rolling hash</a> is simpler.</p>
+<h2 id="practice">Practice</h2>
+<ul><li><a href="https://leetcode.com/problems/repeated-substring-pattern/">459. Repeated Substring Pattern</a></li><li><a href="https://leetcode.com/problems/shortest-palindrome/">214. Shortest Palindrome</a></li><li><a href="https://leetcode.com/problems/longest-happy-prefix/">1392. Longest Happy Prefix</a></li><li><a href="https://leetcode.com/problems/bold-words-in-string/">758. Bold Words in String</a></li><li><a href="https://leetcode.com/problems/sum-of-scores-of-built-strings/">2223. Sum of Scores of Built Strings</a></li></ul>
+<p>KMP is from D. E. Knuth, J. H. Morris and V. R. Pratt, "Fast Pattern Matching in Strings" (1977).</p>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>
