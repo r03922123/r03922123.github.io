@@ -93,6 +93,16 @@ class CheckTest(unittest.TestCase):
         out = self.findings(files)
         self.assertEqual(out, ["leetcode/index.html: leetcode/heap/ is not listed"])
 
+    def test_svg_links_need_an_aria_label(self):
+        body = '<svg viewBox="0 0 10 10"><a href="#x" aria-label="X"><rect/></a><a href="#y"><rect/></a></svg>'
+        out = self.findings({"index.html": PAGE.format(body=body)})
+        self.assertEqual(out, ["index.html: link inside SVG without aria-label: #y"])
+
+    def test_home_weight_budget(self):
+        out = self.findings({"index.html": PAGE.format(body="x" * 150_001)})
+        self.assertEqual(len(out), 1)
+        self.assertIn("budget", out[0])
+
     def test_post_must_be_listed_on_posts_index_not_just_home(self):
         files = {"index.html": PAGE.format(body='<a href="posts/a/">a</a>'),
                  "posts/index.html": PAGE.format(body=""),

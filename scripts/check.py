@@ -27,6 +27,9 @@ HEAD = {
 LINK = re.compile(r'(?:href|src)="([^"]+)"')
 CDN = re.compile(r'<script[^>]+src="(https?://[^"]+)"|<link[^>]+href="(https?://[^"]+\.css)"')
 PINNED = re.compile(r"[@/]\d+\.\d+\.\d+")
+SVG = re.compile(r"<svg\b.*?</svg>", re.S)
+SVG_LINK = re.compile(r'(<a\b[^>]*\bhref="([^"]*)"[^>]*>)')
+HOME_BUDGET = 150_000
 
 
 def text_files(root):
@@ -64,9 +67,18 @@ def check(root, denylist):
             continue
         findings += [f"{rel}: missing {name}" for name, rx in HEAD.items() if not rx.search(text)]
         findings += [f"{rel}: broken link {url}" for url in LINK.findall(text) if not link_ok(root, path, url)]
+        for svg in SVG.findall(text):                 # scene doors: links drawn in SVG must still be named
+            for tag, href in SVG_LINK.findall(svg):
+                if "aria-label=" not in tag:
+                    findings.append(f"{rel}: link inside SVG without aria-label: {href}")
         for script, style in CDN.findall(text):
             if not PINNED.search(script or style):
                 findings.append(f"{rel}: unpinned CDN {script or style}")
+    home = root / "index.html"
+    if home.exists():                                 # SPEC-scene: the home page (HTML + stylesheet) stays light
+        weight = home.stat().st_size + ((root / "style.css").stat().st_size if (root / "style.css").exists() else 0)
+        if weight > HOME_BUDGET:
+            findings.append(f"index.html: home weighs {weight / 1000:.0f} KB with style.css (budget {HOME_BUDGET // 1000} KB)")
     # Each post folder must be linked from its listing page: posts/ from the posts index, leetcode/ from its series page.
     for section, listing in (("posts", "posts/index.html"), ("leetcode", "leetcode/index.html")):
         page = (root / listing).read_text() if (root / listing).exists() else ""
