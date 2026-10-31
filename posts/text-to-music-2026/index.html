@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text-to-music in 2026 · r03922123</title>
+<meta name="description" content="Building up text-to-music from parts: codec language models (MusicGen to HeartMuLa), reward models (CLAP to CMI-RM), and DPO alignment, with tensor shapes at every step.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<header class="post-head">
+  <h1>Text-to-music in 2026: models, reward models and DPO</h1>
+  <div class="meta">October 31, 2026 · 16 min read · music generation · alignment · reward models</div>
+</header>
+
+<p>Three ideas carry most of text-to-music today: a <b>codec language model</b> that writes music as
+discrete tokens, a <b>reward model</b> that judges what it wrote, and <b>preference alignment</b> that
+folds those judgments back into the generator. This post builds all three from a handful of parts, with the
+tensor shape written next to every step. It follows MusicGen (2023) to HeartMuLa (2026), CLAP to the CMI
+reward model, and best-of-N to DPO.</p>
+<p class="note"><b>Notation.</b> <span class="tag">[paper]</span> marks a fact stated by the cited source.
+<span class="tag">[illustrative]</span> marks a number or structure chosen to explain an idea, not the model's
+actual setting. The code is shape-annotated pseudocode, not a runnable implementation.</p>
+
+<nav class="toc"><h2>Contents</h2><ol>
+  <li><a href="#parts">The parts</a></li>
+  <li><a href="#models">Models: codec language models, MusicGen to HeartMuLa</a></li>
+  <li><a href="#scoring">Scoring: from CLAP to reward models</a></li>
+  <li><a href="#dpo">Alignment: DPO</a></li>
+  <li><a href="#together">How the three connect</a></li>
+  <li><a href="#cfg">Appendix: why classifier-free guidance works</a></li>
+  <li><a href="#refs">References</a></li>
+</ol></nav>
+
+<h2 id="parts">1. The parts</h2>
+<h3>Audio is a long list of numbers</h3>
+<pre><code class="language-python"># mono, 32 kHz, 30 seconds
+wav: float[B, 1, S]        # S = 32_000 * 30 = 960_000;  B = batch (songs processed together)</code></pre>
+
+<h3>A codec turns audio into discrete tokens</h3>
+<p>A language model works on discrete tokens, like words from a vocabulary, so the waveform has to become
+tokens first. MusicGen uses the EnCodec codec <a href="#ref-1">[1]</a> <span class="tag">[paper]</span>.
+Its encoder downsamples by 640, turning every 640 samples into one vector:</p>
+<pre><code class="language-python">z = encoder(wav)           # float[B, D, T]
+# T = 960_000 / 640 = 1500 frames (50 frames per second);  D = latent size [illustrative: 128]</code></pre>
+<p>Then <b>residual vector quantization</b> (RVQ) replaces each continuous vector with \(K\) integers. There
+are \(K\) codebooks of 2048 vectors each. The first codebook picks the vector nearest to \(z\); the
+residual \(r = z - \text{chosen}\) goes to the second codebook, which picks the vector nearest to \(r\); and
+so on. Each codebook corrects what the previous ones missed, so later codebooks carry finer detail.</p>
+<pre><code class="language-python">def rvq_encode(z):                 # z: float[B, D, T]
+    residual, codes = z, []
+    for k in range(K):             # MusicGen: K = 4 [paper]
+        dist = ((residual[..., None] - codebook[k]) ** 2).sum(1)   # [B, T, 2048]
+        idx = dist.argmin(-1)                                      # int[B, T]
+        residual = residual - codebook[k][idx]
+        codes.append(idx)
+    return stack(codes, dim=1)     # int[B, K, T] = [B, 4, 1500], values 0..2047</code></pre>
+<p>Decoding sums the chosen vectors across codebooks and runs the decoder back to a waveform. To the model,
+<b>thirty seconds of music is a 4 × 1500 table of integers.</b></p>
+
+<h3>An autoregressive language model</h3>
+<p>The model predicts one step at a time and appends its prediction to the input. The log-probability of a
+whole sequence is the sum of the per-step log-probabilities of the tokens that were chosen:</p>
+\[ \log p(c \mid \text{text}) = \sum_{t=1}^{T} \log p(c_t \mid c_{&lt;t}, \text{text}) \]
+<pre><code class="language-python">logits = lm(c[:, :, :t], text_emb)     # float[B, K, V], V = 2048
+logp = log_softmax(logits, -1)         # log-probability of each candidate token</code></pre>
+<p>DPO in section 4 reuses exactly this sum.</p>
+
+<h3>Embeddings, cosine similarity and the sigmoid</h3>
+<p>An encoder maps a clip or a sentence to a fixed-length vector \(e \in \mathbb{R}^D\). Cosine similarity
+\(\cos(a, b) = a \cdot b / (\lVert a\rVert \lVert b\rVert) \in [-1, 1]\) measures how closely two vectors point
+the same way. The sigmoid \(\sigma(x) = 1/(1 + e^{-x})\) squashes any real number into \((0, 1)\), with
+\(\sigma(0) = 0.5\) and \(\sigma(3) \approx 0.95\).</p>
+
+<h2 id="models">2. Models: codec language models, MusicGen to HeartMuLa</h2>
+<h3>MusicGen (2023)</h3>
+<p>Text goes through a T5 encoder to <code>text_emb: float[B, L, 768]</code>, and a transformer decoder
+reads it through cross-attention while generating codec tokens <a href="#ref-2">[2]</a>
+<span class="tag">[paper]</span>.</p>
+<p><b>Delay pattern.</b> Each frame has four tokens. Predicting them one per step would take 4 × 1500 steps.
+MusicGen instead shifts codebook \(k\) back by \(k\) steps, so each step emits four tokens at once, about
+\(T + K - 1 = 1503\) steps in total.</p>
+<p><b>Classifier-free guidance (CFG).</b> Each step runs the model twice, with and without the text, and
+amplifies the difference (the <a href="#cfg">appendix</a> explains why this works):</p>
+\[ \text{logits} = \text{logits}_{\text{uncond}} + \gamma\,(\text{logits}_{\text{cond}} - \text{logits}_{\text{uncond}}), \qquad \gamma \approx 3 \]
+<pre><code class="language-python">def musicgen_generate(prompt, n_candidates=8, seconds=30):
+    text_emb = repeat(t5(prompt), n_candidates)   # [8, L, 768]
+    T = 50 * seconds                              # 1500
+    c = empty_int(8, 4, 0)                        # [B=8, K=4, 0]
+    for t in range(T + 3):                        # delay pattern
+        x = concat([c, c])                        # CFG: with and without text, stacked to 2B = 16 rows
+        lg = lm(x, concat([text_emb, null_emb]))  # [16, 4, 2048], with a KV cache
+        lg = lg[8:] + 3.0 * (lg[:8] - lg[8:])     # [8, 4, 2048]
+        nxt = sample(softmax(lg / temperature))   # int[8, 4]
+        c = append(c, nxt)                        # [8, 4, t+1]
+    return encodec.decode(undelay(c))             # float[8, 1, 960_000]</code></pre>
+<p>This is the loop my <a href="/musicgen-prune-inference/decoding/">earlier post on MusicGen decoding</a>
+takes apart. Best-of-N pruning hooks in at <code>t = 500</code> and <code>t = 1000</code> (10 s and 20 s):
+decode <code>c[:, :, :t]</code>, score it with CLAP, and cut the batch from 8 to 4, then 4 to 2.</p>
+
+<h3>HeartMuLa (2026): what changed</h3>
+<p>HeartMuLa <a href="#ref-3">[3]</a> is an open family of music foundation models
+<span class="tag">[paper]</span>. The released model has 3B parameters; the paper reports clear gains at 7B,
+which was not released. It conditions on <b>lyrics, style tags and a reference clip</b>. Four things differ
+from MusicGen.</p>
+
+<h4>(a) The codec: acoustic versus semantic tokens</h4>
+<pre><code class="language-python"># ===== MusicGen: EnCodec, purely acoustic compression =====
+wav = float[B, 1, 32_000 * 30]        # 32 kHz mono
+codes = rvq(conv_encoder(wav), K=4, V=2048)   # int[B, 4, 1500], 50 Hz
+wav_hat = conv_decoder(codes)         # convolutions reconstruct the waveform directly
+
+# ===== HeartMuLa: HeartCodec, semantic compression + generative decoding =====
+wav = float[B, 2, 48_000 * 30]        # 48 kHz stereo
+f1 = Whisper(wav)                     # (1) three frozen pretrained models: speech and lyric content
+f2 = WavLM(wav)                       #     speech features (layers 6-9 averaged)
+f3 = MuEncoder(wav)                   #     music features (layer 11 semantic, layer 2 acoustic)
+f = Linear(concat(resample_to_25Hz([f1, f2, f3])))          # [B, 750, C]
+q = transformer(insert_query_every_2(f))[:, query_positions]  # (2) one learned query per 2 frames: 12.5 Hz, [B, 375, C]
+codes = rvq(q, K=8, V=8192)           # int[B, 8, 375]
+latent = flow_matching_DiT(codes, steps=10)   # (3) ~1.5B flow-matching DiT regenerates detail; reflow-distilled 50 -> 10 steps
+wav_hat = sq_codec_decoder(latent)    # [B, 2, S]</code></pre>
+<table>
+  <thead><tr><th></th><th>EnCodec</th><th>HeartCodec</th></tr></thead>
+  <tbody>
+    <tr><td>Frame rate</td><td>50 Hz</td><td>12.5 Hz</td></tr>
+    <tr><td>Per frame</td><td>4 codebooks × 2048</td><td>8 codebooks × 8192</td></tr>
+    <tr><td>What a token records</td><td>Waveform detail</td><td>Semantics: lyrics, melody, style</td></tr>
+    <tr><td>Decoder</td><td>Convolutional, reconstructs</td><td>~1.5B generative model, fills in detail</td></tr>
+  </tbody>
+</table>
+<p>The trade-off: the more abstract the tokens, the shorter the sequence and the easier it is for the
+language model to learn, but decoding now has to <em>generate</em> detail rather than reconstruct it.</p>
+
+<h4>(b) The language model: delay pattern versus global/local</h4>
+<pre><code class="language-python"># ===== MusicGen: one transformer + delay pattern =====
+for t in range(T + K - 1):                  # 30 s: 1503 steps
+    logits = lm(c[:, :, :t], text_emb)      # [B, 4, 2048]: one big model emits all 4 codebooks
+    c = append(c, sample(logits))
+
+# ===== HeartMuLa: global (Llama 3.2, 3B) + local (300M) =====
+for t in range(T):                          # 30 s: 375 steps
+    frame_emb = [sum(embed[k](codes[:, k, s]) for k in range(8)) for s in range(t)]  # sum of 8 token embeddings
+    h = global_tf(cat([cond_prefix, frame_emb]))[:, -1]   # [B, d]
+    frame = [sample(head0(h))]              # the big model predicts only codebook 0, the coarsest
+    for k in range(1, 8):                   # the small model fills in codebooks 1-7 in order
+        frame.append(sample(local_tf(h, frame)))
+    codes = append(codes, stack(frame))     # [B, 8, t+1]</code></pre>
+<p>MusicGen has <b>one large model</b> handle every codebook at every step; the delay pattern only staggers
+them. HeartMuLa <b>splits the work</b>: the large model decides roughly what this moment should be, so the
+expensive long-range attention happens only at the frame level, and a small model fills in detail.</p>
+
+<h4>(c) Conditioning: cross-attention versus a prefix</h4>
+<pre><code class="language-python"># MusicGen: a separate T5 encoder, read by cross-attention in every decoder layer
+text_emb = T5(prompt)                        # [B, L, 768]
+
+# HeartMuLa: everything becomes a prefix in the same sequence as the music tokens
+c_lyrics = embed(llama_tok("[verse] ... [chorus] ..."))       # section markers kept
+c_tag = embed(llama_tok("&lt;tag&gt; jazz, piano, female &lt;/tag&gt;"))
+c_ref = proj(MuQ_MuLan(ref_audio_10s))       # reference clip, dropped 50% of the time in training
+cond_prefix = cat([c_ref, c_tag, c_lyrics])</code></pre>
+<p>During training, tags are sampled per category (genre 0.95, timbre 0.5, mood 0.325, …) so the model gets
+used to incomplete prompts. The reference clip is embedded with MuQ-MuLan <a href="#ref-4">[4]</a>, the same
+encoder CMI-RM uses below, which the paper chose because it carries no singer-timbre information
+<span class="tag">[paper]</span>.</p>
+
+<h4>(d) Training: four stages, ending in DPO</h4>
+<ol>
+  <li><b>Warm-up:</b> 30-second segments with lyrics and reference audio, on a 10,000-hour subset.</li>
+  <li><b>Pretraining:</b> full songs and all three conditions, 100,000 hours, 64 A100s.</li>
+  <li><b>Supervised fine-tuning:</b> 15,000 hours filtered with AudioBox and SongEval; the loss on codebook 0 is up-weighted (\(\lambda_0 = 2.0\)).</li>
+  <li><b>DPO:</b> four songs per prompt; three reward signals each build their own preference pairs and
+  train their own DPO model (\(\beta = 0.1\), learning rate \(10^{-7}\)); the three models' <b>weights are
+  merged linearly</b> <span class="tag">[paper]</span>.</li>
+</ol>
+<pre><code class="language-python">pairs_style = margin(MuQ_similarity) > 0.12                           # is the style right?
+pairs_lyrics = margin(phoneme_error_rate) > 0.1                       # are the lyrics sung correctly?
+pairs_quality = margin(SongEval) > 0.5 and margin(AudioBox_avg) > 0.8  # does it sound good?
+# DPO's log pi(y) splits into a global term (codebook 0) and a local term (codebooks 1-7), optimizable separately</code></pre>
+<p>Inference uses CFG 1.5, temperature 1.0 and top-k 50. The paper also trains <b>HeartCLAP</b>: both towers
+initialized from MuQ-MuLan, projected to 1024 dimensions, symmetric InfoNCE on a million music–description
+pairs. On WikiMT-X text-to-music retrieval it reports R@1 of 4.37, against 2.24 for MuQ-MuLan and 0.71 for
+LAION-CLAP <span class="tag">[paper]</span>.</p>
+
+<h4>Why 12.5 Hz matters</h4>
+<table>
+  <thead><tr><th>Length</th><th>MusicGen, 50 Hz</th><th>HeartMuLa, 12.5 Hz</th></tr></thead>
+  <tbody>
+    <tr><td>30 s</td><td>1,503 large-model steps</td><td>375 large-model steps + 375 × 7 small-model steps</td></tr>
+    <tr><td>4 min</td><td>12,003 large-model steps</td><td>3,000 large-model steps + 21,000 small-model steps</td></tr>
+  </tbody>
+</table>
+<p>Self-attention cost grows with \(T^2\), so at four minutes the large model does roughly
+\((12000/3000)^2 = 16\) times less attention work. The small model takes more steps, but each looks only
+inside one frame (at most eight tokens), which is cheap. A low frame rate plus hierarchical prediction is the
+main reason whole songs of two to four minutes became practical.</p>
+
+<h2 id="scoring">3. Scoring: from CLAP to reward models</h2>
+<h3>How CLAP is trained</h3>
+<p>Take a batch of \(N\) (clip, description) pairs. Two encoders embed each side and form an \(N \times N\)
+similarity matrix whose diagonal holds the true pairs <a href="#ref-5">[5]</a>:</p>
+<pre><code class="language-python">a = normalize(audio_enc(audio))   # [N, D]  [illustrative: D = 512]
+t = normalize(text_enc(text))     # [N, D]
+S = a @ t.T / tau                 # [N, N]: S[i, j] = similarity of clip i and sentence j
+loss = (cross_entropy(S, arange(N)) + cross_entropy(S.T, arange(N))) / 2   # the diagonal should win each row and column</code></pre>
+<p>At inference, <code>score = cos(audio_enc(clip), text_enc(prompt))</code> gives one number.</p>
+<p><b>CLAP's blind spot.</b> It learns <em>which sentence goes with this clip</em>, not <em>which of two clips
+is better</em>. Two "upbeat piano jazz" clips, one lovely and one grating, can score about the same. That is why
+CLAP is only an unvalidated proxy for quality, as my <a href="/musicgen-prune-inference/">best-of-N post</a>
+discusses.</p>
+
+<h3>Reward models learn from comparisons, not scores</h3>
+<p>People cannot reliably say "this one is a 7.3", but they can say "A is better than B". So the data is
+pairs:</p>
+<pre><code class="language-python">pair = {"prompt": "upbeat jazz piano, rainy night",
+        "audio_A": float[1, S], "audio_B": float[1, S],
+        "label": 1}               # 1 = A is better, 0 = B is better</code></pre>
+<p>The <b>Bradley–Terry model</b> assumes each clip has a hidden score \(r\), and that the chance A beats B
+depends only on the difference:</p>
+\[ P(A \succ B) = \sigma(r_A - r_B), \qquad \mathcal{L} = -\big[y \log \sigma(r_A - r_B) + (1-y) \log\big(1 - \sigma(r_A - r_B)\big)\big]. \]
+<p>Equal scores give 0.5; a gap of 3 gives about 0.95. Adding a constant to every score changes nothing, so a
+reward has <b>no absolute unit and is only meaningful in comparison</b>. Section 4 depends on this.</p>
+
+<h3>CMI-RM (2026)</h3>
+<p>CMI-RewardBench <a href="#ref-6">[6]</a> introduces a benchmark and a reward-model family, as reported
+<span class="tag">[paper]</span>:</p>
+<ul>
+  <li><b>Encoders:</b> two frozen MuQ-MuLan towers, one for audio and one for text.</li>
+  <li><b>Two heads:</b> MUS scores musicality; ALI scores alignment with the instruction. About 30M trainable parameters.</li>
+  <li><b>Two-stage training:</b> pretraining on ~110k pseudo-labeled pairs annotated by Qwen3-Omni
+  <a href="#ref-7">[7]</a> (Bradley–Terry loss with label smoothing), then fine-tuning on 4,027 pairs labeled
+  by 31 human annotators.</li>
+  <li><b>Result:</b> 78.2% agreement with humans on the musicality test set, against 65.8% for Gemini 3 Pro.</li>
+</ul>
+<pre><code class="language-python">class CMI_RM:
+    audio_enc = MuQ_MuLan_audio(frozen=True)
+    text_enc = MuQ_MuLan_text(frozen=True)
+    mus_head = MLP(D, 1)          # [illustrative] head shapes
+    ali_head = MLP(2 * D, 1)
+
+    def forward(self, audio, prompt):
+        ea, et = self.audio_enc(audio), self.text_enc(prompt)   # [B, D] each
+        return self.mus_head(ea), self.ali_head(concat(ea, et))   # musicality from audio alone; alignment from both
+
+def train_step(batch):            # batch holds pairs
+    rA_mus, rA_ali = rm(batch.audio_A, batch.prompt)
+    rB_mus, rB_ali = rm(batch.audio_B, batch.prompt)
+    y = batch.label * (1 - eps) + 0.5 * eps                    # label smoothing: 1 -> 0.95
+    loss = bce(sigmoid(rA_mus - rB_mus), y.mus) + bce(sigmoid(rA_ali - rB_ali), y.ali)
+    loss.backward()               # only the two heads are updated</code></pre>
+<p>The paper also uses it for best-of-N on MusicGen-small and Stable-Audio-Open-small: 2,183 MusicCaps prompts,
+ten 10-second clips each, \(N \in \{1, 3, 10\}\), scored only after every clip is fully generated. Compared with
+CLAP best-of-N, the only change is the scoring function, one trained on human preferences. Pruning makes the
+selection <em>cheaper</em>; a better reward makes it <em>more accurate</em>. I have not seen the two combined.</p>
+<p>Code is at <code>github.com/Haiwen-Xia/CMI-RewardBench</code>, and the CMI-Pref datasets are on Hugging Face
+under CC BY-NC-SA. The paper says weights are released but gives no model repository, so check before
+planning an experiment around them.</p>
+
+<h3>Three scorers, two kinds</h3>
+<p>CLAP and MuQ-MuLan belong to the <b>same family</b>: dual-tower contrastive models that output one
+similarity. Qwen3-Omni is a <b>different kind</b>: a generative multimodal LLM that outputs text.</p>
+<pre><code class="language-python"># ===== CLAP (LAION) =====
+audio_enc, text_enc = HTSAT(), RoBERTa()        # Swin transformer on mel; general sound data (LAION-Audio-630K)
+score = cos(audio_enc(mel(x)), text_enc(p))     # [B]: "do they match?"
+
+# ===== MuQ-MuLan: CLAP's architecture, but the audio tower learns music first =====
+targets = MelRVQ(mel(x))           # MuQ: single linear projection + RVQ -> int[B, N, T] as targets
+h = Conformer(mask(mel(x)))        # mask time steps, predict the targets (BERT-style), music only, no labels
+loss = sum(CE(head[k](h), targets[:, k]) for k in range(N))
+score = cos(muq_audio(x), text_enc(p))          # MuLan: contrastive with a text tower, as in CLAP
+
+# ===== Qwen3-Omni: a generative LLM =====
+a = AuT(mel_16k_128bins(x))        # ~0.6B audio encoder trained from scratch, mostly ASR; 12.5 Hz, ~80 ms per token
+answer = Thinker_MoE(interleave(a, tokenize("Which clip is better?")))   # 30B total, 3B active per token; outputs text</code></pre>
+<table>
+  <thead><tr><th></th><th>CLAP</th><th>MuQ-MuLan</th><th>Qwen3-Omni</th></tr></thead>
+  <tbody>
+    <tr><td>Type</td><td>Dual-tower contrastive</td><td>Dual-tower contrastive</td><td>Generative LLM</td></tr>
+    <tr><td>Audio encoder</td><td>HTSAT (Swin)</td><td>MuQ (Conformer, self-supervised on music)</td><td>AuT (~0.6B, mostly ASR)</td></tr>
+    <tr><td>Domain</td><td>General sound</td><td>Music</td><td>Speech and general audio</td></tr>
+    <tr><td>Output</td><td>Cosine</td><td>Cosine</td><td>Text</td></tr>
+    <tr><td>Role in CMI-RM</td><td>—</td><td>Frozen encoders</td><td>One-off pseudo-labeler for 110k pairs</td></tr>
+  </tbody>
+</table>
+<p>Why can a 30M-parameter head beat Gemini 3 Pro on agreement? A large model is a general judge that was
+never calibrated to these 31 annotators' taste. CMI-RM's encoders were trained on music, and its heads were
+fit with Bradley–Terry directly on human choices. Small and specialized beats large and general here.</p>
+
+<h2 id="dpo">4. Alignment: DPO</h2>
+<h3>What alignment is for</h3>
+<p>Best-of-N picks at <em>inference</em> time: every request generates \(N\) songs, at \(N\) times the cost.
+Alignment changes the generator's weights at <em>training</em> time so good outputs are likely to begin with,
+and inference can generate one song, or a few.</p>
+
+<h3>The objective</h3>
+<p>With \(\pi_\theta\) the model being trained, \(\pi_{\text{ref}}\) the frozen original and \(r\) a reward:</p>
+\[ \max_\theta\; \mathbb{E}_{y \sim \pi_\theta}\big[r(x, y)\big] \;-\; \beta\,\mathrm{KL}\big(\pi_\theta \,\|\, \pi_{\text{ref}}\big) \]
+<p>The first term wants high reward; the KL term penalizes drifting from the original model, with
+\(\beta\) setting the strength. Without it the model finds strange sounds that fool the reward model
+(<em>reward hacking</em>) and produces only those. Classic RLHF optimizes this with PPO, which samples during
+training and maintains separate reward and value models: unstable and expensive.</p>
+
+<h3>The key step: the objective has a closed-form optimum</h3>
+<p>The optimal policy can be written down directly <a href="#ref-8">[8]</a>:</p>
+\[ \pi^*(y \mid x) = \frac{1}{Z(x)}\, \pi_{\text{ref}}(y \mid x)\, \exp\!\big(r(x, y)/\beta\big) \]
+<p>Start from the original model and scale each output's probability by \(\exp(r/\beta)\). \(Z(x)\) is the
+normalizing constant; it cannot be computed, but it is about to cancel. To see why \(\pi^*\) is optimal,
+rewrite the objective:</p>
+\[ \mathbb{E}_{\pi}\Big[r - \beta \log \tfrac{\pi}{\pi_{\text{ref}}}\Big] = -\beta\, \mathbb{E}_{\pi}\Big[\log \frac{\pi}{\pi_{\text{ref}}\, e^{r/\beta}}\Big] = -\beta\, \mathrm{KL}\big(\pi \,\|\, \pi^*\big) + \beta \log Z(x). \]
+<p>KL is non-negative and zero only when the distributions match, so the objective peaks at \(\pi = \pi^*\).
+Now solve for the reward:</p>
+\[ r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \beta \log Z(x) \]
+<p>and substitute into Bradley–Terry with a winner \(y_w\) and a loser \(y_l\) for the same prompt. The two
+\(\beta \log Z(x)\) terms cancel in the difference, which is exactly why "only reward differences matter"
+was important:</p>
+\[ \mathcal{L}_{\text{DPO}} = -\log \sigma\Big(\beta\big[(\log \pi_\theta(y_w) - \log \pi_{\text{ref}}(y_w)) - (\log \pi_\theta(y_l) - \log \pi_{\text{ref}}(y_l))\big]\Big). \]
+<p>No separate reward model at training time and no reinforcement learning: an ordinary supervised training
+loop.</p>
+
+<h3>Computing \(\log \pi(y)\) for a codec LM</h3>
+<pre><code class="language-python">def seq_logprob(model, text_emb, codes):         # codes: int[B, K, T]
+    logits = model(codes_shifted, text_emb)      # float[B, K, T, 2048]
+    tok_lp = gather(log_softmax(logits, -1), codes)   # float[B, K, T]: log-prob of the chosen tokens
+    return tok_lp.sum(dim=(1, 2))                # float[B]: one number per song</code></pre>
+
+<h3>One training step</h3>
+<pre><code class="language-python">beta = 0.1                                       # [illustrative] a common value
+def dpo_step(batch):                             # codes_w, codes_l: int[B, 4, 1500], two songs per prompt
+    lw = seq_logprob(policy, batch.text, batch.codes_w)
+    ll = seq_logprob(policy, batch.text, batch.codes_l)
+    with no_grad():
+        rw = seq_logprob(ref, batch.text, batch.codes_w)
+        rl = seq_logprob(ref, batch.text, batch.codes_l)
+    margin = beta * ((lw - rw) - (ll - rl))      # [B]
+    loss = -logsigmoid(margin).mean()
+    loss.backward()</code></pre>
+<p>The gradient pushes the winner's probability up and the loser's down, relative to the reference model,
+weighted by \(\sigma(-\text{margin})\). The more wrong the model currently is (very negative margin), the
+harder it pushes; once a pair is ranked correctly it barely moves.</p>
+
+<h3>Where preference data comes from</h3>
+<ul>
+  <li><b>Human labels:</b> MusicRL used about 300,000 pairs, as summarized by Herremans and Roy's position
+  paper <a href="#ref-9">[9]</a>.</li>
+  <li><b>Reward-model labels (RLAIF):</b> generate two songs per prompt, let a reward model such as CMI-RM pick
+  the winner, train DPO on the pairs. DiffRhythm+ applies DPO to whole-song generation against several scores,
+  including SongEval and Audiobox-aesthetic <a href="#ref-9">[9]</a>.</li>
+  <li><b>HeartMuLa</b> builds pairs from three rewards, trains one DPO model per reward and merges their
+  weights, as above <a href="#ref-3">[3]</a>.</li>
+</ul>
+
+<h2 id="together">5. How the three connect</h2>
+<pre><code class="language-plaintext">generator (§2) --N songs--> reward model (§3) --+--> at inference: keep the best = best-of-N
+                                                 +--> at training: winner/loser pairs -> DPO (§4) updates the generator</code></pre>
+<p>How far does best-of-N move the output distribution? The commonly quoted formula, shown by Beirami et
+al. <a href="#ref-10">[10]</a> to be an upper bound, is</p>
+\[ \mathrm{KL}\big(\pi_{\text{BoN}} \,\|\, \pi_{\text{ref}}\big) \le \log N - \frac{N - 1}{N}. \]
+<p>At \(N = 8\) that is about \(2.08 - 0.875 \approx 1.2\) nats. Doubling \(N\) adds only about
+\(\log 2 \approx 0.69\) nats while doubling the cost, so best-of-N hits diminishing returns quickly. That is the
+case for moving preferences into the model at training time.</p>
+<p>Put together: pruning lowers the cost of best-of-N, a preference-trained reward model makes its choice
+more accurate, and DPO shrinks the \(N\) you need at all. The open question in between is whether a reward
+model's score on the first ten seconds predicts its score on the finished clip. That has to be measured
+before pruning on it.</p>
+
+<h2 id="cfg">Appendix: why classifier-free guidance works</h2>
+<p>In one sentence: each step amplifies the part of the prediction that is specific to the prompt. By Bayes'
+rule,</p>
+\[ \log p(y \mid c) = \log p(y) + \log p(c \mid y) + \text{const}, \]
+<p>where \(p(y)\) asks "does this sound like music?" and \(p(c \mid y)\) is an implicit classifier: "having heard
+this, how likely is the prompt to be \(c\)?" That classifier never needs training, since
+\(\log p(c \mid y) = \log p(y \mid c) - \log p(y) + \text{const} = \ell_c - \ell_u\), hence
+<em>classifier-free</em> <a href="#ref-11">[11]</a>. Weighting it by \(\gamma\):</p>
+\[ p_\gamma \propto p(y)\, p(c \mid y)^{\gamma} \quad\Longrightarrow\quad \log p_\gamma = \ell_u + \gamma\,(\ell_c - \ell_u). \]
+<p>\(\gamma = 0\) is unconditional, \(\gamma = 1\) ordinary conditional generation, and \(\gamma > 1\) follows the
+prompt harder (MusicGen's default is 3). It works on logits directly because the log-sum-exp term is the same
+constant for every token and cancels in the softmax. A worked example with \(\gamma = 3\):
+\(p_u = [.5, .3, .2]\) and \(p_c = [.7, .2, .1]\) give a guided distribution of \([.92, .06, .02]\).</p>
+<p>Training drops the prompt for 10–20% of examples, so one model learns both modes. The costs: twice the rows
+per step, less diversity and more artifacts as \(\gamma\) grows, and applying it token by token is only an
+approximation of guiding the whole sequence. Finally, rewriting \(p_\gamma\) shows the link to DPO:</p>
+\[ p_\gamma \propto p(y \mid c) \cdot \exp\!\Big(\log p(c \mid y) \big/ \tfrac{1}{\gamma - 1}\Big), \]
+<p>the same form as \(\pi^* \propto \pi_{\text{ref}} \exp(r/\beta)\) with \(r = \log p(c \mid y)\) and
+\(\beta = 1/(\gamma - 1)\). CFG is inference-time alignment whose reward is the model's own implicit
+classifier.</p>
+
+<h2 id="refs">References</h2>
+<ol class="refs">
+  <li id="ref-1">A. Défossez, J. Copet, G. Synnaeve, Y. Adi. <i>High Fidelity Neural Audio Compression.</i> TMLR 2023.</li>
+  <li id="ref-2">J. Copet et al. <i>Simple and Controllable Music Generation.</i> NeurIPS 2023.</li>
+  <li id="ref-3">D. Yang et al. <i>HeartMuLa: A Family of Open Sourced Music Foundation Models.</i> arXiv:2601.10547, 2026.</li>
+  <li id="ref-4">H. Zhu et al. <i>MuQ: Self-Supervised Music Representation Learning with Mel Residual Vector Quantization.</i> arXiv:2501.01108, 2025.</li>
+  <li id="ref-5">Y. Wu et al. <i>Large-Scale Contrastive Language-Audio Pretraining with Feature Fusion and Keyword-to-Caption Augmentation.</i> ICASSP 2023.</li>
+  <li id="ref-6">Y. Ma et al. <i>CMI-RewardBench: Evaluating Music Reward Models with Compositional Multimodal Instruction.</i> arXiv:2603.00610, 2026.</li>
+  <li id="ref-7">J. Xu et al. <i>Qwen3-Omni Technical Report.</i> arXiv:2509.17765, 2025.</li>
+  <li id="ref-8">R. Rafailov et al. <i>Direct Preference Optimization: Your Language Model is Secretly a Reward Model.</i> NeurIPS 2023.</li>
+  <li id="ref-9">D. Herremans, A. Roy. <i>Aligning Generative Music AI with Human Preferences: Methods and Challenges.</i> arXiv:2511.15038, 2025.</li>
+  <li id="ref-10">A. Beirami et al. <i>Theoretical Guarantees on the Best-of-n Alignment Policy.</i> arXiv:2401.01879, 2024.</li>
+  <li id="ref-11">J. Ho, T. Salimans. <i>Classifier-Free Diffusion Guidance.</i> arXiv:2207.12598, 2022.</li>
+</ol>
+
+<h2 id="cite">Cite as</h2>
+<pre class="cite"><code class="language-plaintext">@article{lin2026texttomusic,
+  title   = {Text-to-music in 2026: models, reward models and DPO},
+  author  = {Lin, Jie-Hong},
+  journal = {r03922123.github.io},
+  year    = {2026},
+  month   = {Oct},
+  url     = {https://r03922123.github.io/posts/text-to-music-2026/}
+}</code></pre>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>

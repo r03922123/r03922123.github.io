@@ -55,3 +55,6 @@ header nav [aria-current="page"] { color: var(--fg); }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
 .refs { font-size: .9em; padding-left: 1.6em; }
 .refs li:target { background: var(--card); }
+.post-body h4 { font-size: 1rem; margin: 1.4em 0 .3em; }
+.post-body .note { background: var(--card); border-left: 3px solid var(--link); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: .92em; }
+.post-body .tag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8em; color: var(--muted); white-space: nowrap; }
