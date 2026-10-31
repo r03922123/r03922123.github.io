@@ -29,7 +29,16 @@ recruiters who then click "About" to see the person behind it.
 | 4 | `03-ml-depth/system-design/ML System Design - Evaluation.md` | Evaluating ML systems: classification, ranking, search, generative | Remove interview framing; reframe as a reference article |
 
 Excluded on purpose: the softmax note (adapted from Jay Mody's blog, not original),
-`Stanford CME295` (course notes), interview playbooks, all DSA/coding notes, `00-*`, `05-*`, `06-*`.
+`Stanford CME295` (course notes), interview playbooks, the non-LeetCode coding notes (`Coding Flow`,
+`ML Coding`, SQL and pandas cheatsheets), `00-*`, `05-*`, `06-*`.
+
+**LeetCode series (added 2026-10-31 at the user's request).** Every note in `01-coding/patterns/`
+(31, excluding the `dsa.md` index) becomes its own post under `leetcode/<slug>/`, listed on a
+series page `leetcode/index.html` grouped by technique; the home page links the series with one card.
+Each post: the idea in prose, a reusable Python template, worked problems with complexity, and
+links to the LeetCode problems. Thin notes are expanded; notes built on outside material (StackOverflow,
+MIT 6.006, EPI, cp-algorithms) are rewritten with original code and cite their source. All code is
+run before publishing.
 
 ### User stories / acceptance criteria
 
@@ -69,6 +78,8 @@ Deploy:   git push origin main                # GitHub Pages serves main
 index.html              → Post list (home). Existing + new post entries.
 about.html              → Bio, experience, education, competitions, contact
 posts/<slug>/index.html → One folder per in-repo post (the 4 new ones)
+leetcode/index.html     → LeetCode series page, posts grouped by technique
+leetcode/<slug>/index.html → One folder per LeetCode pattern post (31)
 style.css               → Shared styles: hub, post typography, TOC, about page
 404.html                → Unchanged except nav
 scripts/check.py        → Privacy + link + structure checks
@@ -111,7 +122,7 @@ prose in English, first person sparingly; references cite the original papers, n
    The script fails if that file is missing.
 2. **Broken internal links** — every relative `href`/`src` resolves to a file in the repo.
 3. **Structure** — every page has `<title>`, `meta description`, `lang`, viewport; every post
-   in `posts/` is listed in `index.html`.
+   in `posts/` is listed in `index.html`, and every post in `leetcode/` in `leetcode/index.html`.
 4. **Pinned CDN** — every external script URL contains an exact version.
 
 Manual checks per page (recorded in the PR): renders at 375px wide with no horizontal scroll,
@@ -129,6 +140,8 @@ light and dark mode, math and code render, and a side-by-side read of the About 
   coaching; invent a metric or resolve a "not measured" item into a number.
 
 ## Success Criteria
+
+- [ ] 31 LeetCode posts under `leetcode/<slug>/`, each listed on `leetcode/index.html`, code run
 
 - [ ] `index.html` lists 6 posts with date, reading time, tags; nav = Posts · About · GitHub
 - [ ] 4 posts under `posts/<slug>/`, each with TOC, KaTeX math, highlighted code, references, BibTeX

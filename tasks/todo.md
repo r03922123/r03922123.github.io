@@ -145,3 +145,31 @@ success-criteria list.
 
 ## Checkpoint C
 - [ ] Ready to push; pushing to `main` needs your explicit OK
+
+## Phase 2b — LeetCode series (added 2026-10-31)
+
+Every note in `01-coding/patterns/` becomes one post at `leetcode/<slug>/`. Shared rules for
+Tasks 8–13: Python code is extracted and run (asserts on the worked examples) before publishing;
+no interview framing; outside-sourced material rewritten with original code and cited; each post
+links its LeetCode problems; each is listed on `leetcode/index.html`.
+
+## Task 8: Series page, check support, arrays and pointers
+**Files:** `leetcode/index.html`, `scripts/check.py`, `scripts/test_check.py`, `index.html`, posts:
+Two Pointer, Sliding Window, Prefix State Map, Sweep Line, Misc (Boyer–Moore, sieve)
+**Acceptance:** check fails when a `leetcode/` post is missing from the series page (test first);
+home has one series card; 5 posts. **Scope:** M
+
+## Task 9: Search, sorting and selection
+Binary Search, Sorting, Quick Select, Bucket Sort, Reverse Pair, Rolling Hash, String Matching. **Scope:** M
+
+## Task 10: Stacks, queues, heaps and hashing
+Monotonic Stack, Monotonic Queue, Heap, Design (hash set/map). **Scope:** S
+
+## Task 11: Trees, tries and range queries
+Tree, Trie, Segment Tree, Union Find. **Scope:** M
+
+## Task 12: Graphs
+BFS, DFS, Dijkstra, Shortest Distance, Topological Order, Graph. **Scope:** M
+
+## Task 13: Dynamic programming, bits and game theory
+Dynamic Programming, Knapsack, Bitmasking DP, Bit Manipulation, Game Theory. **Scope:** M

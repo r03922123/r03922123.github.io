@@ -58,6 +58,14 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 - [ ] Task 5: Post 3 (LoRA from scratch)
 - [ ] Task 6: Post 4 (evaluating ML systems)
 
+### Phase 2b: LeetCode series (added 2026-10-31)
+- [ ] Task 8: Series page, check-script support, first group (arrays and pointers)
+- [ ] Task 9: Search, sorting and selection
+- [ ] Task 10: Stacks, queues, heaps and hashing
+- [ ] Task 11: Trees, tries and range queries
+- [ ] Task 12: Graphs
+- [ ] Task 13: Dynamic programming, bits and game theory
+
 ### Phase 3: Finish
 - [ ] Task 7: README and full-site verification
 
