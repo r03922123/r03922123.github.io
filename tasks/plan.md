@@ -61,7 +61,7 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 ### Phase 2b: LeetCode series (added 2026-10-31)
 - [x] Task 8: Series page, check-script support, first group (arrays and pointers)
 - [x] Task 9: Search, sorting and selection
-- [ ] Task 10: Stacks, queues, heaps and hashing
+- [x] Task 10: Stacks, queues, heaps and hashing
 - [ ] Task 11: Trees, tries and range queries
 - [ ] Task 12: Graphs
 - [ ] Task 13: Dynamic programming, bits and game theory

@@ -23,7 +23,7 @@
 <main>
 <section class="intro">
   <h1>LeetCode patterns</h1>
-  <p>12 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
+  <p>16 short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
   asserts pass.</p>
 </section>
@@ -44,6 +44,13 @@
   <li><a href="reverse-pairs/">Counting pairs with i &lt; j: merge sort and sorted containers</a><span>Problems that count pairs (i, j) with i &lt; j and some inequality between values. Counting during merge sort, and the sorted-list alternative, applied to reverse pairs and a shifted-difference variant.</span></li>
   <li><a href="rolling-hash/">Rolling hash (Rabin–Karp)</a><span>Hash every length-m window of a string in O(1) per step by sliding a polynomial hash. Substring search, then the real use, comparing many substrings at once, with binary search on length.</span></li>
   <li><a href="string-matching/">String matching with KMP and the Z-function</a><span>Two linear-time tools that reuse what a failed comparison already revealed. The KMP failure table, the Z-array, and how each finds a pattern or scores a string against its own prefixes.</span></li>
+</ul>
+<h2 id="stacks-queues-heaps-and-hashing">Stacks, queues, heaps and hashing</h2>
+<ul class="series">
+  <li><a href="monotonic-stack/">Monotonic stack: next greater, previous smaller</a><span>A stack kept in sorted order answers "nearest larger or smaller element" for every position in one pass. The template, why it is O(n), and its two classic uses, daily temperatures and the largest rectangle.</span></li>
+  <li><a href="monotonic-queue/">Monotonic queue: the window maximum in O(1)</a><span>A deque kept in sorted order gives the maximum of a sliding window at every step in amortized O(1). Sliding window maximum, then the harder use, shortest subarray with sum at least k over prefix sums.</span></li>
+  <li><a href="heap/">Heaps: from an array to four patterns</a><span>A binary heap built from scratch on a plain list, then the four ways heaps show up in problems — top k, two heaps for a running median, greedy with a heap of options, and k-way merging.</span></li>
+  <li><a href="hash-table/">Hash tables from scratch: chaining, hash functions, resizing</a><span>Build a hash map with separate chaining. The division, multiplication and universal hash functions, an operator-precedence bug that quietly changes which bits you keep, and why doubling keeps operations O(1) on average.</span></li>
 </ul>
 </main>
 <footer>Personal site. Not affiliated with any company.</footer>
