@@ -173,3 +173,30 @@ BFS, DFS, Dijkstra, Shortest Distance, Topological Order, Graph. **Scope:** M
 
 ## Task 13: Dynamic programming, bits and game theory
 Dynamic Programming, Knapsack, Bitmasking DP, Bit Manipulation, Game Theory. **Scope:** M
+
+## Phase R — interactive redesign (added 2026-10-31)
+
+Specs: `CAPABILITY-MAP.md`, `SPEC-theme.md`, `SPEC-scene.md`, `SPEC-lofi.md`, `SPEC-reskin.md`.
+Every task ends with `python3 scripts/check.py` and the unit tests passing.
+
+## Task R1: theme
+Tokens (paper + night), `header.site`, footer skyline glyph, AA contrast test written first.
+**Files:** `style.css`, `scripts/test_check.py`, page headers. **Scope:** M
+
+## Task R2: reskin
+Test first: `posts/` entries must be listed on `posts/index.html`. Then the posts index (with
+`#musicgen`), the Desk/Posts/LeetCode/About/GitHub nav everywhere, title blocks and TOC rail, LeetCode
+template + rebuild, About role ids and tape headings, 404. Verify article text unchanged with a
+before/after script. **Scope:** L (split into commits per page type)
+
+## Task R3: scene
+Workflow: 3 designers draw full candidate scenes (different angles) and self-check with headless
+Chrome screenshots; 3 judges with different lenses score all candidates; a synthesizer combines the
+winner with the best ideas. Then integrate into `index.html` + `style.css`. **Scope:** L
+
+## Task R4: lofi
+Pre-paint mode script, toggle with `aria-pressed`, plain view, storage failure handling. **Scope:** S
+
+## Task R5: review
+Review workflow (accessibility, responsive/visual, correctness/privacy, performance), each finding
+adversarially verified, real ones fixed. **Scope:** M

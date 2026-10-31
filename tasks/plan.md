@@ -66,6 +66,16 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 - [x] Task 12: Graphs
 - [x] Task 13: Dynamic programming, bits and game theory
 
+### Phase R: Interactive redesign (added 2026-10-31; see CAPABILITY-MAP.md)
+- [ ] Task R1 `theme`: tokens, header/footer, AA contrast test
+- [ ] Task R2 `reskin`: posts index, nav, posts/LeetCode/About/404 restyled, article text unchanged
+- [ ] Task R3 `scene`: design panel (3 drafts, 3 judges, synthesis), then integrate into index.html
+- [ ] Task R4 `lofi`: toggle, pre-paint mode script, plain home
+- [ ] Task R5 review: multi-lens review workflow over the redesign, verified findings fixed
+
+### Checkpoint R
+- [ ] All module success criteria checked; you review the live preview before any push
+
 ### Phase 3: Finish
 - [ ] Task 7: README and full-site verification
 
