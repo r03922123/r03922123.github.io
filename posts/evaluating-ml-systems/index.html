@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evaluating ML systems · r03922123</title>
+<meta name="description" content="A reference for evaluating classification, recommendation, search and generative systems: from business value to model metrics, offline tests to online experiments.">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Posts</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<header class="post-head">
+  <h1>Evaluating ML systems: classification, ranking, search and generative models</h1>
+  <div class="meta">October 31, 2026 · 8 min read · evaluation · experimentation · reference</div>
+</header>
+
+<p>A model metric is only useful if moving it moves something people care about. This reference follows
+the same chain for four kinds of system: <b>business value → product metric → model metric</b>, then how
+to test offline and online, and the problems that tend to break each step. The formulas are written out,
+and the metric code at the end runs as is.</p>
+
+<nav class="toc"><h2>Contents</h2><ol>
+  <li><a href="#chain">The chain from value to metric</a></li>
+  <li><a href="#classification">Classification</a></li>
+  <li><a href="#recsys">Recommendation</a></li>
+  <li><a href="#search">Search</a></li>
+  <li><a href="#generative">Generative systems</a></li>
+  <li><a href="#online">Online testing, done carefully</a></li>
+  <li><a href="#code">Metric code</a></li>
+  <li><a href="#refs">References</a></li>
+</ol></nav>
+
+<h2 id="chain">The chain from value to metric</h2>
+<p>Start from what one more correct prediction is worth, and work down:</p>
+<ul>
+  <li><b>Business value</b> is money or risk: revenue per recommendation, fraud losses avoided, support cost saved.</li>
+  <li><b>Product metrics</b> are what users do: clicks, watch time, retention, tasks resolved without escalation.</li>
+  <li><b>Model metrics</b> are what you can compute offline: precision at a threshold, NDCG, calibration error.</li>
+</ul>
+<p>Each link is a hypothesis. A gain in offline NDCG is worth something only if it raises a product metric
+online, and that only if the product metric tracks value. Most evaluation failures are one of these links
+quietly breaking.</p>
+
+<h2 id="classification">Classification</h2>
+<h3>Pick the operating point first</h3>
+<p>A deployed classifier runs at one threshold, so threshold-free summaries hide what users will get. Fix the
+constraint the product actually imposes, then report the other side of the trade-off at that point:
+precision at a recall floor set by policy, or recall at a review capacity of \(n\) items a day.</p>
+\[ \text{precision} = \frac{TP}{TP + FP}, \qquad \text{recall} = \frac{TP}{TP + FN}. \]
+<h3>Threshold-free summaries, and when to use which</h3>
+<ul>
+  <li><b>ROC AUC</b> is the probability that a random positive scores above a random negative. It ignores class
+  balance, which makes it stable across datasets but optimistic when positives are rare: a model can have a
+  high ROC AUC and still bury every true positive under false alarms.</li>
+  <li><b>PR AUC</b> (average precision) is dominated by the positive class, so it moves when performance on rare
+  positives moves. With positives under a few percent, it is the more honest summary.</li>
+</ul>
+<h3>Calibration</h3>
+<p>If scores are used as probabilities (for expected-value decisions, or combined with other models), check
+that a score of 0.8 means right about 80% of the time. Expected calibration error bins predictions by
+confidence and averages the gap between confidence and accuracy, weighted by bin size
+<a href="#ref-1">[1]</a>:</p>
+\[ \mathrm{ECE} = \sum_{b=1}^{B} \frac{|S_b|}{n}\, \big|\, \mathrm{acc}(S_b) - \mathrm{conf}(S_b) \,\big|. \]
+<p>Modern networks are often over-confident; temperature scaling on a held-out set is a cheap first fix
+<a href="#ref-1">[1]</a>.</p>
+<h3>Where it breaks</h3>
+<ul>
+  <li><b>Label scarcity and rarity.</b> When positives are rare, the test set holds few of them and every metric
+  is noisy. Report confidence intervals, and mine hard negatives so the training set teaches the boundary.</li>
+  <li><b>Labels that disagree.</b> If two experts disagree on 20% of borderline cases, no model can be measured
+  above that ceiling. Measuring inter-rater agreement comes before measuring the model.</li>
+</ul>
+
+<h2 id="recsys">Recommendation</h2>
+<h3>Business and product metrics</h3>
+<p>Write down the value of one more relevant recommendation. For a shop it is roughly
+\(P(\text{click}) \cdot P(\text{buy} \mid \text{click}) \cdot \text{average order value}\); for ads it is
+impressions × revenue per thousand impressions; for a subscription, the effect on retention times customer
+lifetime value. The product metrics that follow are session watch or dwell time, revenue per user, retention,
+and <b>catalog coverage</b>, the share of the catalog that gets recommended at all.</p>
+<h3>Model metrics</h3>
+<ul>
+  <li><b>Recall@k</b>: of the items the user went on to engage with, the fraction that were in the top \(k\).
+  It is the natural metric for a retrieval stage, whose job is to not lose good candidates.</li>
+  <li><b>NDCG@k</b> <a href="#ref-2">[2]</a>: rewards putting the most relevant items highest, with a
+  logarithmic discount by rank, normalized by the best possible ordering:
+  \[ \mathrm{DCG@}k = \sum_{i=1}^{k} \frac{\mathrm{rel}_i}{\log_2(i + 1)}, \qquad \mathrm{NDCG@}k = \frac{\mathrm{DCG@}k}{\mathrm{IDCG@}k}. \]
+  A common variant uses gain \(2^{\mathrm{rel}_i} - 1\) to weight highly relevant items more.</li>
+  <li><b>MRR</b> <a href="#ref-3">[3]</a>: the reciprocal rank of the first relevant item, averaged over
+  queries. Right when the user needs one good answer.</li>
+  <li><b>Coverage and diversity</b>: offline accuracy rewards recommending what is already popular, so track
+  these alongside it.</li>
+  <li><b>Calibration</b> of predicted click rates matters whenever scores feed an auction or a blend with other
+  objectives.</li>
+</ul>
+<h3>Where it breaks</h3>
+<ul>
+  <li><b>Logged data is biased by the old system.</b> Offline labels are clicks on what the previous model chose to
+  show, at the positions it chose. A new model that surfaces different items looks worse offline simply
+  because those items were never shown. See <a href="/posts/position-bias/">position bias</a> for corrections
+  with inverse propensity weighting.</li>
+  <li><b>Feedback loops.</b> A model trained on its own output narrows over time. A small exploration budget and
+  a long-lived holdout served by a simple heuristic give a baseline that model changes cannot drag along.</li>
+</ul>
+
+<h2 id="search">Search</h2>
+<p>Search differs from recommendation in having an explicit query, which makes graded relevance judgments
+possible: annotators rate query–document pairs (say 0–3), and those judgments are reusable across models.</p>
+<ul>
+  <li><b>NDCG@10 on judged pairs</b> is the standard offline metric, because graded labels are what DCG's gain
+  was designed for.</li>
+  <li><b>MRR</b> for navigational queries, where one correct result is the answer.</li>
+  <li><b>Precision@k</b> for the first screen, since that is what users read.</li>
+  <li><b>Zero-result rate and query reformulation rate</b> are product signals of failure that need no labels.</li>
+</ul>
+<p>The trap is <b>unjudged documents</b>: a new ranker retrieves documents nobody rated, and counting them as
+irrelevant penalizes exactly the novelty you wanted. Judge the new top results before comparing, or report
+how many results were unjudged. Online, compare rankers with interleaving, which reaches a verdict with far
+less traffic than a split test <a href="#ref-4">[4]</a>.</p>
+
+<h2 id="generative">Generative systems</h2>
+<h3>Product metrics</h3>
+<p>These depend heavily on the application: task resolution rate, how often a human has to take over and
+how long that takes, response latency, satisfaction, and safety incidents.</p>
+<h3>Model metrics: a portfolio, not a number</h3>
+<p>There is no single scalar for generation quality, so measure several things at once:</p>
+<ul>
+  <li><b>Overlap with references.</b> BLEU <a href="#ref-5">[5]</a> and ROUGE <a href="#ref-6">[6]</a> count
+  shared n-grams; BERTScore <a href="#ref-7">[7]</a> and BLEURT <a href="#ref-8">[8]</a> compare meaning with
+  learned models. All need references, and open-ended outputs have many valid answers that share few words
+  with any one reference.</li>
+  <li><b>Behavior.</b> Factuality and hallucination rates, toxicity and policy classifiers, and diversity, for
+  example self-BLEU between a model's own samples <a href="#ref-9">[9]</a>, where higher means more repetitive.</li>
+  <li><b>Preference.</b> Pairwise win rate against a baseline, from people or from an LLM judge. LLM judges agree
+  with people reasonably often but have known biases toward position, length and their own style
+  <a href="#ref-10">[10]</a>, so swap orders and spot-check against human labels.</li>
+  <li><b>Audio and music.</b> Fréchet Audio Distance <a href="#ref-11">[11]</a> compares the distribution of
+  generated audio to real audio in an embedding space; CLAP score <a href="#ref-12">[12]</a> measures how well a
+  clip matches its text prompt. Neither measures whether people like it, which is the subject of my
+  <a href="/musicgen-prune-inference/">post on judging text-to-music</a>.</li>
+</ul>
+<h3>Testing</h3>
+<p>Offline, build a <b>golden prompt set</b> that covers the main intents, languages, hard edge cases and
+known policy risks, with several reference answers or pairwise human rankings per prompt. Online, run the
+candidate in <b>shadow mode</b> first: it answers in the background, invisible to users, so you can log
+latency, cost and automated quality scores. Then ramp traffic in an A/B test while watching safety dashboards
+next to product metrics, and keep a small group on the previous model as a standing baseline for drift.</p>
+<h3>Where it breaks</h3>
+<ul>
+  <li><b>Human review is slow and expensive.</b> Split quality into dimensions (fluency, factuality, style) and send
+  only uncertain cases to experts, with automated checks screening the rest.</li>
+  <li><b>Hallucination is worst on rare prompts,</b> so test suites must deliberately include tail queries, and
+  safety detectors should be tuned for few misses rather than few false alarms.</li>
+  <li><b>Test sets go stale.</b> Prompts drift with users; refresh evaluation sets from recent traffic, and
+  version the rubric along with the model.</li>
+</ul>
+
+<h2 id="online">Online testing, done carefully</h2>
+<p>For a click-through-rate test with \(n_A\) and \(n_B\) independent trials, the two-proportion z-test pools
+the rate under the null hypothesis of no difference:</p>
+\[ \hat p = \frac{c_A + c_B}{n_A + n_B}, \qquad z = \frac{\hat p_B - \hat p_A}{\sqrt{\hat p (1 - \hat p)\left(\frac{1}{n_A} + \frac{1}{n_B}\right)}}. \]
+<p>\(\hat p(1 - \hat p)\) is the variance of one Bernoulli trial; the square root of the whole expression is
+the standard error of the difference. With 500,000 sessions per arm and CTRs of 2.00% and 2.10%, the relative
+lift is 5.0%, \(z = 3.53\), and the two-sided p-value is \(4 \times 10^{-4}\).</p>
+<p>Three ways this goes wrong in practice:</p>
+<ul>
+  <li><b>The unit of analysis is not the unit of randomization.</b> If users are randomized but the metric is
+  clicks per session, sessions from one user are correlated and the formula above understates the variance.
+  Use the delta method for ratio metrics, or bootstrap over users <a href="#ref-13">[13]</a>.</li>
+  <li><b>Peeking.</b> Checking significance every day and stopping at the first \(p &lt; 0.05\) inflates false
+  positives far beyond 5%. Fix the sample size in advance, or use a sequential test designed for it.</li>
+  <li><b>Sample ratio mismatch.</b> If a 50/50 split arrives as 50.6/49.4 over a million users, something in
+  assignment or logging is broken, and the result should not be trusted until it is found
+  <a href="#ref-13">[13]</a>.</li>
+</ul>
+
+<h2 id="code">Metric code</h2>
+<pre><code class="language-python">import math
+
+
+def dcg(rels):
+    return sum(rel / math.log2(i + 2) for i, rel in enumerate(rels))   # rank 1 -> log2(2) = 1
+
+
+def ndcg_at_k(rels, k):
+    ideal = dcg(sorted(rels, reverse=True)[:k])
+    return dcg(rels[:k]) / ideal if ideal > 0 else 0.0
+
+
+def mrr(ranked_lists):                   # each list: 1 if relevant else 0, in ranked order
+    return sum(next((1 / (i + 1) for i, r in enumerate(rels) if r), 0.0)
+               for rels in ranked_lists) / len(ranked_lists)
+
+
+def recall_at_k(rels, k, n_relevant):
+    return sum(1 for r in rels[:k] if r) / n_relevant
+
+
+def two_proportion_z(clicks_a, n_a, clicks_b, n_b):
+    p_a, p_b = clicks_a / n_a, clicks_b / n_b
+    p = (clicks_a + clicks_b) / (n_a + n_b)              # pooled rate under H0
+    se = math.sqrt(p * (1 - p) * (1 / n_a + 1 / n_b))
+    return (p_b - p_a) / se, (p_b - p_a) / p_a           # z, relative lift
+
+
+assert ndcg_at_k([3, 2, 1, 0], 4) == 1.0                 # already ideal
+assert round(ndcg_at_k([0, 1, 2, 3], 4), 3) == 0.614     # fully reversed
+assert mrr([[0, 1, 0], [1, 0, 0], [0, 0, 0]]) == 0.5     # (1/2 + 1 + 0) / 3
+assert recall_at_k([1, 0, 1, 0, 0], 3, n_relevant=4) == 0.5
+z, lift = two_proportion_z(10_000, 500_000, 10_500, 500_000)
+assert round(z, 2) == 3.53 and round(lift, 3) == 0.05</code></pre>
+
+<h2 id="refs">References</h2>
+<ol class="refs">
+  <li id="ref-1">C. Guo, G. Pleiss, Y. Sun, K. Q. Weinberger. <i>On Calibration of Modern Neural Networks.</i> ICML 2017.</li>
+  <li id="ref-2">K. Järvelin, J. Kekäläinen. <i>Cumulated Gain-Based Evaluation of IR Techniques.</i> ACM TOIS 20(4), 2002.</li>
+  <li id="ref-3">E. M. Voorhees. <i>The TREC-8 Question Answering Track Report.</i> TREC 1999.</li>
+  <li id="ref-4">O. Chapelle, T. Joachims, F. Radlinski, Y. Yue. <i>Large-Scale Validation and Analysis of Interleaved Search Evaluation.</i> ACM TOIS 30(1), 2012.</li>
+  <li id="ref-5">K. Papineni, S. Roukos, T. Ward, W.-J. Zhu. <i>BLEU: A Method for Automatic Evaluation of Machine Translation.</i> ACL 2002.</li>
+  <li id="ref-6">C.-Y. Lin. <i>ROUGE: A Package for Automatic Evaluation of Summaries.</i> ACL Workshop 2004.</li>
+  <li id="ref-7">T. Zhang, V. Kishore, F. Wu, K. Q. Weinberger, Y. Artzi. <i>BERTScore: Evaluating Text Generation with BERT.</i> ICLR 2020.</li>
+  <li id="ref-8">T. Sellam, D. Das, A. P. Parikh. <i>BLEURT: Learning Robust Metrics for Text Generation.</i> ACL 2020.</li>
+  <li id="ref-9">Y. Zhu et al. <i>Texygen: A Benchmarking Platform for Text Generation Models.</i> SIGIR 2018.</li>
+  <li id="ref-10">L. Zheng et al. <i>Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.</i> NeurIPS 2023.</li>
+  <li id="ref-11">K. Kilgour, M. Zuluaga, D. Roblek, M. Sharifi. <i>Fréchet Audio Distance: A Reference-Free Metric for Evaluating Music Enhancement Algorithms.</i> Interspeech 2019.</li>
+  <li id="ref-12">Y. Wu et al. <i>Large-Scale Contrastive Language-Audio Pretraining with Feature Fusion and Keyword-to-Caption Augmentation.</i> ICASSP 2023.</li>
+  <li id="ref-13">R. Kohavi, D. Tang, Y. Xu. <i>Trustworthy Online Controlled Experiments: A Practical Guide to A/B Testing.</i> Cambridge University Press, 2020.</li>
+</ol>
+
+<h2 id="cite">Cite as</h2>
+<pre class="cite"><code class="language-plaintext">@article{lin2026evaluating,
+  title   = {Evaluating ML systems: classification, ranking, search and generative models},
+  author  = {Lin, Jie-Hong},
+  journal = {r03922123.github.io},
+  year    = {2026},
+  month   = {Oct},
+  url     = {https://r03922123.github.io/posts/evaluating-ml-systems/}
+}</code></pre>
+</article>
+</main>
+<footer>Personal site. Not affiliated with any company.</footer>
+</div>
+</body>
+</html>
