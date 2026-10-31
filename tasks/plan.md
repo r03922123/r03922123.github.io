@@ -77,7 +77,7 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 - [ ] All module success criteria checked; you review the live preview before any push
 
 ### Phase 3: Finish
-- [ ] Task 7: README and full-site verification
+- [x] Task 7: README and full-site verification
 
 ### Checkpoint C — complete
 - [ ] All spec success criteria checked; ready to push (push needs your OK)
