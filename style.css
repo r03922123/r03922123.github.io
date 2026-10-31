@@ -1,17 +1,19 @@
 /* r03922123: one stylesheet. Sections: tokens, base, header/footer, reading pages, About, LeetCode, scene, lo-fi.
-   Colours live only in the token blocks (paper = light, night = dark) and in the scene art. */
+   Colours live only in the token blocks (parchment = light, candlelit = dark) and in the scene art. */
+@font-face { font-family: "Cinzel"; src: url("/fonts/cinzel/cinzel-latin.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
 :root {
-  --bg: #f7f5f0; --fg: #1f2130; --muted: #5d6070; --line: #e2ded4; --card: #fffdf8;
-  --accent: #c2410c; --link: #1d4ed8; --signal: #0e7490; --tower: #dc2626;
-  --code-builtin: #b45309; --code-keyword: #c5283d;
+  --bg: #f3e9d2; --fg: #2b2118; --muted: #6b5a45; --line: #dccfb0; --card: #f8f1df;
+  --accent: #8a2a1a; --link: #7a2414; --signal: #8a6d1f; --gold: #b8860b;
+  --code-builtin: #8a4b08; --code-keyword: #a3172f;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Helvetica, Arial, sans-serif;
+  --font-display: "Cinzel", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d1020; --fg: #e8e6f0; --muted: #9ba0b8; --line: #262b45; --card: #141933;
-    --accent: #f5b14c; --link: #8ab4ff; --signal: #5eead4; --tower: #f87171;
+    --bg: #1a1410; --fg: #efe3c8; --muted: #b9a88a; --line: #3a2e24; --card: #231b15;
+    --accent: #e0a85a; --link: #e8bf7a; --signal: #f0c869; --gold: #d9a441;
     --code-builtin: #ffa657; --code-keyword: #ff7b72;
   }
 }
@@ -24,14 +26,14 @@ a { color: var(--link); text-decoration: none; text-underline-offset: .15em; }
 a:hover { text-decoration: underline; }
 .post-body :is(p, li, td) a:not(.toc a), .aside a, .crumb a, .lost p a, .role li a, .about .contact a { text-decoration: underline; text-decoration-thickness: 1px; }
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 2px; }
-.label { font: 600 .78rem/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.label { font: 600 .8rem/1.4 var(--font-display); letter-spacing: .08em; color: var(--muted); }
 
 /* Header and footer, shared by every page */
 header.site { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding: 18px 0; }
-header.site .home { font: 700 .95rem/1 var(--font-mono); letter-spacing: .08em; color: var(--fg); display: inline-flex; align-items: center; gap: .55em; }
-header.site .home::before { content: ""; width: .55em; height: .55em; border-radius: 50%; background: var(--tower); }   /* the tower's beacon */
+header.site .home { font: 700 1rem/1 var(--font-display); letter-spacing: .1em; color: var(--fg); display: inline-flex; align-items: center; gap: .55em; }
+header.site .home::before { content: ""; width: .5em; height: .5em; background: var(--gold); transform: rotate(45deg); }   /* a gold seal */
 header.site .home:hover { text-decoration: none; }
-header.site nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+header.site nav { display: flex; flex-wrap: wrap; gap: 4px 18px; font-family: var(--font-display); font-weight: 600; letter-spacing: .05em; }
 header.site nav a { color: var(--muted); }
 header.site nav a:hover, header.site nav [aria-current] { color: var(--fg); }
 header.site nav [aria-current] { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; }   /* page, or true on sub-pages */
@@ -39,11 +41,12 @@ header.site nav a:focus-visible { text-decoration: underline; }
 @media (max-width: 480px) { header.site nav { gap: 4px 14px; font-size: .95em; } }
 @media (min-width: 481px) { header.site nav { margin-left: auto; } }   /* stays right-aligned when the home adds its toggle */
 footer.site { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .85em; padding: 40px 0 32px; }
-footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted); opacity: .45; }
+footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); opacity: .7; }
 
 /* Lists of posts: the home (until the scene), the posts index, the series page */
 .intro { padding: 40px 0 24px; }
 .intro h1 { font-size: 2rem; margin: 0 0 .3em; }
+.intro h1, .post-head h1, .post-body h2, .about h2, .group > h2, .lofi h1, .lost h1, .toc h2 { font-family: var(--font-display); letter-spacing: .03em; }
 .intro p { color: var(--muted); margin: 0; }
 .post { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; margin: 16px 0; color: var(--fg); }
 .post:hover { text-decoration: none; border-color: var(--link); }
@@ -59,7 +62,7 @@ footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted
 /* Reading pages: long-form posts and LeetCode posts */
 .post-head { padding: 40px 0 8px; }
 .post-head h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 .4em; }
-.post-head .meta { font: 500 .78rem/1.6 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.post-head .meta { font: 600 .8rem/1.6 var(--font-display); letter-spacing: .08em; color: var(--muted); }   /* a game-menu line */
 .post-body { overflow-wrap: break-word; }
 .post-body h2 { font-size: 1.4rem; margin: 2em 0 .5em; }
 .post-body h3 { font-size: 1.1rem; margin: 1.5em 0 .4em; }
@@ -72,7 +75,7 @@ footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted
   .post-body .toc { position: fixed; top: 96px; left: calc(50% - 616px); width: 220px; max-height: calc(100vh - 128px);
                     overflow: auto; margin: 0; padding: 0 0 0 14px; background: none; border: 0; border-left: 2px solid var(--line);
                     border-radius: 0; font-size: .85rem; line-height: 1.45; }
-  .post-body .toc h2 { font: 600 .72rem/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .post-body .toc h2 { font: 700 .78rem/1.4 var(--font-display); letter-spacing: .1em; color: var(--muted); }
   .post-body .toc ol { padding-left: 1.1em; }
   .post-body .toc li { margin: .3em 0; }
 }
@@ -100,11 +103,9 @@ footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted
 .role { margin: 20px 0; }
 .role-head, .role-sub { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .role-head h3 { font-size: 1.05rem; margin: 0; }
-.tape .role-head h3 { position: relative; padding: 3px 12px 3px 30px; border: 1px solid var(--line); border-top: 3px solid var(--accent);
-                      border-radius: 4px; background: var(--card); font-family: var(--font-mono); font-size: .95rem; letter-spacing: .04em; }
-.tape .role-head h3::before { content: ""; position: absolute; left: 10px; top: 50%; width: 9px; height: 9px; margin-top: -6px;
-                              border: 2px solid var(--muted); border-radius: 50%; }   /* a reel */
-.tape:target .role-head h3 { border-color: var(--accent); }
+.portrait .role-head h3 { padding: 4px 14px; border: 3px double var(--gold); outline: 1px solid var(--line); outline-offset: 2px;
+                          background: var(--card); font-family: var(--font-display); font-size: 1rem; letter-spacing: .06em; }   /* a gilt frame */
+.portrait:target .role-head h3 { border-color: var(--accent); }
 .role-head span, .role-sub { color: var(--muted); font-size: .9em; }
 .role ul, .plain { padding-left: 1.2em; margin: .6em 0 0; }
 .role li, .plain li { margin: .5em 0; }
@@ -119,7 +120,7 @@ footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted
 
 /* 404 */
 .lost { text-align: center; padding-top: 72px; }
-.lost-skyline { width: 240px; height: 50px; color: var(--muted); opacity: .5; }
+.lost-glyph { width: 40px; height: 48px; color: var(--gold); }
 .lost p { color: var(--fg); }
 
 /* Scene: the home page's desk at night (SPEC-scene). Every class is sc-*, except the links (.door).
@@ -273,7 +274,7 @@ footer.site .skyline { width: 96px; height: 20px; flex: none; color: var(--muted
 .mode-toggle { display: none; }
 [data-mode] .mode-toggle { display: inline-block; }   /* no JS, no toggle */
 @media (max-width: 600px) { body.home header.site .mode-toggle { margin-left: auto; } body.home header.site nav { flex-basis: 100%; margin-left: 0; } }
-.mode-toggle { font: 600 .72rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+.mode-toggle { font: 700 .75rem/1 var(--font-display); letter-spacing: .1em; color: var(--muted);
                background: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
 .mode-toggle:hover, .mode-toggle[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); }
 .lofi { display: none; padding: 40px 0 8px; }
