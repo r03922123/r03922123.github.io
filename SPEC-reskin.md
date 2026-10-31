@@ -1,6 +1,6 @@
 # Spec: reskin
 
-Module of `CAPABILITY-MAP.md`. Depends on `theme`. Status: **approved** 2026-10-31.
+Module of `CAPABILITY-MAP.md`. Depends on `theme`. Status: **approved** 2026-10-31; **amended** 2026-11-01 for the parchment theme (approved 2026-11-01).
 
 ## Objective
 Every reading page wears the theme and leads back to the desk, while staying a plain, fast, shareable
@@ -13,6 +13,14 @@ page. Because the home becomes the scene, the post list moves to a new **posts i
 | `leetcode/` + 31 posts | Same, through the template in `tools/leetcode/build.py`, then a full rebuild |
 | `about.html` | Each role gets an id (`kkcompany`, `tiktok`, `htc`) and a tape-label heading matching the scene |
 | `404.html` | "Lost in the city" with a small skyline and a link back to the desk |
+
+### Amendment for version 2
+- Every reading page moves to the parchment/candlelit theme (`SPEC-theme.md` v2): display-serif headings,
+  small-caps meta lines, the candle footer glyph. Article text stays byte-for-byte the same.
+- The nav's first item becomes **Common room** (the home); the three generated groups (LeetCode, topic posts,
+  posts index) take the new header from their renderers' templates and are regenerated.
+- About's tape-label headings become portrait-frame headings, matching the portraits in the room.
+- 404: "Lost in the castle" with a way back to the common room.
 
 ## Tech Stack
 Existing static HTML and `style.css`; the LeetCode pages are regenerated with the stdlib renderer.

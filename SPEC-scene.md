@@ -1,6 +1,6 @@
 # Spec: scene
 
-Module of `CAPABILITY-MAP.md`. Depends on `theme`. Status: **approved** 2026-10-31.
+Module of `CAPABILITY-MAP.md`. Depends on `theme`. Status: **superseded** by `SPEC-room.md` on 2026-11-01 (shipped as version 1, replaced in version 2).
 
 ## Objective
 The home page is a hand-drawn SVG scene: a desk at night in front of a large window, with Tokyo spread out

@@ -1,6 +1,6 @@
 # Spec: lofi
 
-Module of `CAPABILITY-MAP.md`. Depends on `scene`. Status: **approved** 2026-10-31.
+Module of `CAPABILITY-MAP.md`. Depends on `scene`. Status: **approved** 2026-10-31; **amended** 2026-11-01 for `room` (approved 2026-11-01).
 
 ## Objective
 An escape hatch from the scene: a plain, fast, text-only home with the same content. A **lo-fi** toggle
@@ -9,6 +9,12 @@ Visitors whose OS asks for reduced motion start in lo-fi, and can still switch t
 
 The plain home shows: the greeting, the four sections as a list (Posts, LeetCode, About, MusicGen), and
 the latest three posts.
+
+### Amendment for `room` (version 2)
+- Visitors whose browser has no WebGL start in lo-fi, and the toggle is hidden for them (the room cannot render).
+  `room.js` decides this after it loads; until then the title card and text door list are already readable.
+- In lo-fi mode `room.js` never loads three.js, so the plain home stays light.
+- The plain home lists the same doors as the room: Posts, LeetCode, About, MusicGen, plus the latest three posts.
 
 ## Tech Stack
 A `data-mode="scene|lofi"` attribute on `<html>`, set by an inline script in `<head>` before first paint

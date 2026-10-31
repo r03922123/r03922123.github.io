@@ -1,61 +1,60 @@
 # Spec: theme
 
-Module of `CAPABILITY-MAP.md`. Status: **approved** 2026-10-31.
+Module of `CAPABILITY-MAP.md`. Version 2 (parchment), 2026-11-01. Status: **approved** 2026-11-01.
+Version 1 (Tokyo-night paper/night tokens) shipped on 2026-11-01 and is replaced by this.
 
 ## Objective
-One visual language for the whole site, taken from the home scene: a Tokyo night of deep indigo,
-sodium-lamp amber and the red-white of Tokyo Tower, with neon cyan and pink as small accents. Reading
-pages must stay comfortable for 15-minute posts, so the theme has a **paper** (light) and a **night**
-(dark) variant, chosen by the visitor's OS setting as today. The scene itself is always night.
+One look for the whole site, taken from the common room: **parchment** pages (aged paper, iron-gall ink, a burgundy
+and gold accent) in light mode and **candlelit** pages (warm dark wood, cream text, gold accents) in dark mode,
+chosen by the OS setting. Headings use a carved-serif display face; body text stays a highly readable font, because
+posts run 15 minutes. Small labels (dates, tags, menu items) look like a 2000s console-game menu: small caps,
+generous letter spacing.
 
 ## Tech Stack
-Plain CSS custom properties in the existing single `style.css`. System font stacks only, no web fonts,
-so pages make no extra requests for type.
+CSS custom properties in the single `style.css`. Display font **Cinzel** (SIL Open Font Licence), **self-hosted**
+as one variable `woff2` in `fonts/` with its licence, so no font request leaves the site; system serif fallback
+(`"Iowan Old Style", "Palatino Linotype", Georgia, serif`). Body: the system sans stack as today.
 
 ## Commands
 ```
-Preview: python3 -m http.server 8000
-Check:   python3 scripts/check.py && (cd scripts && python3 -m unittest test_check)
+Check: python3 scripts/check.py && (cd scripts && python3 -m unittest test_check)
 ```
 
 ## Project Structure
 ```
-style.css   → sections in order: tokens, base, header/footer, reading pages, LeetCode, scene, lo-fi
+style.css          → tokens (parchment, candlelit), base, header/footer, lists, reading pages, About, LeetCode, room, lo-fi
+fonts/cinzel/      → Cinzel variable woff2 + OFL.txt
 ```
 
 ## Code Style
-Tokens are named by role, never by colour, so the light and dark variants swap values only:
+Role-named tokens, swapped per variant, as in version 1:
 ```css
 :root {
-  --bg: #f7f5f0; --fg: #1f2130; --muted: #5d6070; --line: #e2ded4; --card: #fffdf8;
-  --accent: #c2410c;          /* sodium amber, darkened for contrast on paper */
-  --link: #1d4ed8; --signal: #0e7490; --tower: #dc2626;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #f3e9d2; --fg: #2b2118; --muted: #6b5a45; --line: #dccfb0; --card: #f8f1df;
+  --accent: #8a2a1a; --link: #7a2414; --signal: #8a6d1f; --gold: #b8860b;
+  --font-display: "Cinzel", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #0d1020; --fg: #e8e6f0; --muted: #9ba0b8; --line: #262b45; --card: #141933;
-          --accent: #f5b14c; --link: #8ab4ff; --signal: #5eead4; --tower: #f87171; }
+  :root { --bg: #1a1410; --fg: #efe3c8; --muted: #b9a88a; --line: #3a2e24; --card: #231b15;
+          --accent: #e0a85a; --link: #e8bf7a; --signal: #f0c869; --gold: #d9a441; }
 }
 ```
-- Headings use the body stack at heavier weights; small labels (dates, tags, the wordmark) use `--font-mono`
-  in small caps-like uppercase with letter spacing, echoing signage.
-- Header: wordmark `r03922123` on the left; nav **Desk · Posts · LeetCode · About · GitHub** on the right;
-  wraps cleanly at 375px.
-- Footer: one line, plus a small skyline glyph (inline SVG, a few hundred bytes) as a signature.
+- Headings (`h1`, `h2`) and the wordmark in `--font-display`; menus and meta lines in small caps.
+- Header: wordmark, then nav **Common room · Posts · LeetCode · About · GitHub**; the lo-fi toggle on the home.
+- Footer: one line with a small candle glyph replacing the skyline.
 
 ## Testing Strategy
-- `scripts/check.py` keeps passing (head fields, links, privacy, pinned CDNs).
-- Contrast: every text/background token pair meets WCAG AA (4.5:1 body, 3:1 large text), computed by a
-  small test added to `scripts/test_check.py` that parses the tokens from `style.css`.
-- Browser: home, a long-form post, a LeetCode post and About, at 375px and 1440px, in light and dark.
+- The AA contrast test covers every text token on every surface in both variants (exact values above may be tuned
+  to pass; the test decides).
+- No literal colours outside the token blocks and the room section (existing test).
+- Browser: each page type at 375 and 1440 px, both variants; KaTeX and code readable on parchment.
 
 ## Boundaries
-- Always: change colours through tokens; keep KaTeX and code highlighting readable in both variants.
-- Ask first: adding any web font or external stylesheet.
-- Never: colour-only meaning (links stay underlined on hover/focus), body text below AA contrast.
+- Always: colours through tokens; underlined prose links; focus visible on every control.
+- Ask first: any further font or external stylesheet.
+- Never: display font for body text; text below AA contrast.
 
 ## Success Criteria
-- [ ] All pages read from the same tokens; no hard-coded colours outside the token block and the scene art
-- [ ] AA contrast test passes for both variants
-- [ ] Header nav fits at 375px without horizontal scroll on every page
+- [ ] Every page reads from the parchment/candlelit tokens; AA test passes for both
+- [ ] Cinzel served from the site; no external font request
+- [ ] Header and footer consistent on every page at 375 and 1440 px
