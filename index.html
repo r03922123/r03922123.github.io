@@ -13,6 +13,11 @@
     if (mode !== "scene" && mode !== "lofi")
       mode = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "lofi" : "scene";
     document.documentElement.setAttribute("data-mode", mode);
+    if (mode === "scene") {                  // the room will import three.js: start fetching it now (never in lo-fi)
+      var l = document.createElement("link");
+      l.rel = "modulepreload"; l.href = "/vendor/three/0.169.0/three.module.min.js";
+      document.head.appendChild(l);
+    }
   })();</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
