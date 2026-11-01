@@ -481,6 +481,8 @@ function build(THREE, context) {
   }).filter(Boolean);
   const bookDoor = doors.find((d) => d.focus === top);
   let last = 0, running = false, raf = 0, onScreen = true, wanted = true;   // animation state, used from here on
+  let lastInput = 0;
+  const coarse = matchMedia("(pointer: coarse)").matches;
 
   // The pointer wins while it is over a door; otherwise the keyboard-focused door stays lit with its label.
   let active = null, hovered = null, focused = null;
@@ -521,6 +523,8 @@ function build(THREE, context) {
     aim.tx = (ev.clientX - r.left) / r.width * 2 - 1; aim.ty = (ev.clientY - r.top) / r.height * 2 - 1;
   });
   stage.addEventListener("pointerleave", () => { aim.tx = aim.ty = 0; });
+  stage.addEventListener("pointermove", () => { lastInput = performance.now(); }, { passive: true });
+  stage.addEventListener("focusin", () => { lastInput = performance.now(); });
   stage.addEventListener("scroll", () => { stage.scrollTop = stage.scrollLeft = 0; });   // older browsers without overflow: clip
 
   const v = new THREE.Vector3(), tmp = new THREE.Vector3(), spellOffset = new THREE.Vector3(0, .2, .9);
@@ -635,7 +639,10 @@ function build(THREE, context) {
   function still() { render(0, 0, true); }
   function tick(now) {
     raf = requestAnimationFrame(tick);
-    if (now - last < 1000 / 30 - 2) return;                                  // the era's 30 frames a second
+    // The era's 30 frames a second while someone is using the room; 15 when idle for 8 s or on a touch screen, which
+    // the fire (9 texture frames a second) still reads well at and which halves the battery cost.
+    const idle = !active && (coarse || now - lastInput > 8000);
+    if (now - last < 1000 / (idle ? 15 : 30) - 2) return;
     const dt = last ? Math.min(.1, (now - last) / 1000) : 1 / 30;
     last = now;
     render(now / 1000, dt, false);
