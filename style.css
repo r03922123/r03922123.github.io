@@ -180,9 +180,10 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .rm-load { position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 12px;
            background: #07060b; transition: opacity .7s, visibility .7s; }
 .rm-ready .rm-load { opacity: 0; visibility: hidden; }
+.rm-ready .rm-bar i { animation: none; }   /* a hidden element's animation keeps running */
 .rm-load b { font: 700 .9rem/1 var(--font-display); letter-spacing: .3em; text-transform: uppercase; color: #e2b04f; }
 .rm-bar { position: relative; overflow: hidden; width: 180px; height: 8px; border: 1px solid #b8862f; padding: 1px; }
-.rm-bar i { position: absolute; top: 1px; bottom: 1px; left: 1px; width: 38%; background: linear-gradient(90deg, #a8742a, #ffe08a); }
+.rm-bar i { position: absolute; top: 1px; bottom: 1px; left: 1px; width: 38%; will-change: transform; background: linear-gradient(90deg, #a8742a, #ffe08a); }
 .rm-load small { font-size: .78rem; color: #b3a07c; }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -190,7 +191,7 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
   .rm-hint { animation: rm-pulse 2.6s ease-in-out infinite; }
   .rm-bar i { animation: rm-slide 1.3s ease-in-out infinite alternate; }
   @keyframes rm-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-  @keyframes rm-slide { 0% { left: 1px; } 100% { left: calc(62% - 1px); } }
+  @keyframes rm-slide { 0% { transform: none; } 100% { transform: translateX(158%); } }   /* compositor only, no layout */
 }
 
 /* The same doors as plain links, so navigation never depends on the picture. */
