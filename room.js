@@ -35,7 +35,8 @@ async function sync() {
   let gl = null;                             // made on the room's own canvas and handed to three.js: one context
   try { gl = stage.querySelector(".rm-canvas").getContext("webgl2", GL_OPTIONS); } catch (e) {}
   if (!gl) { giveUp(); return; }
-  try { room = build(await import(THREE_URL), gl); } catch (e) { giveUp(); }
+  try { room = build(await import(THREE_URL), gl); } catch (e) { giveUp(); return; }
+  if (root.getAttribute("data-mode") !== "scene") room.pause();   // switched to lo-fi while three.js was loading
 }
 new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ["data-mode"] });
 // Creating a WebGL context can take seconds while a cold GPU wakes up, so let the title card and door list paint first.
