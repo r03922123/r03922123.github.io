@@ -478,13 +478,14 @@ function build(THREE, context) {
     const c = b.getCenter(new THREE.Vector3());
     return { ...d, link, box: b, corners, center: c, glow: 0, hotColor: new THREE.Color(d.hot) };
   }).filter(Boolean);
-  let active = null;
-  function setActive(d) { active = d; if (!running) still(); }
+  // The pointer wins while it is over a door; otherwise the keyboard-focused door stays lit with its label.
+  let active = null, hovered = null, focused = null;
+  function choose() { active = hovered || focused; if (!running) still(); }
   doors.forEach((d) => {
-    d.link.addEventListener("pointerenter", (ev) => { if (ev.pointerType !== "touch") setActive(d); });
-    d.link.addEventListener("pointerleave", () => { if (active === d) setActive(null); });
-    d.link.addEventListener("focus", () => setActive(d));
-    d.link.addEventListener("blur", () => { if (active === d) setActive(null); });
+    d.link.addEventListener("pointerenter", (ev) => { if (ev.pointerType !== "touch") { hovered = d; choose(); } });
+    d.link.addEventListener("pointerleave", () => { if (hovered === d) { hovered = null; choose(); } });
+    d.link.addEventListener("focus", () => { focused = d; choose(); });
+    d.link.addEventListener("blur", () => { if (focused === d) { focused = null; choose(); } });
   });
 
   // ---- Size: render at about 270 px tall and scale up by a whole number, so every pixel is a crisp square.
