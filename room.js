@@ -487,7 +487,7 @@ function build(THREE, context) {
   }).filter(Boolean);
   const bookDoor = doors.find((d) => d.focus === top);
   let last = 0, running = false, raf = 0, onScreen = true, wanted = true;   // animation state, used from here on
-  let lastInput = 0;
+  let lastInput = 0, ready = false;           // ready once the shaders are compiled
   const coarse = matchMedia("(pointer: coarse)").matches;
 
   // The pointer wins while it is over a door; otherwise the keyboard-focused door stays lit with its label.
@@ -642,7 +642,7 @@ function build(THREE, context) {
     placeDoors();
     stage.classList.add("rm-ready");
   }
-  function still() { render(0, 0, true); }
+  function still() { if (ready) render(0, 0, true); }
   function tick(now) {
     raf = requestAnimationFrame(tick);
     // The era's 30 frames a second while someone is using the room; 15 when idle for 8 s or on a touch screen, which
@@ -654,6 +654,7 @@ function build(THREE, context) {
     render(now / 1000, dt, false);
   }
   function loop() {
+    if (!ready) return;
     const go = wanted && onScreen && !document.hidden && !reduce.matches;
     if (go && !running) { running = true; last = 0; raf = requestAnimationFrame(tick); }
     if (!go && running) { running = false; cancelAnimationFrame(raf); }
@@ -665,6 +666,8 @@ function build(THREE, context) {
   new ResizeObserver(resize).observe(stage);
   document.fonts?.ready.then(() => { doors.forEach((d) => { d.tipW = 0; d.placed = ""; }); if (!running) still(); });
   resize();
-  loop();
+  // Compile the 12 shader programs off the main thread where the browser can (KHR_parallel_shader_compile) before the
+  // first frame, instead of in one long task inside the first render.
+  renderer.compileAsync(scene, camera).catch(() => {}).then(() => { ready = true; loop(); });
   return { pause() { wanted = false; loop(); }, resume() { wanted = true; resize(); loop(); } };
 }
