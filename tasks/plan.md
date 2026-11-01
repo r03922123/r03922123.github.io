@@ -105,21 +105,46 @@ version 2 is pushed. Specs: `CAPABILITY-MAP.md` v2, `SPEC-posts-vault.md`, `SPEC
 
 - [x] Specs v2, posts renderer (`tools/posts/build.py`), vendored three.js r169 + Cinzel (80b502a)
 - [x] Theme v2 + reskin v2: parchment/candlelit, Cinzel, "Common room" nav, gilt frames, castle 404 (dafb657)
-- [ ] **posts-vault**: 7 of 55 sources drafted in `tools/posts/src/` (batchnorm-vs-layernorm, cross-entropy-vs-mse,
-      entropy-and-information, ml-fundamentals-quick-reference, regression-as-maximum-likelihood,
-      regularization-l1-l2, stable-softmax-cross-entropy) but **none reviewed**; uncommitted on disk with their
-      rendered `posts/<slug>/` and the regenerated `posts/index.html`. The run stopped on a usage limit.
-      Resume: run `tools/dev/workflows/vault-posts.js` with the Workflow tool, after removing the 7 drafted slugs from
-      POSTS for the writer stage (they still need the review stage only).
-- [ ] **room**: no draft exists yet (both designers stopped on the usage limit). Before running
-      `tools/dev/workflows/room-design-panel.js`: `mkdir -p .cache/room/shared`, copy
-      `vendor/three/0.169.0/three.module.min.js` and `fonts/cinzel/cinzel-latin.woff2` into it, and serve it with
-      `(cd .cache/room && python3 -m http.server 8767 &)`. 3D screenshots: `tools/dev/shoot3d.sh` (SwiftShader;
-      slow under load, up to 75 s each). Then merge `.cache/room/final/` into `index.html`, `room.js`, `style.css`
-      (replacing the Tokyo scene section), pointing imports at `/vendor/...` and `/fonts/...`.
-- [ ] **lofi** amendment: no-WebGL → lo-fi; never load three.js in lo-fi mode.
-- [ ] Full rebuild (`python3 -I tools/posts/build.py .`, `python3 -I tools/leetcode/build.py .`), review workflow,
-      fixes, local preview for the owner, then push only with the owner's OK.
+- [x] **posts-vault**: all 55 written and reviewed in 3 batches (2026-11-01) and committed on branch `v2` (0692cf9).
+      MusicGen was removed from the home page (the owner studied it and is not its author); the gramophone
+      stays as decoration (ce0eb9e, 74ba115).
+- [x] **room**: `room.js` + room markup in `index.html` + `rm-*` section of `style.css`, committed on `v2` (1f87a26).
+      Checked in real Chrome: hover/Tab labels, focus no longer scrolls the stage (`overflow: clip`), no console
+      errors, phone framing. Code review (J2) returned 11 findings, to be triaged in J5.
+- [x] **lofi** amendment: implemented in `room.js` (no WebGL → lo-fi + toggle hidden; lo-fi never fetches three.js,
+      verified via resource timing).
+
+### Ready jobs (queued 2026-11-01): run in order, without asking
+
+All v2 work is on branch `v2`, nothing pushed or merged. `main` is unchanged at 851b0b7.
+
+The owner's rule (memory `decide-next-step-by-role`): pick the best-practice step, give it to its role, and state a
+one-line reason grounded in real industry practice plus this project's evidence.
+
+- [x] **J1 Rebuild + checks** (done: fixed a denylisted company name, a realistic phone number, and an interview-URL credit): role: main session.
+      `python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py .`, then `python3 scripts/check.py`,
+      the unit tests, and a grep of `tools/posts/src` for interview|obsidian|vault|musicgen.
+      Why: every change is built and tested before review (Google's presubmit on TAP); here, batch 1-2 posts dropped
+      links to posts that didn't exist yet.
+- [x] **J2 Room code review** (done: 11 findings, 1 high): role: `agent-skills:code-reviewer`, on `room.js`, the room markup in `index.html`
+      and the `rm-*` CSS, against `SPEC-room.md` and `SPEC-lofi.md`.
+      Why: no change lands without a reviewer (Google eng-practices, "The Standard of Code Review"); here, `room.js`
+      has had no review.
+- [x] **J3 Privacy audit, all 55 posts** (done: 'publishable after the listed fixes'; 5 findings): role: `agent-skills:security-auditor`, on `tools/posts/src/*.md` plus the
+      rendered `posts/`. Look for interview framing, hiring-target companies, personal details, claims of authorship
+      over others' work (MusicGen and the like), and copied third-party text.
+      Why: identify and control personal data before release (NIST Privacy Framework); here, each per-post
+      reviewer only saw its own post.
+- [ ] **J4 Home performance audit** (running): role: `agent-skills:web-performance-auditor`, on `index.html`, `room.js` and
+      `style.css`: first paint before three.js, the 30 fps cap, pausing when hidden or off-screen, and phone cost.
+      Why: set performance budgets and measure against them (web.dev, Core Web Vitals); here, `SPEC-room.md`'s
+      30 fps cap has never been measured.
+- [ ] **J5 Fix findings**: role: main session. Apply confirmed findings from J2-J4, then rerun J1.
+- [ ] **J6 Owner preview, then stop**: role: owner. Serve locally, give the owner a short summary, and push only
+      with the owner's explicit OK.
+      Why: a human approves before a release reaches users (Google SRE book, "Release Engineering"); here, the
+      handoff rules say "push only with the owner's explicit OK".
+J2, J3 and J4 are independent: launch them together, in parallel.
 
 Dev tools: `tools/dev/shoot.sh` (2D screenshots, light/dark, phone frame), `tools/dev/shoot3d.sh` (WebGL),
 `tools/dev/same_articles.py <git-ref>` (article text unchanged check). Scratch output goes to `.cache/` (gitignored).
