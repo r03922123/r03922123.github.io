@@ -13,7 +13,9 @@
     if (mode !== "scene" && mode !== "lofi")
       mode = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "lofi" : "scene";
     document.documentElement.setAttribute("data-mode", mode);
-    if (mode === "scene") {                  // the room will import three.js: start fetching it now (never in lo-fi)
+    // The room will import three.js: start fetching it now. Never in lo-fi, and not where WebGL2 does not exist at all
+    // (a real context is only tried after first paint, so a disabled GPU can still cost this one download, once).
+    if (mode === "scene" && "WebGL2RenderingContext" in window) {
       var l = document.createElement("link");
       l.rel = "modulepreload"; l.href = "/vendor/three/0.169.0/three.module.min.js";
       document.head.appendChild(l);
