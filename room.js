@@ -595,7 +595,8 @@ function build(THREE, context) {
         sparks.life[i] = rand();
       }
     }
-    for (let i = 0; i < sparks.life.length; i++) {
+    sparks.p.visible = !!sb;                 // nothing chosen: no upload, no draw
+    if (sb) for (let i = 0; i < sparks.life.length; i++) {
       let l = sparks.life[i] + (still ? 0 : dt * (.5 + (i % 4) * .15));
       if (l >= 1 || !sb) {
         l = l % 1;
@@ -606,7 +607,7 @@ function build(THREE, context) {
       const a = sb && !still ? Math.sin(l * Math.PI) * (i % 3 ? 1 : .5 + .5 * Math.sin(t * 25 + i)) * (active ? active.glow : 0) : 0;
       sparks.col.setXYZ(i, a, a * .86, a * .55);
     }
-    sparks.pos.needsUpdate = sparks.col.needsUpdate = true;
+    if (sb) sparks.pos.needsUpdate = sparks.col.needsUpdate = true;
 
     // The record turns; the spellbook's page turns while it is chosen.
     disc.rotation.y -= still ? 0 : dt * 1.1;
