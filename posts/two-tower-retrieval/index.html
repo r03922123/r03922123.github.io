@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two-tower retrieval: from millions of items to a few hundred candidates · r03922123</title>
+<meta name="description" content="Why the first stage of a recommender cannot score every item with a rich model, and how two encoders that meet only at a dot product get around it. A trained model with in-batch negatives and the logQ correction, an inverted-file index built from scratch, new items served through content features, and hard negatives.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · Recommender systems</p>
+<header class="post-head">
+  <h1>Two-tower retrieval: from millions of items to a few hundred candidates</h1>
+  <div class="meta">November 1, 2026 · 12 min read · retrieval · recommendation · embeddings · nearest-neighbour search</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-retrieval-needs-a-different-model">Why retrieval needs a different model</a></li><li><a href="#a-small-world-to-learn">A small world to learn</a></li><li><a href="#the-two-towers">The two towers</a></li><li><a href="#training-with-in-batch-negatives">Training with in-batch negatives</a></li><li><a href="#serving-an-offline-index-and-an-online-query">Serving: an offline index and an online query</a></li><li><a href="#new-items-come-through-the-content-features">New items come through the content features</a></li><li><a href="#hard-negatives">Hard negatives</a></li><li><a href="#how-it-compares">How it compares</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<p>A recommender with ten million items cannot look carefully at all of them for every request, so it works as a funnel. A cheap first stage, retrieval, pulls a few hundred plausible items from the whole catalogue; a more expensive <a href="../recommendation-ranking/">ranking model</a> orders those with every feature it has; a last pass applies business rules. Each stage sees fewer items and can spend more on each.</p>
+<p>The two-tower model is the standard first stage. One network turns the user into a vector, another turns an item into a vector, and the score is their dot product. That restriction looks severe, and it is exactly what makes retrieval fast. This post builds one, trains it, serves it from an index, and checks each claim in code.</p>
+<h2 id="why-retrieval-needs-a-different-model">Why retrieval needs a different model</h2>
+<p>A ranking model is free to cross user and item features: "watched three cooking videos today" times "is a cooking video" is what makes it accurate. The price is one model evaluation per (user, item) pair. At an optimistic microsecond per pair, ten million items cost ten seconds per request.</p>
+<p>The two-tower model removes the pairing. If the score has the form</p>
+\[ s(u, i) = f(u)^\top g(i), \]
+<p>with a user tower \(f\) and an item tower \(g\) that never see each other's inputs, then \(g(i)\) does not depend on the user and can be computed for every item ahead of time. A request runs \(f\) once and then searches for the item vectors with the largest dot product, a nearest-neighbour problem with fast approximate solutions.</p>
+<p>The idea goes back to DSSM, which matched search queries to documents this way, and reached recommendation at scale with YouTube's candidate generator (Covington, Adams and Sargin, 2016) and its later two-tower model with item features (Yi et al., 2019).</p>
+<h2 id="a-small-world-to-learn">A small world to learn</h2>
+<p>The example invents a ground truth. Items have hidden taste factors and a hidden popularity, users have hidden tastes, and a user picks an item with probability proportional to \(\exp(\text{user} \cdot \text{taste} + \text{popularity})\). The model sees none of that: only item IDs, a noisy 16-number content description of each item (think category, text and image embeddings), and each user's last ten items. Three hundred items are held back as launched after training, never appearing in any history or label.</p>
+<pre><code class="language-python">import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+rng = np.random.default_rng(0)
+torch.manual_seed(0)
+torch.set_num_threads(1)
+
+n_items, d_true, d_feat = 3000, 8, 16
+taste = rng.normal(size=(n_items, d_true))            # hidden item factors
+appeal = rng.normal(size=n_items)                     # hidden popularity
+mix = rng.normal(size=(d_true, d_feat)) / np.sqrt(d_true)
+content = (taste @ mix + 0.7 * rng.normal(size=(n_items, d_feat))).astype(np.float32)  # what we observe
+
+is_new = np.zeros(n_items, bool)
+is_new[rng.choice(n_items, 300, replace=False)] = True  # launched after training: no interactions yet
+old_ids, new_ids = np.flatnonzero(~is_new), np.flatnonzero(is_new)
+
+
+def draw(user, pool, k):
+    """k items per user, drawn with probability proportional to exp(user . taste + appeal)."""
+    logits = user @ taste[pool].T + appeal[pool]
+    p = np.exp(logits - logits.max(1, keepdims=True))
+    cdf = np.cumsum(p / p.sum(1, keepdims=True), 1)
+    u = rng.random((len(user), k))
+    return pool[np.minimum([np.searchsorted(c, x) for c, x in zip(cdf, u)], len(pool) - 1)]
+
+
+def make_users(n):
+    u = rng.normal(size=(n, d_true))
+    return draw(u, old_ids, 10), draw(u, old_ids, 5), draw(u, new_ids, 5)  # history, next items, next new items
+
+
+hist_train, next_train, _ = make_users(3000)
+hist_test, next_test, next_new_test = make_users(1000)</code></pre>
+<h2 id="the-two-towers">The two towers</h2>
+<p>Each tower can be as deep as it likes and use any features from its own side. The item tower combines a learned ID embedding with the content features. The user tower averages the ID embeddings and content of the user's last ten items and passes that through its own MLP. Both outputs are scaled to unit length, so the score is a cosine, divided by a temperature \(\tau\) in training.</p>
+<p>The towers do not have to share nothing, as is sometimes said; here they share the ID embedding table, since a history is made of items. The real rule is narrower: <b>no input from one side reaches the other side's tower</b>. They meet only in the final dot product.</p>
+<pre><code class="language-python">class TwoTower(nn.Module):
+    def __init__(self, dim=32, tau=0.1):
+        super().__init__()
+        self.ids = nn.Embedding(n_items + 1, dim)            # row 0: "unknown item"; shared by both towers
+        self.content = torch.tensor(content)
+        self.item_mlp = nn.Sequential(nn.Linear(dim + d_feat, 64), nn.ReLU(), nn.Linear(64, dim))
+        self.user_mlp = nn.Sequential(nn.Linear(dim + d_feat, 64), nn.ReLU(), nn.Linear(64, dim))
+        self.tau = tau
+
+    def item_tower(self, items, id_known=True):
+        items = torch.as_tensor(items)
+        ids = torch.where(torch.as_tensor(id_known), items + 1, 0)
+        x = torch.cat([self.ids(ids), self.content[items]], -1)
+        return F.normalize(self.item_mlp(x), dim=-1)
+
+    def user_tower(self, history):
+        h = torch.as_tensor(history)
+        x = torch.cat([self.ids(h + 1).mean(1), self.content[h].mean(1)], -1)   # pooled history
+        return F.normalize(self.user_mlp(x), dim=-1)
+
+
+# The only place the towers meet is a dot product, so a precomputed item matrix gives the same scores.
+m0 = TwoTower()
+with torch.no_grad():
+    V = m0.item_tower(old_ids)                                 # offline, once
+    q = m0.user_tower(hist_test[:1])                           # online, per request
+    pair = torch.stack([(m0.user_tower(hist_test[:1]) * m0.item_tower(old_ids[j:j + 1])).sum() for j in range(5)])
+assert torch.allclose((q @ V.T)[0, :5], pair, atol=1e-6)</code></pre>
+<p>Real towers carry much more, such as query text, device, time and a <a href="../sequential-user-modeling/">sequence model</a> over recent behaviour on the user side, and text and image encoders, category and age on the item side, but the shape of the model stays the same.</p>
+<h2 id="training-with-in-batch-negatives">Training with in-batch negatives</h2>
+<p>The data is (user, item they engaged with) pairs, and each pair is a classification over items. A softmax over ten million classes is too expensive, so the batch supplies them: compute all \(B \times B\) scores for a batch of \(B\) pairs, and treat row \(b\) as a softmax whose answer is item \(b\), with the other \(B - 1\) items as negatives. This is the InfoNCE loss from <a href="../contrastive-loss/">contrastive loss</a>:</p>
+\[ \mathcal{L} = -\frac{1}{B} \sum_{b=1}^{B} \log \frac{\exp(s_{bb})}{\sum_{j=1}^{B} \exp(s_{bj})}, \qquad s_{bj} = \frac{f(u_b)^\top g(i_j)}{\tau} - \log q_{i_j} . \]
+<ul><li><b>The logQ correction.</b> In-batch negatives are other users' positives, so popular items turn up as negatives far more often than niche ones, and the model learns to push them down. Subtracting the log of each item's sampling probability \(q_i\) from its logit, in training only, removes that bias. Yi et al. (2019) applied this correction to in-batch softmax, estimating \(q_i\) from streaming counts.</li><li><b>Duplicates.</b> An item that appears twice in a batch is a false negative for the other copy's user, so those entries are masked.</li></ul>
+<p>The test is 1,000 new users, scored by recall at 50: the share of each user's next five items found among the 50 retrieved out of 2,700.</p>
+<pre><code class="language-python">rows = np.repeat(np.arange(len(hist_train)), next_train.shape[1])
+pos = next_train.ravel()
+freq = np.bincount(pos, minlength=n_items) / len(pos)     # how often each item lands in a batch as a positive
+
+
+def train(log_q=True, epochs=3, batch=512, id_dropout=0.1, seed=0):
+    torch.manual_seed(seed)
+    g = np.random.default_rng(seed)
+    model = TwoTower()
+    opt = torch.optim.Adam(model.parameters(), lr=3e-3)
+    for _ in range(epochs):
+        order = g.permutation(len(pos))
+        for s in range(0, len(order), batch):
+            b = order[s:s + batch]
+            items = pos[b]
+            q = model.user_tower(hist_train[rows[b]])
+            v = model.item_tower(items, id_known=g.random(len(b)) &gt; id_dropout)
+            logits = q @ v.T / model.tau                      # row i: user i against every item in the batch
+            if log_q:
+                logits = logits - torch.tensor(np.log(freq[items]), dtype=torch.float32)
+            dup = torch.as_tensor(items[:, None] == items[None, :]) &amp; ~torch.eye(len(b), dtype=torch.bool)
+            loss = F.cross_entropy(logits.masked_fill(dup, -1e9), torch.arange(len(b)))
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+    return model
+
+
+def recall_at(top, truth):
+    """Share of each user's held-out items that appear in their retrieved list, averaged."""
+    return (top[:, :, None] == truth[:, None, :]).any(1).mean()
+
+
+def retrieve(model, history, pool, k, id_known=True):
+    with torch.no_grad():
+        V = model.item_tower(pool, id_known).numpy()
+        Q = model.user_tower(history).numpy()
+    return pool[np.argpartition(-(Q @ V.T), k, axis=1)[:, :k]], Q, V
+
+
+K = 50
+plain, model = train(log_q=False), train(log_q=True)
+r_plain = recall_at(retrieve(plain, hist_test, old_ids, K)[0], next_test)
+top, Q, V = retrieve(model, hist_test, old_ids, K)
+r_model = recall_at(top, next_test)
+r_pop = recall_at(np.tile(old_ids[np.argsort(-freq[old_ids])[:K]], (len(hist_test), 1)), next_test)
+r_rand = K / len(old_ids)
+print(f"random {r_rand:.3f}  popular {r_pop:.3f}  no logQ {r_plain:.3f}  logQ {r_model:.3f}")
+assert r_model &gt; 1.2 * r_plain and r_plain &gt; r_rand and r_model &gt; 1.5 * r_pop
+
+top_plain = retrieve(plain, hist_test, old_ids, K)[0]
+print(f"mean label frequency of retrieved items: no logQ {freq[top_plain].mean():.5f}  logQ {freq[top].mean():.5f}")
+assert freq[top_plain].mean() &lt; freq[top].mean() / 3       # uncorrected: the popular items go missing</code></pre>
+<table><thead><tr><th>Retriever</th><th>Recall at 50</th></tr></thead><tbody><tr><td>Random 50 items</td><td>0.019</td></tr><tr><td>Most popular 50 items</td><td>0.272</td></tr><tr><td>Two-tower, no logQ correction</td><td>0.388</td></tr><tr><td>Two-tower, logQ correction</td><td>0.516</td></tr></tbody></table>
+<p>The towers nearly double the popularity list, and the one-line correction adds a third more recall. Without it, the items retrieved appear less than a third as often in the training labels as those the corrected model retrieves: the popular items, which are the likeliest clicks, go missing.</p>
+<h2 id="serving-an-offline-index-and-an-online-query">Serving: an offline index and an online query</h2>
+<ul><li><b>Offline</b>, a batch job runs the item tower over the catalogue and loads the vectors into a nearest-neighbour index, again whenever the model is retrained. New items are added as they arrive.</li><li><b>Online</b>, each request runs the user tower once, searches the index for the top few hundred items, and passes them to ranking.</li></ul>
+<p>Exact search over ten million 128-dimensional vectors is over a billion multiply-adds per request, so real systems search approximately. The simplest index is the <b>inverted file</b> (IVF): cluster the item vectors with k-means, keep a list of items per cluster, and at query time scan only the clusters whose centroids are closest to the query. The number probed, <code>n_probe</code>, trades recall for speed.</p>
+<pre><code class="language-python">def kmeans(X, k, iters=20, seed=0):
+    """Spherical k-means: centroids are kept at unit length, assignment by largest dot product."""
+    C = X[np.random.default_rng(seed).choice(len(X), k, replace=False)]
+    for _ in range(iters):
+        assign = np.argmax(X @ C.T, 1)
+        C = np.stack([X[assign == c].sum(0) if (assign == c).any() else C[c] for c in range(k)])
+        C /= np.linalg.norm(C, axis=1, keepdims=True)
+    return C, np.argmax(X @ C.T, 1)
+
+
+class IVF:
+    def __init__(self, X, n_lists):
+        self.X = X
+        self.C, assign = kmeans(X, n_lists)
+        self.lists = [np.flatnonzero(assign == c) for c in range(n_lists)]
+
+    def search(self, q, k, n_probe):
+        probe = np.argsort(-(self.C * q).sum(1))[:n_probe]           # nearest clusters first
+        cand = np.concatenate([self.lists[c] for c in probe])
+        best = cand[np.argsort(-(self.X[cand] * q).sum(1))[:k]]
+        return best, len(cand)
+
+
+index = IVF(V, n_lists=32)
+exact = np.argsort(-(Q @ V.T), axis=1)[:, :10]                # brute force over every item
+results = []
+for n_probe in [1, 2, 4, 8, 16, 32]:
+    found, scanned = zip(*(index.search(q, 10, n_probe) for q in Q[:300]))
+    rec = np.mean([np.isin(e, f).mean() for e, f in zip(exact[:300], found)])
+    results.append((n_probe, np.mean(scanned) / len(V), rec))
+    print(f"n_probe {n_probe:2d}: scans {results[-1][1]:.0%} of items, recall@10 vs exact {rec:.3f}")
+recalls = [r for _, _, r in results]
+assert all(a &lt;= b for a, b in zip(recalls, recalls[1:])) and recalls[-1] == 1.0</code></pre>
+<table><thead><tr><th>Clusters probed (of 32)</th><th>Items scanned</th><th>Recall at 10 vs exact</th></tr></thead><tbody><tr><td>1</td><td>3%</td><td>0.357</td></tr><tr><td>2</td><td>6%</td><td>0.538</td></tr><tr><td>4</td><td>13%</td><td>0.740</td></tr><tr><td>8</td><td>25%</td><td>0.905</td></tr><tr><td>16</td><td>50%</td><td>0.987</td></tr><tr><td>32</td><td>100%</td><td>1.000</td></tr></tbody></table>
+<p>Recall never falls as clusters are added, because the probed lists only grow and any exact neighbour among the candidates stays in the top 10. With every cluster probed, IVF is exact. How fast the curve rises depends on how clustered the vectors are and on the number of lists, so a real index needs this same check on its own queries. The main index families are all available in FAISS; ScaNN takes a similar partition-then-quantize approach:</p>
+<table><thead><tr><th>Index</th><th>How it works</th><th>Trade-off</th></tr></thead><tbody><tr><td>Flat</td><td>Compares with every vector</td><td>Exact; cost grows with the catalogue</td></tr><tr><td>IVF</td><td>Scans only nearby clusters</td><td>Fast and simple; stores full vectors, so no memory saved</td></tr><tr><td>HNSW</td><td>Walks a layered neighbour graph toward the query</td><td>High recall at low latency; graph links add memory</td></tr><tr><td>PQ</td><td>Stores a short code per chunk of each vector</td><td>Large memory savings, some accuracy lost; usually paired with IVF</td></tr></tbody></table>
+<p>Memory often decides. A hundred million 128-dimensional float32 vectors take 51.2 GB; 16-byte product-quantization codes take 1.6 GB. <a href="../vector-databases/">Vector databases</a> covers storage and updates.</p>
+<h2 id="new-items-come-through-the-content-features">New items come through the content features</h2>
+<p>Matrix factorization has nothing to say about an item nobody has touched: its embedding was never trained. A two-tower model with content in the item tower can embed a new item from its description. At launch, a new item goes in with the shared "unknown" ID and its real content. The <code>id_dropout</code> above makes that input a familiar one: in training, an item's ID is swapped for the unknown ID 10% of the time, so the tower has seen this input before instead of meeting an untrained row for the first time. The code checks how much each part contributes by also training a model without ID dropout.</p>
+<pre><code class="language-python">def cold_recall(m, k=20):
+    return recall_at(retrieve(m, hist_test, new_ids, k, id_known=False)[0], next_new_test)
+
+
+r_cold, r_cold_nodrop = cold_recall(model), cold_recall(train(log_q=True, id_dropout=0.0))
+r_cold_rand = 20 / len(new_ids)
+print(f"new items, recall@20: ID dropout {r_cold:.3f}  no ID dropout {r_cold_nodrop:.3f}  random {r_cold_rand:.3f}")
+assert min(r_cold, r_cold_nodrop) &gt; 4 * r_cold_rand          # the content features carry the new items
+assert abs(r_cold - r_cold_nodrop) &lt; 0.1                     # dropout is a small refinement here</code></pre>
+<p>For the 300 items never seen in training, recall at 20 is 0.514, against 0.067 for a random pick. Most of that comes from the content features: the model trained without ID dropout still reaches 0.504. In this small world the content description carries the item well, so dropout adds little. It is cheap insurance for items whose content says less than their ID, but measure what it buys before relying on it. Once the item collects interactions, the next retraining learns its ID embedding. <a href="../cold-start/">Cold start</a> covers the wider problem, including new users.</p>
+<h2 id="hard-negatives">Hard negatives</h2>
+<p>In-batch and random negatives are mostly easy, and once the model separates them they teach little. <b>Hard negatives</b> are items the current model scores highly but the user did not engage with, mined by running retrieval and sampling from its results. They force finer distinctions, with a risk: the top-scored items without an interaction are often ones the user would have liked but never saw. For Facebook's embedding-based search, Huang et al. (2020) found that negatives taken from the very top of the results did worse than ones sampled further down the list, and that hard negatives worked best blended with random ones rather than on their own. Yang et al. (2020) mix in-batch negatives with items drawn uniformly from the catalogue, which also lets rarely-clicked long-tail items be pushed down.</p>
+<h2 id="how-it-compares">How it compares</h2>
+<table><thead><tr><th>Approach</th><th>Captures</th><th>Falls short on</th></tr></thead><tbody><tr><td>Lexical match (BM25)</td><td>Exact words in a query</td><td>Synonyms, personalization, requests with no text</td></tr><tr><td>Matrix factorization</td><td>Co-engagement patterns</td><td>New items and users; no content or context</td></tr><tr><td>Cross-encoder or ranker</td><td>Full user-item interaction</td><td>One evaluation per pair, too slow for a catalogue</td></tr><tr><td>Two-tower</td><td>Content, context and engagement at catalogue scale</td><td>No feature crosses; bounded by the index's recall</td></tr></tbody></table>
+<p>Production systems usually merge several retrievers, such as a two-tower model, co-visitation lists and lexical match, before ranking.</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Version skew.</b> User and item vectors share a space only if they come from the same model. Ship both towers and the index as one versioned unit.</li><li><b>Pair features in a tower.</b> "Has this user seen this item before?" belongs to the pair, so neither tower can compute it at serving time. Smuggled into training anyway (say, computed for the training user and fed to the item tower), it makes offline metrics look excellent and then vanishes in production. It belongs in ranking.</li><li><b>Judging by the loss.</b> In-batch loss depends on batch size and temperature. Measure recall at the number of candidates actually passed on, against the full catalogue, on users held out by time; see <a href="/posts/evaluating-ml-systems/">evaluating ML systems</a>.</li><li><b>Silent index loss.</b> Approximate search drops candidates without error. Check index recall against exact search on real queries whenever the index changes.</li><li><b>Feedback loops.</b> Retrieval learns from interactions with items earlier retrieval surfaced, the same loop described in <a href="/posts/position-bias/">position bias</a>. Some exploration traffic keeps the data from narrowing.</li></ul>
+<p>Sources: Po-Sen Huang et al., Learning Deep Structured Semantic Models for Web Search using Clickthrough Data (CIKM 2013); Paul Covington, Jay Adams and Emre Sargin, <a href="https://dl.acm.org/doi/10.1145/2959100.2959190">Deep Neural Networks for YouTube Recommendations</a> (RecSys 2016); Xinyang Yi et al., <a href="https://dl.acm.org/doi/10.1145/3298689.3346996">Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations</a> (RecSys 2019); Jui-Ting Huang et al., <a href="https://arxiv.org/abs/2006.11632">Embedding-based Retrieval in Facebook Search</a> (KDD 2020); Ji Yang et al., Mixed Negative Sampling for Learning Two-tower Neural Networks in Recommendations (WWW 2020); Jeff Johnson, Matthijs Douze and Hervé Jégou, <a href="https://arxiv.org/abs/1702.08734">Billion-scale similarity search with GPUs</a> (2017), the paper behind <a href="https://github.com/facebookresearch/faiss">FAISS</a>; Ruiqi Guo et al., Accelerating Large-Scale Inference with Anisotropic Vector Quantization (ICML 2020, ScaNN); Yu. A. Malkov and D. A. Yashunin, <a href="https://arxiv.org/abs/1603.09320">Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs</a> (2016); Hervé Jégou, Matthijs Douze and Cordelia Schmid, Product Quantization for Nearest Neighbor Search (TPAMI 2011). The serving and system-design framing also draws on Eugene Yan's <a href="https://eugeneyan.com/writing/system-design-for-discovery/">System Design for Recommendations and Search</a> (2021).</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

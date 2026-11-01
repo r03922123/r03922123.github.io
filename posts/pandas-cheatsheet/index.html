@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pandas on one page: select, group, join, reshape and regex · r03922123</title>
+<meta name="description" content="A working reference for the pandas operations that come up in nearly every data task: building and inspecting a frame, boolean masks, counting and ranking, missing values, groupby with agg versus transform, merges and anti-joins, melt and pivot, vectorising row logic, and string methods with a regex table. Every snippet runs on a tiny DataFrame and proves its claim with an assert.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · Coding and data</p>
+<header class="post-head">
+  <h1>pandas on one page: select, group, join, reshape and regex</h1>
+  <div class="meta">November 1, 2026 · 11 min read · pandas · python · data wrangling · regex · reference</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#a-frame-its-columns-and-its-index">A frame, its columns and its index</a></li><li><a href="#selecting-rows-and-columns">Selecting rows and columns</a></li><li><a href="#counting-sorting-and-ranking">Counting, sorting and ranking</a></li><li><a href="#missing-values-and-duplicates">Missing values and duplicates</a></li><li><a href="#groupby-agg-transform-size-and-count">groupby: agg, transform, size and count</a></li><li><a href="#joining-frames">Joining frames</a></li><li><a href="#reshaping-melt-and-pivot">Reshaping: melt and pivot</a></li><li><a href="#row-logic-without-loops">Row logic without loops</a></li><li><a href="#strings-and-regular-expressions">Strings and regular expressions</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<p>pandas is the tool most ML work starts in: logs arrive as a CSV or a SQL result, and a few lines of filtering, grouping and joining turn them into features or an evaluation table. The API is large, but the same twenty or so calls do most of the work, and most of the bugs come from a handful of traps around them. This page collects both. Each section runs on a frame small enough to check by eye, and the asserts show what each call returns, so the page doubles as a test that the claims hold on pandas 2.3. The SQL versions of many of these operations are in the <a href="../sql-cheatsheet/">SQL cheatsheet</a>.</p>
+<h2 id="a-frame-its-columns-and-its-index">A frame, its columns and its index</h2>
+<p>A <code>DataFrame</code> is a set of named columns that share one row index. Each column is a <code>Series</code>: a typed array plus that index. Build one from a dict of columns or from a list of rows; then <code>dtypes</code>, <code>info()</code> and <code>describe()</code> tell you what you actually loaded.</p>
+<pre><code class="language-python">import re
+import sys
+import warnings
+
+import numpy as np
+import pandas as pd
+
+warnings.simplefilter("error", FutureWarning)        # fail on deprecated calls, so the code below stays current
+
+orders = pd.DataFrame({
+    "order_id": [1, 2, 3, 4, 5, 6],
+    "user": ["ana", "bo", "ana", "cy", "bo", "ana"],
+    "city": ["Taipei", "Tokyo", "Taipei", "Osaka", None, "Taipei"],
+    "amount": [30.0, 12.5, 30.0, 8.0, 50.0, np.nan],
+})
+rows = pd.DataFrame([(7, "dee", "Paris", 5.0)], columns=["order_id", "user", "city", "amount"])
+
+assert orders.shape == (6, 4)
+assert orders["amount"].dtype == "float64" and orders["user"].dtype == object
+assert list(rows.columns) == list(orders.columns)
+
+stats = orders["amount"].describe()                  # count, mean, std, min, quartiles, max
+assert stats["count"] == 5                           # the NaN is skipped, not counted as zero
+assert stats["mean"] == orders["amount"].sum() / 5   # sum() also skips NaN
+assert orders.isna().sum().to_dict() == {"order_id": 0, "user": 0, "city": 1, "amount": 1}</code></pre>
+<p><code>convert_dtypes()</code> switches columns to the nullable types (<code>Int64</code>, <code>string</code>, <code>boolean</code>), which keep integers as integers when a value is missing instead of silently turning the column into floats.</p>
+<pre><code class="language-python">ids = pd.Series([1, None, 3])
+assert ids.dtype == "float64"                         # one gap turns the integers into floats
+assert ids.convert_dtypes().dtype == "Int64"          # nullable integer: 1, &lt;NA&gt;, 3
+assert ids.convert_dtypes().isna().tolist() == [False, True, False]</code></pre>
+<h2 id="selecting-rows-and-columns">Selecting rows and columns</h2>
+<p>Use <code>.loc[rows, columns]</code> for labels and boolean masks, <code>.iloc</code> for positions. A mask is a boolean Series aligned with the rows, and masks combine with <code>&amp;</code>, <code>|</code> and <code>~</code>.</p>
+<p>The classic bug is precedence. In Python <code>&amp;</code> binds tighter than <code>==</code>, so <code>df.a == 1 &amp; df.b == 2</code> is parsed as <code>df.a == (1 &amp; df.b) == 2</code>, a chained comparison that raises an error at best. Wrap every comparison in parentheses, or use <code>query</code>.</p>
+<pre><code class="language-python">mask = (orders["user"] == "ana") &amp; (orders["amount"] &gt; 20)
+assert orders.loc[mask, "order_id"].tolist() == [1, 3]
+assert orders.query("user == 'ana' and amount &gt; 20")["order_id"].tolist() == [1, 3]
+try:
+    orders["user"] == "ana" &amp; orders["amount"] &gt; 20   # parsed as a chained comparison around "ana" &amp; amount
+    raise AssertionError("expected an error")
+except (TypeError, ValueError):
+    pass
+
+asia = ["Taipei", "Tokyo", "Osaka"]
+assert orders.loc[orders["city"].isin(asia), "order_id"].tolist() == [1, 2, 3, 4, 6]
+assert orders.loc[~orders["city"].isin(asia), "order_id"].tolist() == [5]     # None is "not in" the list
+
+assert orders.iloc[0, 1] == "ana"                     # position: first row, second column
+assert orders.loc[orders.index[-1], "user"] == "ana"  # label: last row's label, column "user"
+
+# set_index makes a column the row labels; labels keep their type, so 5 is not "5"
+by_id = orders.set_index("order_id")
+assert by_id.loc[5, "user"] == "bo"
+assert "5" not in by_id.index
+assert by_id.reset_index().equals(orders)             # reset_index turns it back into a column</code></pre>
+<p>Write through <code>.loc</code> too. Indexing twice, as in <code>df[mask]["col"] = value</code>, assigns into a temporary copy made by the first step, so the original frame does not change. pandas 2.3 warns about it; under copy-on-write, the default from pandas 3, it never works.</p>
+<pre><code class="language-python">fixed = orders.copy()
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always")
+    fixed[fixed["user"] == "cy"]["amount"] = 99.0     # chained: writes into a copy
+assert fixed.loc[3, "amount"] == 8.0                  # unchanged
+assert caught                                         # and pandas 2.3 warned about it
+
+fixed.loc[fixed["user"] == "cy", "amount"] = 99.0     # one .loc call: writes into fixed
+assert fixed.loc[3, "amount"] == 99.0</code></pre>
+<h2 id="counting-sorting-and-ranking">Counting, sorting and ranking</h2>
+<p><code>unique()</code> returns the distinct values in order of first appearance; <code>nunique()</code> counts them and skips missing values. <code>value_counts()</code> returns a Series of counts sorted from most to least frequent, indexed by value, and a mask on it is still a Series: take <code>.index</code> to get the values.</p>
+<pre><code class="language-python">assert orders["user"].unique().tolist() == ["ana", "bo", "cy"]
+assert orders["city"].nunique() == 3                       # None is not a city
+assert orders["city"].nunique(dropna=False) == 4
+
+counts = orders["user"].value_counts()
+assert counts.to_dict() == {"ana": 3, "bo": 2, "cy": 1}
+frequent = counts[counts &gt;= 2]
+assert isinstance(frequent, pd.Series) and frequent.index.tolist() == ["ana", "bo"]
+
+# sort_values returns a new frame; with inplace=True it returns None, so never assign that result
+by_amount = orders.sort_values("amount", ascending=False)
+assert by_amount["order_id"].tolist() == [5, 1, 3, 2, 4, 6]   # NaN goes last by default
+assert orders.copy().sort_values("amount", inplace=True) is None</code></pre>
+<p><code>rank</code> handles ties in several ways. <code>method="dense"</code> gives tied values the same rank and leaves no gaps (1, 1, 2), which is what a leaderboard with ties usually wants; <code>"min"</code> leaves gaps like a sports table (1, 1, 3); <code>"first"</code> breaks ties by order of appearance.</p>
+<pre><code class="language-python">scores = pd.Series([90, 85, 90, 70])
+assert scores.rank(method="dense", ascending=False).tolist() == [1, 2, 1, 3]
+assert scores.rank(method="min", ascending=False).tolist() == [1, 3, 1, 4]
+assert scores.rank(method="first", ascending=False).tolist() == [1, 3, 2, 4]</code></pre>
+<h2 id="missing-values-and-duplicates">Missing values and duplicates</h2>
+<p><code>isna()</code> and <code>notna()</code> are the tests to use: <code>NaN == NaN</code> is false, so <code>df[df.x == np.nan]</code> is always empty. <code>dropna()</code> drops rows with any missing value (narrow it with <code>subset=</code>), <code>fillna()</code> replaces them. <code>drop_duplicates(subset=..., keep=...)</code> keeps the first or last copy of each key.</p>
+<pre><code class="language-python">assert orders[orders["amount"] == np.nan].empty                     # never matches anything
+assert orders.loc[orders["amount"].isna(), "order_id"].tolist() == [6]
+
+assert len(orders.dropna()) == 4                                    # orders 5 and 6 each miss a value
+assert len(orders.dropna(subset=["amount"])) == 5
+assert orders["city"].fillna("unknown").tolist()[4] == "unknown"
+
+assert orders.drop_duplicates(subset=["user"])["order_id"].tolist() == [1, 2, 4]
+assert orders.drop_duplicates(subset=["user"], keep="last")["order_id"].tolist() == [4, 5, 6]
+assert len(orders.drop_duplicates(subset=["user", "amount"])) == 5  # order 3 repeats order 1</code></pre>
+<h2 id="groupby-agg-transform-size-and-count">groupby: agg, transform, size and count</h2>
+<p><code>groupby</code> splits rows by key, applies a function to each group and combines the results. What comes back depends on the verb:</p>
+<ul><li><code>agg</code> reduces each group to one row. The result is indexed by the key. Named aggregation, <code>agg(new=("column", func))</code>, names the output columns as it goes.</li><li><code>transform</code> returns one value per original row, aligned with the original index, so it can go straight into a new column. Use it to compare each row with its group, such as "rows equal to their group's maximum".</li><li><code>size()</code> counts rows per group; <code>count()</code> counts non-missing values per column, so the two differ when there are gaps.</li></ul>
+<p>By default <code>groupby</code> also drops rows whose key is missing; pass <code>dropna=False</code> to keep them as their own group.</p>
+<pre><code class="language-python">g = orders.groupby("user")
+assert g["amount"].sum().to_dict() == {"ana": 60.0, "bo": 62.5, "cy": 8.0}
+assert g["amount"].agg(["sum", "max"]).loc["bo"].tolist() == [62.5, 50.0]
+
+summary = g.agg(n_orders=("order_id", "size"), spent=("amount", "sum"),
+                big=("amount", lambda s: (s &gt; 20).sum()))
+assert summary.loc["ana"].tolist() == [3, 60.0, 2]
+
+assert g.size().to_dict() == {"ana": 3, "bo": 2, "cy": 1}
+assert g["amount"].count().to_dict() == {"ana": 2, "bo": 2, "cy": 1}     # ana's NaN is not counted
+
+table = g.size().reset_index(name="count")          # back to a flat frame with a named column
+assert table.columns.tolist() == ["user", "count"]
+
+best = g["amount"].transform("max")                 # same length and index as orders
+assert best.tolist() == [30.0, 50.0, 30.0, 8.0, 50.0, 30.0]
+assert orders.loc[orders["amount"] == best, "order_id"].tolist() == [1, 3, 4, 5]
+orders["share"] = orders["amount"] / g["amount"].transform("sum")
+assert np.isclose(orders.loc[orders["user"] == "bo", "share"].sum(), 1.0)
+orders = orders.drop(columns="share")
+
+assert orders.groupby("city")["order_id"].count().sum() == 5             # the order with no city vanished
+assert orders.groupby("city", dropna=False)["order_id"].count().sum() == 6</code></pre>
+<h2 id="joining-frames">Joining frames</h2>
+<p><code>pd.merge(left, right, on=key, how=...)</code> is SQL's join. <code>how</code> is <code>"inner"</code> (the default), <code>"left"</code>, <code>"right"</code>, <code>"outer"</code> or <code>"cross"</code> (every pair, which takes no key). When the key columns have different names, use <code>left_on=</code> and <code>right_on=</code>.</p>
+<p>Two habits prevent most join bugs. First, a key that repeats on both sides multiplies rows, so pass <code>validate="many_to_one"</code> (or <code>"one_to_one"</code>) when you expect the right side to be unique and pandas raises instead of quietly duplicating. Second, <code>indicator=True</code> adds a <code>_merge</code> column that says where each row came from, which is the cleanest anti-join: "left rows with no match".</p>
+<pre><code class="language-python">users = pd.DataFrame({"name": ["ana", "bo", "eve"], "tier": ["gold", "free", "gold"]})
+
+inner = pd.merge(orders, users, left_on="user", right_on="name")
+assert len(inner) == 5 and "cy" not in set(inner["user"])
+
+left = pd.merge(orders, users, left_on="user", right_on="name", how="left")
+assert len(left) == 6 and left.loc[left["user"] == "cy", "tier"].isna().all()
+
+outer = pd.merge(orders, users, left_on="user", right_on="name", how="outer")
+assert len(outer) == 7                                  # eve has no orders but still appears
+
+assert len(pd.merge(users, users, how="cross")) == 9
+
+flagged = pd.merge(users, orders, left_on="name", right_on="user", how="left", indicator=True)
+no_orders = flagged.loc[flagged["_merge"] == "left_only", "name"].tolist()
+assert no_orders == ["eve"]
+
+dupes = pd.concat([users, users.iloc[[0]]])             # "ana" now appears twice on the right
+assert len(pd.merge(orders, dupes, left_on="user", right_on="name")) == 8   # 5 rows became 8
+try:
+    pd.merge(orders, dupes, left_on="user", right_on="name", validate="many_to_one")
+    raise AssertionError("expected a MergeError")
+except pd.errors.MergeError:
+    pass</code></pre>
+<h2 id="reshaping-melt-and-pivot">Reshaping: melt and pivot</h2>
+<p>Wide data has one column per measurement; long data has one row per measurement. <code>melt</code> goes from wide to long: <code>id_vars</code> are the columns repeated on every row, <code>value_vars</code> are the columns that become rows, and <code>var_name</code> and <code>value_name</code> name the two new columns. <code>pivot</code> goes back, and <code>pivot_table</code> does the same while aggregating any rows that share an index and column pair, which plain <code>pivot</code> refuses.</p>
+<pre><code class="language-python">wide = pd.DataFrame({"day": ["Mon", "Tue"], "A": [1, 4], "B": [2, 5], "C": [3, 6]})
+long = wide.melt(id_vars="day", value_vars=["A", "B", "C"], var_name="product", value_name="sales")
+assert long.shape == (6, 3)
+assert long.sort_values(["day", "product"])["sales"].tolist() == [1, 2, 3, 4, 5, 6]
+
+back = long.pivot(index="day", columns="product", values="sales").reset_index()
+back.columns.name = None
+assert back.equals(wide)                               # melt and pivot are inverses
+
+repeated = pd.concat([long, long.iloc[[0]]])           # Mon/A appears twice
+try:
+    repeated.pivot(index="day", columns="product", values="sales")
+    raise AssertionError("expected a ValueError")
+except ValueError:
+    pass
+summed = repeated.pivot_table(index="day", columns="product", values="sales", aggfunc="sum")
+assert summed.loc["Mon", "A"] == 2</code></pre>
+<h2 id="row-logic-without-loops">Row logic without loops</h2>
+<p><code>df.apply(f, axis=1)</code> calls a Python function once per row and wraps each row in a new Series first, which is slow. Most row logic is a column expression in disguise: <code>np.where</code> for one condition, <code>np.select</code> for several, arithmetic and comparisons for the rest. When you do need to loop, <code>itertuples()</code> yields lightweight named tuples and is much faster than <code>iterrows()</code>.</p>
+<pre><code class="language-python">flag_apply = orders.apply(lambda r: "big" if r["amount"] &gt; 20 else "small", axis=1)
+flag_vec = pd.Series(np.where(orders["amount"] &gt; 20, "big", "small"), index=orders.index)
+assert flag_apply.equals(flag_vec)                     # NaN &gt; 20 is False in both
+
+band = np.select([orders["amount"] &gt;= 30, orders["amount"] &gt;= 10], ["high", "mid"], default="low")
+assert band.tolist() == ["high", "mid", "high", "low", "high", "low"]
+
+total = sum(row.amount for row in orders.itertuples() if row.user == "bo")
+assert total == orders.loc[orders["user"] == "bo", "amount"].sum() == 62.5</code></pre>
+<h2 id="strings-and-regular-expressions">Strings and regular expressions</h2>
+<p>The <code>.str</code> accessor applies a string operation to every element and passes missing values through as missing. It covers the Python string methods (<code>lower</code>, <code>capitalize</code>, <code>strip</code>, slicing with <code>.str[1:]</code>) and the regex methods below:</p>
+<table><thead><tr><th>Method</th><th>Returns</th></tr></thead><tbody><tr><td><code>str.contains(pat, case=False, na=False)</code></td><td>boolean mask: does the pattern occur anywhere?</td></tr><tr><td><code>str.fullmatch(pat)</code></td><td>boolean mask: does the whole string match?</td></tr><tr><td><code>str.extract(pat)</code></td><td>one column per capture group, from the first match</td></tr><tr><td><code>str.findall(pat)</code></td><td>a list of every match per row</td></tr><tr><td><code>str.replace(pat, repl, regex=True)</code></td><td>the string with matches replaced</td></tr><tr><td><code>str.count(pat)</code></td><td>number of matches per row</td></tr></tbody></table>
+<p><code>extract</code> needs at least one capture group and raises without one. Named groups, <code>(?P&lt;name&gt;...)</code>, name the output columns.</p>
+<pre><code class="language-python">s = pd.Series(["$12.50", "$7", None])
+price = s.str.replace(r"^\$", "", regex=True).astype(float)        # astype, not .float()
+assert price.iloc[:2].tolist() == [12.5, 7.0] and np.isnan(price.iloc[2])
+
+names = pd.Series(["aLICE", "bob", "CHARLIE"])
+assert names.str.capitalize().tolist() == ["Alice", "Bob", "Charlie"]
+assert names.str.capitalize().equals(names.str[0].str.upper() + names.str[1:].str.lower())
+
+codes = pd.Series(["abc-123", "xy-7", "nope"])
+parts = codes.str.extract(r"(?P&lt;word&gt;\w+)-(?P&lt;num&gt;\d+)")
+assert parts.columns.tolist() == ["word", "num"] and parts.loc[0].tolist() == ["abc", "123"]
+assert parts.loc[2].isna().all()                                   # no match gives NaN, not an error
+assert codes.str.extract(r"(\w+)-(?:\d+)").shape == (3, 1)          # (?:...) groups without capturing
+try:
+    codes.str.extract(r"\w+-\d+")
+    raise AssertionError("expected a ValueError")
+except ValueError:
+    pass
+
+codes = pd.Series(["ref 12-34-5678", "ord A9-12-345-678"])
+assert codes.str.replace(r"\D", "", regex=True).tolist() == ["12345678", "912345678"]
+assert codes.str.count(r"\d").tolist() == [8, 9]
+assert pd.Series(["a1b22c333"]).str.findall(r"\d+").iloc[0] == ["1", "22", "333"]</code></pre>
+<p>The pieces of a pattern, each checked against Python's <code>re</code> below:</p>
+<table><thead><tr><th>Pattern</th><th>Matches</th></tr></thead><tbody><tr><td><code>^</code>, <code>$</code></td><td>start and end of the string (<code>$</code> also matches just before a final newline)</td></tr><tr><td><code>.</code></td><td>any character except a newline</td></tr><tr><td><code>*</code>, <code>+</code>, <code>?</code></td><td>zero or more, one or more, zero or one</td></tr><tr><td><code>{k}</code>, <code>{lo,up}</code></td><td>exactly \(k\), or between <code>lo</code> and <code>up</code>, repetitions</td></tr><tr><td><code>[abc]</code>, <code>[^abc]</code></td><td>one character from the set, or not from it</td></tr><tr><td><code>\d</code>, <code>\w</code>, <code>\s</code></td><td>a digit, a word character (letters, digits, underscore), whitespace</td></tr><tr><td><code>\D</code>, <code>\W</code>, <code>\S</code></td><td>the complements</td></tr><tr><td><code>(...)</code>, <code>(?:...)</code></td><td>capturing group, non-capturing group</td></tr><tr><td><code>a(?=b)</code>, <code>a(?!b)</code></td><td>an <code>a</code> followed, or not followed, by <code>b</code></td></tr><tr><td><code>(?&lt;=b)a</code>, <code>(?&lt;!b)a</code></td><td>an <code>a</code> preceded, or not preceded, by <code>b</code></td></tr></tbody></table>
+<p>Alternation, <code>cat|dog</code>, matches either side; group it, as in <code>(?:cat|dog)s</code>, to limit how far it reaches. Lookarounds check their condition without consuming it, so the match is only the <code>a</code>.</p>
+<pre><code class="language-python">assert re.findall(r"sa*", "s sa saa") == ["s", "sa", "saa"]
+assert re.findall(r"sa+", "s sa saa") == ["sa", "saa"]
+assert re.findall(r"sa?", "s sa saa") == ["s", "sa", "sa"]
+assert re.fullmatch(r"s{2}", "ss") and not re.fullmatch(r"s{2}", "sss")
+assert re.fullmatch(r"a{1,3}", "aa")
+assert re.findall(r"(?:cat|dog)s", "cats dogs cat") == ["cats", "dogs"]
+if sys.version_info &lt; (3, 13):                   # checked on Python 3.11 and 3.12
+    assert re.fullmatch(r"a{1, 3}", "a{1, 3}")    # a space in the braces makes them literal text
+    assert not re.fullmatch(r"a{1, 3}", "aa")
+
+assert [m.start() for m in re.finditer(r"a(?=b)", "ab ac ad")] == [0]
+assert [m.start() for m in re.finditer(r"a(?!b)", "ab ac ad")] == [3, 6]
+assert [m.start() for m in re.finditer(r"(?&lt;=b)a", "ba ca da")] == [1]
+assert [m.start() for m in re.finditer(r"(?&lt;!b)a", "ba ca da")] == [4, 7]
+assert re.findall(r"\w+", "user_1@x") == ["user_1", "x"]          # underscore counts as a word character
+
+assert re.fullmatch(r"\d", "٣")                   # \d also matches non-ASCII digits; use [0-9] to mean ASCII
+assert not re.fullmatch(r"[0-9]", "٣")</code></pre>
+<p>One worked example combines most of the table: <a href="https://leetcode.com/problems/find-users-with-valid-e-mails/">1517. Find Users With Valid E-Mails</a> asks for addresses whose prefix starts with a letter, contains only letters, digits, <code>_</code>, <code>.</code> and <code>-</code>, and ends in <code>@leetcode.com</code>. Escape the dot in the domain, and prefer <code>fullmatch</code> to <code>contains</code> with <code>^...$</code>: in Python, <code>$</code> also matches just before a trailing newline, so an address with a stray <code>\n</code> slips through.</p>
+<pre><code class="language-python">mails = pd.Series(["mei@leetcode.com", "no-at-sign", "kai-@leetcode.com",
+                   "_lin@leetcode.com", "ren.x@leetcodeXcom", "yu#7@leetcode.com",
+                   "tao9@leetcode.com\n"])
+prefix = r"[a-zA-Z][a-zA-Z0-9_.-]*@leetcode\.com"
+
+anchored = mails.str.contains("^" + prefix + "$", regex=True)
+strict = mails.str.fullmatch(prefix)
+assert strict.tolist() == [True, False, True, False, False, False, False]
+assert anchored.tolist() == strict.tolist()[:-1] + [True]           # the trailing newline got through
+assert re.fullmatch(r"x@leetcode.com", "x@leetcodeXcom")            # an unescaped dot matches any character</code></pre>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Unparenthesised masks.</b> <code>a == 1 &amp; b == 2</code> is not "a is 1 and b is 2". Parenthesise, or use <code>query</code>.</li><li><b>Chained assignment.</b> <code>df[mask]["col"] = v</code> writes into a copy. Use one <code>.loc[mask, "col"] = v</code>.</li><li><b>Keeping an in-place result.</b> <code>inplace=True</code> returns <code>None</code>. Prefer the returned frame and drop <code>inplace</code>.</li><li><b>Comparing with missing values.</b> <code>NaN</code> equals nothing, itself included. Use <code>isna()</code>.</li><li><b>Silent row loss and row growth.</b> <code>groupby</code> drops missing keys, inner joins drop unmatched rows and repeated keys multiply rows. Check <code>len()</code> before and after, use <code>dropna=False</code>, <code>validate=</code> and <code>indicator=True</code>.</li><li><b>Size versus count.</b> <code>size()</code> counts rows, <code>count()</code> counts non-missing values.</li><li><b>Aggregate versus transform.</b> <code>agg</code> gives one row per group, <code>transform</code> one value per original row.</li><li><b>Regex surprises.</b> Escape literal dots and dollar signs, give <code>extract</code> a capture group, use <code>fullmatch</code> for whole-string validation, and write <code>{lo,up}</code> without a space.</li></ul>
+<p>Several of the worked patterns follow problems from LeetCode's pandas study plans; the explanations and code here are my own, checked against pandas 2.3 and the official pandas and Python <code>re</code> documentation.</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

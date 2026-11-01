@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The bias-variance tradeoff, measured · r03922123</title>
+<meta name="description" content="Expected test error splits into bias, variance and noise. This post derives the split, measures each term by retraining models on hundreds of simulated datasets, reads them off learning curves, shows which term bagging and boosting each attack, and ends with double descent, where the classic U-shaped curve breaks.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · Machine learning fundamentals</p>
+<header class="post-head">
+  <h1>The bias-variance tradeoff, measured</h1>
+  <div class="meta">November 1, 2026 · 14 min read · bias · variance · model capacity · ensembles · double descent</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-decomposition">The decomposition</a></li><li><a href="#measuring-it-by-simulation">Measuring it by simulation</a></li><li><a href="#regularization-is-the-same-dial">Regularization is the same dial</a></li><li><a href="#reading-it-from-learning-curves">Reading it from learning curves</a></li><li><a href="#ensembles-attack-one-term-each">Ensembles attack one term each</a></li><li><a href="#double-descent-where-the-u-breaks">Double descent: where the U breaks</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<p>A model can be wrong in two different ways. It can be wrong on average: however many times you retrain it on fresh data, its predictions centre on the wrong value, because its form cannot express the truth. That is <b>bias</b>. Or it can be right on average but jumpy: each new training set gives quite different predictions, because the model reacts to the particular noise it happened to see. That is <b>variance</b>. Under squared error, the expected test error is exactly the squared bias plus the variance plus a noise floor that no model can remove.</p>
+<p>The useful part is that the two errors respond to different fixes. More data cures variance and does little for bias; more capacity cures bias and usually adds variance. This post derives the split, then measures every term by brute force: train the same model on hundreds of simulated training sets and look at how its predictions scatter.</p>
+<h2 id="the-decomposition">The decomposition</h2>
+<p>Assume the data come from \(y = f(x) + \varepsilon\), where \(f\) is the true regression function and the noise \(\varepsilon\) has mean 0 and variance \(\sigma^2\). A training set \(D\) is random, so the fitted model \(\hat f_D\) is random too. Write \(\bar f(x) = \mathbb{E}_D[\hat f_D(x)]\) for the average prediction over all training sets you might have drawn. At a fixed test point \(x\), with a fresh label \(y\) whose noise is independent of \(D\):</p>
+\[ \mathbb{E}_{D,\varepsilon}\big[(y - \hat f_D(x))^2\big] = \underbrace{\big(\bar f(x) - f(x)\big)^2}_{\text{bias}^2} + \underbrace{\mathbb{E}_D\big[(\hat f_D(x) - \bar f(x))^2\big]}_{\text{variance}} + \underbrace{\sigma^2}_{\text{noise}} \]
+<p>The proof is two lines. Write \(y - \hat f_D = \varepsilon + (f - \bar f) + (\bar f - \hat f_D)\) and square. Every cross term vanishes in expectation: \(\varepsilon\) has mean zero and is independent of \(D\), \(f - \bar f\) is a constant at this \(x\), and \(\bar f - \hat f_D\) has mean zero over \(D\) by the definition of \(\bar f\).</p>
+<p>Three details are easy to get wrong:</p>
+<ul><li>Bias is measured against \(f(x)\), the noise-free truth, not against an observed label \(y\). The gap between \(\bar f\) and a noisy label mixes bias with noise.</li><li>Variance is spread across <b>training sets</b>, not across test points. It is the answer to "how much would this prediction move if I collected my data again?" Randomness in training (initialization, shuffling, bootstrap samples) adds to it as well.</li><li>The clean additive split holds for squared error. For 0-1 classification loss there is no unique decomposition, and several competing definitions exist; the intuition carries over, the algebra does not.</li></ul>
+<h2 id="measuring-it-by-simulation">Measuring it by simulation</h2>
+<p>Because we choose \(f\), we can do what is impossible with real data: draw 300 independent training sets of 30 points each, fit the same model to every one, and compute \(\bar f\) and the spread directly. The truth is \(f(x) = \sin(2\pi x)\) on \([0, 1]\) with noise \(\sigma = 0.3\), and the model is a polynomial whose degree sets the capacity.</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+f = lambda x: np.sin(2 * np.pi * x)                  # the truth, which the learner never sees
+sigma, n, reps = 0.3, 30, 300
+x_test = np.linspace(0.02, 0.98, 200)
+
+
+def features(x, degree):
+    return np.polynomial.legendre.legvander(2 * x - 1, degree)    # Legendre basis: well conditioned
+
+
+def fit_predict(x, y, degree, lam=0.0):
+    A = features(x, degree)
+    w = np.linalg.solve(A.T @ A + lam * np.eye(degree + 1), A.T @ y)
+    return features(x_test, degree) @ w
+
+
+def bias_variance(preds):
+    """preds[r, j] is the model trained on dataset r, evaluated at test point j; averaged over j."""
+    mean_pred = preds.mean(axis=0)                   # f-bar at each test point
+    return np.mean((mean_pred - f(x_test)) ** 2), np.mean(preds.var(axis=0))
+
+
+datasets = []
+for _ in range(reps):
+    x = rng.uniform(0, 1, n)
+    datasets.append((x, f(x) + rng.normal(0, sigma, n)))
+y_fresh = f(x_test) + rng.normal(0, sigma, (reps, x_test.size))   # new labels, never trained on
+
+rows = {}
+for d in range(10):
+    preds = np.array([fit_predict(x, y, d) for x, y in datasets])
+    b2, var = bias_variance(preds)
+    test_mse = np.mean((y_fresh - preds) ** 2)
+    rows[d] = (b2, var, test_mse)
+    assert abs(test_mse - (b2 + var + sigma**2)) &lt; 0.02 * test_mse   # the decomposition, by simulation
+
+b2s, vars_, mses = (np.array([rows[d][k] for d in range(10)]) for k in range(3))
+assert b2s[0] &gt; b2s[1] &gt; b2s[3] and (b2s[3:] &lt; 0.01).all()           # bias falls, then stays near zero
+assert all(vars_[d] &lt; vars_[d + 1] for d in range(3, 9))               # variance keeps rising
+assert mses.argmin() == 3                                              # the sweet spot in between
+
+train_mse = [np.mean([np.mean((features(x, d) @ np.linalg.lstsq(features(x, d), y, rcond=None)[0] - y) ** 2)
+                      for x, y in datasets]) for d in range(10)]
+assert all(a &gt; b for a, b in zip(train_mse, train_mse[1:]))           # training error only ever falls</code></pre>
+<table><thead><tr><th>Degree</th><th>Bias²</th><th>Variance</th><th>Test MSE</th></tr></thead><tbody><tr><td>0</td><td>0.518</td><td>0.023</td><td>0.628</td></tr><tr><td>1</td><td>0.174</td><td>0.023</td><td>0.285</td></tr><tr><td>3</td><td>0.004</td><td>0.014</td><td>0.108</td></tr><tr><td>5</td><td>0.000</td><td>0.032</td><td>0.122</td></tr><tr><td>7</td><td>0.001</td><td>0.481</td><td>0.573</td></tr><tr><td>9</td><td>0.004</td><td>4.51</td><td>4.60</td></tr></tbody></table>
+<p>Each figure is averaged over the 200 test points; test MSE includes the noise floor \(\sigma^2 = 0.09\), and matches bias² + variance + 0.09 to within 2% in every row. The small nonzero bias² at degrees 7 and 9 is simulation noise, not bias: \(\bar f\) is itself estimated from 300 fits, and that estimate inherits a share of the variance.</p>
+<p>Degree 1 is a straight line through a sine wave: its predictions barely move between datasets, but they are reliably wrong. Degree 3 is the first that can bend the right way, and bias drops almost to zero. After that, bias stays negligible and every extra degree only buys variance, until degree 9, with 10 coefficients and 30 noisy points, produces wild swings near the edges of the interval. Training error, meanwhile, falls with every degree (a bigger polynomial contains every smaller one, so least squares can only fit the training points better), so it cannot pick the sweet spot.</p>
+<h2 id="regularization-is-the-same-dial">Regularization is the same dial</h2>
+<p>Degree is not the only capacity control. Keep the degree-9 polynomial and add a ridge penalty \(\lambda \lVert w \rVert^2\) instead (see <a href="../regularization-l1-l2/">L1 and L2 regularization</a>). Increasing \(\lambda\) pulls every fit toward zero, which makes fits on different datasets agree more (less variance) and also pulls the average fit away from the truth (more bias):</p>
+<pre><code class="language-python">sweep = {}
+for lam in [1e-5, 1e-2, 1.0, 10.0]:
+    sweep[lam] = bias_variance(np.array([fit_predict(x, y, 9, lam) for x, y in datasets]))
+lams = sorted(sweep)
+assert all(sweep[a][1] &gt; sweep[b][1] for a, b in zip(lams, lams[1:]))     # variance only falls
+assert sweep[10.0][0] &gt; 10 * sweep[1e-2][0]                               # bias eventually climbs
+best = min(lams, key=lambda l: sum(sweep[l]))
+assert best == 1.0 and sum(sweep[best]) + sigma**2 &lt; rows[3][2] + 0.03   # close to choosing degree 3</code></pre>
+<table><thead><tr><th>Ridge \(\lambda\)</th><th>Bias²</th><th>Variance</th><th>Test MSE</th></tr></thead><tbody><tr><td>0.00001</td><td>0.002</td><td>2.46</td><td>2.55</td></tr><tr><td>0.01</td><td>0.000</td><td>0.079</td><td>0.170</td></tr><tr><td>1</td><td>0.016</td><td>0.020</td><td>0.126</td></tr><tr><td>10</td><td>0.191</td><td>0.010</td><td>0.291</td></tr></tbody></table>
+<p>A well-regularized flexible model ends up close to the right-sized one (test MSE 0.126 against 0.108). This is why "pick a big model and tune the regularization" is a workable strategy, and why <a href="../dropout/">dropout</a>, weight decay and early stopping are all, in this picture, ways to buy back variance at a small price in bias.</p>
+<h2 id="reading-it-from-learning-curves">Reading it from learning curves</h2>
+<p>On real data you get one training set and cannot compute \(\bar f\). What you can do is watch training and validation error as the training set grows, and the two failure modes leave different fingerprints.</p>
+<pre><code class="language-python">x_eval = np.linspace(0, 1, 401)       # the whole input range: test inputs come from the training distribution
+
+
+def learning_curve(degree, sizes, reps=200):
+    out = []
+    for m in sizes:
+        train, test = [], []
+        for _ in range(reps):
+            x = rng.uniform(0, 1, m)
+            y = f(x) + rng.normal(0, sigma, m)
+            w = np.linalg.lstsq(features(x, degree), y, rcond=None)[0]
+            train.append(np.mean((features(x, degree) @ w - y) ** 2))
+            test.append(np.mean((features(x_eval, degree) @ w - f(x_eval)) ** 2) + sigma**2)
+        out.append((np.mean(train), np.median(test)))
+    return np.array(out)
+
+
+sizes = [20, 40, 80, 320]
+simple, flexible = learning_curve(1, sizes), learning_curve(7, sizes)
+gap_simple, gap_flexible = simple[:, 1] - simple[:, 0], flexible[:, 1] - flexible[:, 0]
+plateau = 0.5 - 3 / np.pi**2 + sigma**2      # best straight line through sin(2 pi x) on [0, 1], plus noise
+
+assert (simple &gt; 0.24).all() and (gap_simple &gt; 0).all()               # both far above the 0.09 floor, test above train
+assert abs(simple[-1, 1] - plateau) &lt; 0.01 and abs(simple[-1, 1] - simple[-2, 1]) &lt; 0.01   # stuck at bias² + noise
+assert gap_flexible[0] &gt; 3 * gap_simple[0]                             # small data: a wide train/test gap
+assert flexible[-1, 1] &lt; 0.1 and gap_flexible[-1] &lt; 0.01               # more data closes it
+assert abs(flexible[0, 0] - sigma**2 * (1 - 8 / 20)) &lt; 0.006           # 8 coefficients on 20 points: below the floor</code></pre>
+<table><thead><tr><th>Training points</th><th>Degree 1: train</th><th>Degree 1: test</th><th>Degree 7: train</th><th>Degree 7: test</th></tr></thead><tbody><tr><td>20</td><td>0.263</td><td>0.312</td><td>0.056</td><td>0.238</td></tr><tr><td>40</td><td>0.270</td><td>0.299</td><td>0.070</td><td>0.115</td></tr><tr><td>80</td><td>0.286</td><td>0.294</td><td>0.082</td><td>0.100</td></tr><tr><td>320</td><td>0.284</td><td>0.289</td><td>0.088</td><td>0.092</td></tr></tbody></table>
+<p>Test error is measured over the whole interval \([0, 1]\) the training inputs come from, and is the median over 200 runs, because a degree-7 fit on 20 points occasionally explodes and would swamp a mean. The degree-1 curves meet at 0.286, which can be checked by hand: the best straight line through \(\sin(2\pi x)\) on \([0, 1]\) leaves a squared error of \(1/2 - 3/\pi^2 \approx 0.196\), and the noise adds 0.09.</p>
+<ul><li><b>High bias:</b> training error is already high and validation error sits just above it. Both plateau at bias² plus noise, and more data does not move them.</li><li><b>High variance:</b> training error is low, validation error is much higher, and the gap shrinks as data grows.</li></ul>
+<p>One correction to the usual rule of thumb, "low train accuracy means high bias": training error has to be judged against the noise floor, not against zero. Here no model can get below 0.09, so a training MSE of 0.09 would be perfect, and the degree-7 model reaching 0.056 on 20 points is memorizing noise. That number is no accident: least squares with \(p\) coefficients on \(n\) points has expected training error \(\sigma^2 (1 - p/n)\) when the model can express the truth, here \(0.09 \times (1 - 8/20) = 0.054\). On real problems the floor is unknown; a strong baseline, human agreement on the labels, or the best published result stands in for it.</p>
+<table><thead><tr><th>Symptom</th><th>Diagnosis</th><th>Fixes that help</th></tr></thead><tbody><tr><td>Train and validation error both high and close</td><td>High bias</td><td>More capacity, better features, less regularization, boosting</td></tr><tr><td>Low train error, large gap to validation</td><td>High variance</td><td>More data, augmentation, stronger regularization, smaller model, bagging, early stopping</td></tr><tr><td>Both low and close, but above the target</td><td>Near the noise floor</td><td>Better labels or new information in the inputs; the model is not the bottleneck</td></tr></tbody></table>
+<p>The <a href="../overfitting-playbook/">overfitting playbook</a> ranks the variance fixes in more detail.</p>
+<h2 id="ensembles-attack-one-term-each">Ensembles attack one term each</h2>
+<p>Averaging and boosting are the two classic ensemble strategies, and they sit on opposite sides of the decomposition (more in <a href="../decision-trees-to-boosting/">from decision trees to boosting</a>).</p>
+<p><b>Bagging</b> trains \(B\) models on bootstrap resamples and averages them. If each has variance \(s^2\) and any two have correlation \(\rho\), the average has variance</p>
+\[ \operatorname{Var}\Big(\frac1B \sum_{b=1}^B \hat f_b\Big) = \rho\, s^2 + \frac{1 - \rho}{B}\, s^2 . \]
+<p>The second term vanishes as \(B\) grows; the first does not. Bootstrap resamples of one dataset overlap heavily, so the trees stay correlated, and \(\rho s^2\) is a floor that more trees cannot break. Random forests lower \(\rho\) by also restricting each split to a random subset of features. The average has the same expectation as a single bagged tree, so bias barely moves. That is why bagging pairs with deep, low-bias, high-variance trees.</p>
+<p><b>Boosting</b> goes the other way: it starts from a very simple model, such as a one-split tree (a stump), and adds stumps one at a time, each fit to the residuals of the sum so far. The rounds drive bias down; variance creeps up slowly, which is why the number of rounds and the learning rate need tuning.</p>
+<pre><code class="language-python">from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.tree import DecisionTreeRegressor
+
+n, reps, B = 100, 60, 25
+trees = np.empty((reps, B, x_test.size))
+for r in range(reps):
+    x = rng.uniform(0, 1, n)
+    y = f(x) + rng.normal(0, sigma, n)
+    for b in range(B):
+        i = rng.integers(0, n, n)                                    # bootstrap resample
+        trees[r, b] = DecisionTreeRegressor().fit(x[i, None], y[i]).predict(x_test[:, None])
+
+single, bagged = bias_variance(trees[:, 0]), bias_variance(trees.mean(axis=1))
+assert bagged[1] &lt; 0.55 * single[1]                                    # variance roughly halves
+assert bagged[0] &lt; 0.01 and single[0] &lt; 0.01                           # bias was never the problem
+
+s2 = trees.var(axis=(0, 1))                                            # one tree's variance, per test point
+dev = trees - trees.mean(axis=(0, 1))
+pair_cov = ((dev.sum(axis=1) ** 2 - (dev**2).sum(axis=1)) / (B * (B - 1))).mean(axis=0)
+rho = pair_cov / s2
+assert np.isclose(np.mean(rho * s2 + (1 - rho) * s2 / B), bagged[1])  # the formula above, exact for sample moments
+assert 0.3 &lt; rho.mean() &lt; 0.6 and bagged[1] &lt; 1.1 * np.mean(rho * s2)  # already close to the floor
+
+stages = {1: [], 10: [], 50: [], 200: []}
+for r in range(30):
+    x = rng.uniform(0, 1, n)
+    y = f(x) + rng.normal(0, sigma, n)
+    gb = GradientBoostingRegressor(max_depth=1, n_estimators=200, learning_rate=0.1).fit(x[:, None], y)
+    for k, p in enumerate(gb.staged_predict(x_test[:, None]), 1):
+        if k in stages:
+            stages[k].append(p)
+boost = {k: bias_variance(np.array(v)) for k, v in stages.items()}
+assert boost[1][0] &gt; boost[10][0] &gt; boost[50][0] &gt; boost[200][0]       # bias falls round after round
+assert boost[200][1] &gt; boost[10][1]                                    # variance slowly rises</code></pre>
+<table><thead><tr><th>Model</th><th>Bias²</th><th>Variance</th></tr></thead><tbody><tr><td>One deep tree (one bootstrap sample)</td><td>0.001</td><td>0.085</td></tr><tr><td>Bag of 25 deep trees</td><td>0.001</td><td>0.042</td></tr><tr><td>Floor \(\rho s^2\) (\(\rho \approx 0.46\))</td><td></td><td>0.040</td></tr><tr><td>Boosted stumps, 1 round</td><td>0.438</td><td>0.006</td></tr><tr><td>Boosted stumps, 10 rounds</td><td>0.130</td><td>0.006</td></tr><tr><td>Boosted stumps, 50 rounds</td><td>0.028</td><td>0.010</td></tr><tr><td>Boosted stumps, 200 rounds</td><td>0.002</td><td>0.015</td></tr></tbody></table>
+<p>Bagging halved the variance and was already within 5% of its floor at 25 trees. Boosting cut bias by a factor of more than 200 while variance went from 0.006 to 0.015.</p>
+<h2 id="double-descent-where-the-u-breaks">Double descent: where the U breaks</h2>
+<p>The textbook picture says test error traces a U as capacity grows. Belkin, Hsu, Ma and Mandal (2019) showed that for models that can fit the training data exactly, the curve often has a second act: error peaks where the model has just enough parameters to interpolate, then falls again as capacity keeps growing. They called it <b>double descent</b>.</p>
+<p>The simplest place to see it is least squares on Gaussian features. The truth uses 400 features with slowly decaying weights; the model sees only the first \(p\) of them and is fit on \(n = 40\) rows. Below \(p = n\) it is ordinary least squares. Above it there are infinitely many exact fits, and <code>lstsq</code> returns the one with the smallest norm, which is also what gradient descent from zero converges to. For \(p &lt; n - 1\) the expected risk has a closed form. The omitted features act as extra noise, and for a Gaussian design the expected trace of \((X^\top X)^{-1}\) is \(p/(n - p - 1)\):</p>
+\[ \mathbb{E}[\text{test MSE}] = \big(\sigma^2 + \lVert w_{\text{omitted}} \rVert^2\big)\, \frac{n - 1}{n - p - 1} \]
+<p>Split the factor as \((n-1)/(n-p-1) = 1 + p/(n-p-1)\). The 1 is the noise plus the signal the model cannot see; the \(p/(n-p-1)\) part is variance, and it blows up as \(p\) approaches \(n\).</p>
+<pre><code class="language-python">rng = np.random.default_rng(3)
+n, D, noise_var = 40, 400, 0.25
+w_true = np.arange(1, D + 1) ** -0.7
+w_true *= 2 / np.linalg.norm(w_true)
+ps = [5, 10, 20, 30, 36, 40, 44, 50, 80, 200, 400]
+ridgeless, ridge = {p: [] for p in ps}, {p: [] for p in ps}
+for _ in range(100):
+    X = rng.normal(size=(n, D))
+    y = X @ w_true + rng.normal(0, np.sqrt(noise_var), n)
+    for p in ps:
+        Xp = X[:, :p]
+        for store, w in [(ridgeless, np.linalg.lstsq(Xp, y, rcond=None)[0]),
+                         (ridge, Xp.T @ np.linalg.solve(Xp @ Xp.T + 5.0 * np.eye(n), y))]:
+            err = w_true.copy()
+            err[:p] -= w
+            store[p].append(err @ err + noise_var)                 # exact test MSE for Gaussian inputs
+
+med = {p: np.median(ridgeless[p]) for p in ps}
+for p in [5, 10, 20]:
+    omitted = noise_var + w_true[p:] @ w_true[p:]
+    assert abs(np.mean(ridgeless[p]) / (omitted * (n - 1) / (n - p - 1)) - 1) &lt; 0.08   # the formula
+assert max(med, key=med.get) == n                                      # the peak sits at p = n
+assert med[n] &gt; 10 * med[10] and med[80] &lt; med[50] &lt; med[44]           # and error descends again after it
+ridge_med = [np.median(ridge[p]) for p in ps[1:]]
+assert all(a &lt; b for a, b in zip(ridge_med, ridge_med[1:]))           # ridge: no peak, just a slow rise
+assert np.median(ridge[n]) &lt; med[n] / 10</code></pre>
+<table><thead><tr><th>Features \(p\)</th><th>5</th><th>10</th><th>20</th><th>30</th><th>36</th><th>40</th><th>44</th><th>50</th><th>80</th><th>200</th><th>400</th></tr></thead><tbody><tr><td>Minimum-norm least squares</td><td>1.88</td><td>1.68</td><td>1.90</td><td>3.45</td><td>7.70</td><td>57.8</td><td>7.74</td><td>4.06</td><td>2.92</td><td>3.52</td><td>3.87</td></tr><tr><td>Ridge, \(\lambda = 5\)</td><td>1.87</td><td>1.61</td><td>1.63</td><td>1.82</td><td>1.94</td><td>2.01</td><td>2.11</td><td>2.26</td><td>2.75</td><td>3.52</td><td>3.87</td></tr></tbody></table>
+<p>Median test MSE over 100 draws; the mean is infinite at \(p = n\). Predicting zero everywhere scores 4.25.</p>
+<p>Three things are worth taking from this. The decomposition itself still holds everywhere; what fails is the assumption that variance rises steadily with parameter count. Past the interpolation threshold, adding features gives the minimum-norm solution more directions to spread its fit over, and variance falls. And whether the second descent ends below the classical sweet spot depends on the problem: here three quarters of the signal sits in the first 10 features and the small model still wins, while in Belkin et al.'s random-feature and neural-network experiments the large models came out ahead. A modest ridge penalty removes the spike altogether; Nakkiran, Venkat, Kakade and Ma (2021) proved that optimally tuned ridge does this for linear regression with isotropic Gaussian inputs, as here, and saw the same effect in neural networks.</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Reading the tradeoff as a law.</b> Bias and variance often trade against each other, but not always. More data lowers variance for free; a better feature can lower both; and past the interpolation threshold, more parameters can lower variance.</li><li><b>Using training error to choose capacity.</b> It only falls as capacity grows: asserted for the polynomial sweep above, and equally true for a weaker ridge penalty, more boosting rounds or more features. Only held-out error shows the trade.</li><li><b>Expecting bagging to fix bias, or more trees to fix everything.</b> Bagging leaves bias alone, and its variance reduction stops at \(\rho s^2\).</li><li><b>Forgetting the noise floor.</b> When train and validation error meet at a level you are unhappy with, and that level is the noise in the labels, no model change helps. Spend the effort on the data.</li></ul>
+<p>For where this fits among the other basics, see the <a href="../ml-fundamentals-quick-reference/">ML fundamentals quick reference</a>; for why squared error is the natural loss here, see <a href="../regression-as-maximum-likelihood/">regression as maximum likelihood</a>.</p>
+<p>The decomposition and the bagging variance formula follow chapters 7 and 15 of Hastie, Tibshirani and Friedman's The Elements of Statistical Learning (2009) and section 3.2 of Bishop's Pattern Recognition and Machine Learning (2006); the bias/variance framing for learning machines was popularised by Geman, Bienenstock and Doursat (1992). Double descent is from Belkin, Hsu, Ma and Mandal (PNAS, 2019); the result on tuned ridge is from Nakkiran, Venkat, Kakade and Ma (ICLR, 2021).</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cold start: recommending with no history · r03922123</title>
+<meta name="description" content="New items and new users have no interactions, so a recommender trained on interactions has nothing to say about them and, left alone, never collects any. A content-based prior for new items, simulations of greedy ranking, impression budgets and Thompson sampling, fast updates and an onboarding question for new users, graduation to the main model, and the fallback chain that keeps a feed from ever being empty.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · Recommender systems</p>
+<header class="post-head">
+  <h1>Cold start: recommending with no history</h1>
+  <div class="meta">November 1, 2026 · 13 min read · recommendation · cold start · exploration · Thompson sampling · Bayesian updating</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#two-problems-and-one-loop">Two problems and one loop</a></li><li><a href="#new-items-start-from-a-prior-not-from-zero">New items: start from a prior, not from zero</a></li><li><a href="#a-prior-is-not-enough-someone-has-to-look">A prior is not enough: someone has to look</a></li><li><a href="#new-users-learn-from-every-impression">New users: learn from every impression</a></li><li><a href="#graduation-from-cold-treatment-to-the-main-model">Graduation: from cold treatment to the main model</a></li><li><a href="#the-fallback-chain">The fallback chain</a></li><li><a href="#measuring-it">Measuring it</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<p>A recommender learns from interactions, so anything without interactions is invisible to it. A video uploaded a minute ago has no click-through rate; an account created a minute ago has no history. That is the <b>cold-start problem</b>, and on a busy platform it is not a corner case: new items arrive every second, and part of every day's traffic comes from people the system has never seen.</p>
+<p>This post builds the standard tools in order: a prior from content for new items, exploration to collect their first evidence, fast updates and one good question for new users, and a fallback chain for when everything else fails. Each claim is checked in a small simulation.</p>
+<h2 id="two-problems-and-one-loop">Two problems and one loop</h2>
+<ul><li><b>New items</b> have none of the engagement features (CTR, completion rate, likes per view) the ranker leans on, and their collaborative embeddings were never trained.</li><li><b>New users</b> have no history for the user tower to pool. What remains is the request itself (locale, device, time, how they arrived) and whatever the user is willing to say.</li></ul>
+<p>A feedback loop turns the gap into a trap. A new item scored low is not shown; an item not shown collects no clicks; an item with no clicks keeps its low score. The only data that could correct the model is data its own choices prevent. The same loop drives <a href="/posts/position-bias/">position bias</a>, and the cure is similar: deliberately spend some traffic where the model is unsure.</p>
+<h2 id="new-items-start-from-a-prior-not-from-zero">New items: start from a prior, not from zero</h2>
+<p>Treat each item's click rate as unknown and describe the belief about it with a Beta distribution, as in <a href="../beta-uncertainty/">uncertainty in a rate</a>. A prior with mean \(m\) worth \(K\) pseudo-impressions, updated with \(c\) clicks in \(n\) impressions, gives the posterior mean</p>
+\[ \hat p = \frac{c + K m}{n + K} = \frac{n}{n + K}\cdot\frac{c}{n} + \frac{K}{n + K}\cdot m . \]
+<p>With no data the estimate is \(m\); as impressions arrive the weight moves to the observed rate, and the prior's share \(K/(n + K)\) is a half at \(n = K\) and a tenth at \(n = 9K\).</p>
+<p>The <a href="../recsys-features/">features post</a> fits one global prior for all items. A new item does have something better: its <b>content</b> (category, creator, duration, embeddings of its title and images). Regress the click rate of mature items on their content and use the prediction as each new item's own prior mean \(m_i\), with \(K\) fitted from how far mature items stray from their prediction once binomial noise is removed. In the simulation, eight content numbers explain part of each item's quality and a hidden term the rest.</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+d = 8
+w_true = rng.normal(size=d) * 0.35
+
+
+def logistic(z):
+    return 1 / (1 + np.exp(-z))
+
+
+def make_items(n):
+    """Content features and a true click rate; part of the quality is invisible in the content."""
+    x = rng.normal(size=(n, d))
+    return x, logistic(-3.0 + x @ w_true + 0.5 * rng.normal(size=n))
+
+
+n_old = 300                                                   # mature items with plenty of history
+x_old, ctr_old = make_items(n_old)
+imps_old = rng.integers(200, 5000, size=n_old)
+clicks_old = rng.binomial(imps_old, ctr_old)
+raw = clicks_old / imps_old
+
+# global prior: one mean for everyone, strength from the spread of rates net of binomial noise
+M = clicks_old.sum() / imps_old.sum()
+K_glob = M * (1 - M) / (raw.var() - np.mean(M * (1 - M) / imps_old)) - 1
+
+# content prior: ridge regression of the (smoothed) logit rate on content
+smooth = (clicks_old + K_glob * M) / (imps_old + K_glob)
+X1 = np.c_[x_old, np.ones(n_old)]
+coef = np.linalg.solve(X1.T @ X1 + np.eye(d + 1), X1.T @ np.log(smooth / (1 - smooth)))
+
+
+def content_prior(x):
+    return logistic(np.c_[x, np.ones(len(x))] @ coef)
+
+
+m_old = content_prior(x_old)
+K_cont = np.mean(m_old * (1 - m_old)) / (np.mean((raw - m_old) ** 2) - np.mean(m_old * (1 - m_old) / imps_old)) - 1
+print(f"global prior: mean {M:.3f}, K {K_glob:.0f};  content prior: K {K_cont:.0f}")
+
+# new items: how close is each estimate to the true rate after n impressions?
+x_new, ctr_new = make_items(1000)
+m_new = content_prior(x_new)
+rmse = {}
+for n in [0, 10, 100, 1000]:
+    c = rng.binomial(n, ctr_new)
+    rmse[n] = [np.sqrt(np.mean(((c + K * m) / (n + K) - ctr_new) ** 2)) for K, m in [(K_glob, M), (K_cont, m_new)]]
+    print(f"n={n:5d}  RMSE global prior {rmse[n][0]:.4f}  content prior {rmse[n][1]:.4f}")
+
+assert rmse[0][1] &lt; 0.75 * rmse[0][0]                         # content says a lot before any impression
+assert rmse[10][1] &lt; rmse[10][0]
+assert abs(rmse[1000][1] - rmse[1000][0]) &lt; 0.001             # with enough data the prior stops mattering
+assert K_cont &gt; K_glob                                       # less unexplained spread, so a stronger prior</code></pre>
+<table><thead><tr><th>Impressions</th><th>RMSE, global prior</th><th>RMSE, content prior</th></tr></thead><tbody><tr><td>0</td><td>0.0479</td><td>0.0316</td></tr><tr><td>10</td><td>0.0428</td><td>0.0302</td></tr><tr><td>100</td><td>0.0210</td><td>0.0186</td></tr><tr><td>1000</td><td>0.0071</td><td>0.0070</td></tr></tbody></table>
+<p>Before a single impression, content cuts the error by a third. The advantage is gone by a thousand impressions, which is the point: the prior stands in for evidence until evidence arrives. It is also stronger (\(K\) of 53 against 20), because content has already explained part of the spread.</p>
+<p>Two variants are common: averaging the rates of the \(k\) mature items nearest in content-embedding space, and embedding the new item from its content inside a <a href="../two-tower-retrieval/">two-tower model</a> trained with item IDs randomly hidden. All three fail on an item unlike anything seen before.</p>
+<h2 id="a-prior-is-not-enough-someone-has-to-look">A prior is not enough: someone has to look</h2>
+<p>Ranking by the posterior mean is greedy. A new item with an average or even good prior will not displace incumbents that have proven themselves, so it is never shown and its estimate never moves.</p>
+<p>The simulation runs a feed of ten slots for 4,000 requests, starting from the 300 mature items, with a new item arriving every ten requests. Eleven of the 400 new items are "stars", better than the tenth-best incumbent; a star counts as found once it has 200 impressions. Efficiency is expected clicks over the second half of the run as a share of what an oracle knowing every true rate would earn. Four policies:</p>
+<ul><li><b>Greedy:</b> the posterior mean with the content prior.</li><li><b>Impression budget:</b> greedy, but one slot goes to the new item with the best content prior among those with fewer than 10 impressions, so every item gets a trial.</li><li><b>Thompson sampling:</b> draw a rate from each item's posterior and show the ten highest draws. An item with little data has a wide posterior and sometimes draws high; as evidence accumulates its draws narrow. Run once with the global prior and once with the content prior.</li></ul>
+<pre><code class="language-python">n_arrivals = 400
+x_arr, ctr_arr = make_items(n_arrivals)
+ctr_all = np.r_[ctr_old, ctr_arr]
+m_all = content_prior(np.r_[x_old, x_arr])
+star = ctr_arr &gt; np.sort(ctr_old)[-10]                        # new items that belong in the top ten
+
+
+def run_feed(policy, rounds=4000, slots=10, seed=1):
+    g = np.random.default_rng(seed)
+    n = np.r_[imps_old, np.zeros(n_arrivals)].astype(float)
+    c = np.r_[clicks_old, np.zeros(n_arrivals)].astype(float)
+    earned = possible = 0.0
+    for t in range(rounds):
+        live = n_old + min(n_arrivals, t // 10 + 1)           # one new item every ten requests
+        cl, nl, ml = c[:live], n[:live], m_all[:live]
+        if policy == "thompson, global prior":
+            score = g.beta(cl + K_glob * M, nl - cl + K_glob * (1 - M))
+        elif policy == "thompson, content prior":
+            score = g.beta(cl + K_cont * ml, nl - cl + K_cont * (1 - ml))
+        else:
+            score = (cl + K_cont * ml) / (nl + K_cont)        # greedy posterior mean
+        shown = np.argpartition(-score, slots)[:slots]
+        if policy == "impression budget":
+            fresh = np.setdiff1d(np.flatnonzero(nl &lt; 10), shown)
+            if len(fresh):
+                shown[np.argmin(score[shown])] = fresh[np.argmax(ml[fresh])]
+        n[shown] += 1
+        c[shown] += g.random(slots) &lt; ctr_all[shown]
+        if t &gt;= rounds // 2:
+            earned += ctr_all[shown].sum()
+            possible += np.sort(ctr_all[:live])[-slots:].sum()
+    imps_new = n[n_old:]
+    return {"efficiency": earned / possible, "never shown": np.mean(imps_new == 0),
+            "stars found": np.sum(imps_new[star] &gt;= 200)}       # a star counts as found once it has 200 impressions
+
+
+policies = ["greedy", "impression budget", "thompson, global prior", "thompson, content prior"]
+feed = {p: run_feed(p) for p in policies}
+print(f"{star.sum()} stars among {n_arrivals} new items")
+for p, r in feed.items():
+    print(f"{p:24s}" + "  ".join(f"{k} {v:.3g}" for k, v in r.items()))
+
+greedy, budget, ts_global, ts_content = feed.values()
+assert greedy["never shown"] &gt; 0.98 and greedy["stars found"] == 0  # the loop: new items are almost never tried
+assert budget["never shown"] == 0
+assert budget["efficiency"] == min(r["efficiency"] for r in feed.values())  # the least efficient policy
+assert ts_global["never shown"] &lt; 0.05 and ts_global["efficiency"] &lt; greedy["efficiency"]
+assert min(ts_global["stars found"], ts_content["stars found"]) &gt; max(greedy["stars found"], budget["stars found"])
+assert ts_content["efficiency"] &gt; max(greedy["efficiency"], budget["efficiency"], ts_global["efficiency"]) + 0.02
+assert ts_content["never shown"] &gt; 0.5                          # it skips items that look weak on paper</code></pre>
+<table><thead><tr><th>Policy</th><th>Efficiency</th><th>New items never shown</th><th>Stars found</th></tr></thead><tbody><tr><td>Greedy</td><td>0.923</td><td>99.5%</td><td>0 of 11</td></tr><tr><td>Impression budget</td><td>0.890</td><td>0%</td><td>1 of 11</td></tr><tr><td>Thompson, global prior</td><td>0.905</td><td>3%</td><td>4 of 11</td></tr><tr><td>Thompson, content prior</td><td>0.950</td><td>61%</td><td>6 of 11</td></tr></tbody></table>
+<p>Greedy tries only the two new items whose content prior beats the incumbents and finds no star, while the feed keeps showing worse mature items. The budget fixes visibility and little else: ten impressions at a 6% click rate is under one click, far too little to move a posterior worth 50 pseudo-impressions, so every item gets its trial, proves nothing and drops back. It is the least efficient policy.</p>
+<p>Thompson sampling spends exploration where it can change a decision. With the global prior it tries almost every new item and finds four stars, but exploring that broadly still costs more than it earns over this horizon. With the content prior it skips most items that look weak on paper, finds six stars and earns the most clicks. Across other seeds the two variants find similar numbers of stars; the content prior finds them cheaply. The flip side is that a star whose appeal is invisible in its content starts behind. Thompson sampling goes back to Thompson (1933); Chapelle and Li (2011) showed how well it works for click rates, and contextual bandits such as LinUCB (Li et al., 2010) share evidence across items through their features.</p>
+<p>A common design stages the budget: a small trial, a larger one for items whose early signal clears a bar, then the main ranker. That is a hand-tuned approximation of what Thompson sampling does automatically. Any budget must be large enough to separate a star from its prior, and new items per day times budget per item must fit inside the traffic set aside, or the queue of untested items grows without limit.</p>
+<h2 id="new-users-learn-from-every-impression">New users: learn from every impression</h2>
+<p>A new user is the mirror image: many unknown preferences and a short horizon, since someone whose first screens are dull may not return. The signal available is popularity (per region or time of day), context carried by the request (device, language, referrer, campaign), an onboarding question, and the session itself, if each click and skip reaches the next screen within seconds.</p>
+<p>In the simulation each of 3,000 new users has one favourite category out of twenty, drawn by popularity, so about 40% have a favourite outside the top four. They click it at 40% and everything else at 4%, over ten screens of four items. The policies keep a Beta posterior per user and category, starting from that category's population rate.</p>
+<pre><code class="language-python">n_cat, n_users, screens, per_screen = 20, 3000, 10, 4
+pop = 1 / np.arange(1, n_cat + 1)
+pop /= pop.sum()                                              # Zipf-like popularity of categories
+fav = rng.choice(n_cat, n_users, p=pop)
+rows = np.arange(n_users)[:, None]
+p_click = np.full((n_users, n_cat), 0.04)
+p_click[rows[:, 0], fav] = 0.40
+mu = 0.04 + 0.36 * pop                                        # population click rate per category
+K_cat = mu * (1 - mu) / (0.36 ** 2 * pop * (1 - pop)) - 1    # Beta prior matching the population spread
+
+
+def run_users(policy, answered=0.0, seed=3, n_screens=screens):
+    g = np.random.default_rng(seed)
+    a, b = np.tile(K_cat * mu, (n_users, 1)), np.tile(K_cat * (1 - mu), (n_users, 1))
+    told = g.random(n_users) &lt; answered                       # these users named their favourite at signup
+    a[told, fav[told]] += 4
+    clicks = np.zeros((n_users, n_screens))
+    for t in range(n_screens):
+        if policy == "popularity":
+            score = np.tile(mu, (n_users, 1))
+        elif policy == "thompson":
+            score = g.beta(a, b)
+        else:
+            score = a / (a + b)                               # greedy on the per-user posterior mean
+        show = np.argsort(-score, axis=1)[:, :per_screen]
+        y = g.random(show.shape) &lt; p_click[rows, show]
+        a[rows, show] += y                                    # clicks raise a category ...
+        b[rows, show] += ~y                                   # ... and skips lower it
+        clicks[:, t] = y.sum(1)
+    return clicks
+
+
+niche = fav &gt;= per_screen
+users = {"popularity": run_users("popularity"), "thompson": run_users("thompson"),
+         "posterior mean": run_users("mean"), "posterior mean + question": run_users("mean", answered=0.5)}
+for name, c in users.items():
+    print(f"{name:26s} clicks per user {c.sum(1).mean():.2f}  screens 1-3 {c[:, :3].mean():.2f}  "
+          f"screens 8-10, niche users {c[niche, -3:].mean():.2f}")
+
+pop_c, ts_c, mean_c, q_c = users.values()
+assert mean_c.sum(1).mean() &gt; pop_c.sum(1).mean()
+assert mean_c[niche, -3:].mean() &gt; 2 * pop_c[niche, -3:].mean()   # niche users are who popularity fails
+assert ts_c[:, :3].mean() &lt; pop_c[:, :3].mean()                     # exploration costs early screens
+assert ts_c.sum(1).mean() &lt; min(pop_c.sum(1).mean(), mean_c.sum(1).mean())  # ... and does not repay them in ten screens
+assert q_c.sum(1).mean() &gt; mean_c.sum(1).mean()
+assert q_c[:, :3].mean() &gt; max(pop_c[:, :3].mean(), mean_c[:, :3].mean())  # the answer helps from the first screen
+
+# a longer session: 60 screens instead of 10
+long = {p: run_users(p, n_screens=60).sum(1).mean() for p in ["popularity", "thompson", "mean"]}
+print("60 screens, clicks per user:", {p: round(v, 1) for p, v in long.items()})
+assert long["thompson"] &gt; long["popularity"] and long["thompson"] &gt; 0.95 * long["mean"]</code></pre>
+<table><thead><tr><th>Policy</th><th>Clicks per user, 10 screens</th><th>Clicks per screen, screens 1-3</th><th>Clicks per screen, screens 8-10, niche users</th></tr></thead><tbody><tr><td>Popularity</td><td>3.76</td><td>0.38</td><td>0.16</td></tr><tr><td>Thompson sampling</td><td>3.22</td><td>0.28</td><td>0.30</td></tr><tr><td>Posterior mean</td><td>4.03</td><td>0.39</td><td>0.32</td></tr><tr><td>Posterior mean + question (half answer)</td><td>4.64</td><td>0.46</td><td>0.42</td></tr></tbody></table>
+<p>Popularity leaves niche users at the 4% background rate forever. Updating on every impression fixes that with no explicit exploration: the first screen is the popular one, each skip lowers that category in the user's posterior, and on the second screen over nine users in ten already see at least one category the popular screen left out. Skips are information. Thompson sampling, which won for items, loses here: with twenty categories and ten screens its randomness costs more early clicks than it repays. Over a 60-screen session the gap all but closes: Thompson sampling then beats popularity and comes within 5% of the posterior mean. Exploration has to pay back within the time the user stays.</p>
+<p>The question beats everything from the first screen although only half the users answer it. If there is room for one question, ask the one whose answer is hardest to predict and would most change the first screen; a question everyone answers alike carries no <a href="../entropy-and-information/">information</a>.</p>
+<h2 id="graduation-from-cold-treatment-to-the-main-model">Graduation: from cold treatment to the main model</h2>
+<ul><li><b>A separate cold-start model</b> on content and context, until the item or user has enough evidence. A hard switch makes scores jump, so blending by evidence, like \(n/(n + K)\) above, is smoother.</li><li><b>One model for both</b>, trained with the interaction features or IDs of warm examples randomly hidden so it learns to fall back on content. DropoutNet (Volkovs, Yu and Poutanen, 2017) does this for collaborative embeddings.</li><li><b>Freshness as a feature.</b> Covington, Adams and Sargin (2016) fed the age of each training example into YouTube's candidate generator and set it to zero, or slightly negative, at serving time, so the model could represent the preference for fresh uploads instead of averaging it away.</li></ul>
+<h2 id="the-fallback-chain">The fallback chain</h2>
+<p>Whatever the models do, the feed must never come back empty:</p>
+<pre><code class="language-plaintext">1. personalized ranking           enough history; main retrieval and ranker
+2. lightly personalized           a few interactions; session items, item-to-item neighbours
+3. content and context            onboarding answers, locale, device, item content
+4. popularity                     trending or editorial, per region; always available, cached</code></pre>
+<p>Each tier fills the slots the one above left, without duplicates, and has a timeout, so a slow feature store drops the request a tier instead of failing it. The last tier depends on no model.</p>
+<h2 id="measuring-it">Measuring it</h2>
+<p>Averages hide cold start, because warm traffic dominates. Report the cold slices separately: for items, time to the first \(N\) impressions and how fast eventual stars are found; for users, engagement in the first sessions and return rate after a day and a week. Offline, split by time so test items and users really are new. The net cost of exploration shows only in an <a href="../ab-testing/">A/B test</a> against a version without it (see also <a href="/posts/evaluating-ml-systems/">evaluating ML systems</a>), and logging each exploratory item's display probability makes that traffic usable for off-policy evaluation later. Thompson sampling has no closed-form display probability, so estimate it by repeating the draw a few hundred times per request.</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Zero as the estimate.</b> No clicks means an unknown rate, not a zero one. Use a prior, and give the model the impression count too.</li><li><b>Trials that decide nothing.</b> A budget too small to move the estimate past the bar only costs clicks.</li><li><b>Exploring a new user as if they will stay.</b> Exploration has to pay back within the session.</li><li><b>Trusting content absolutely.</b> Keep some exploration that does not depend on the content prior.</li><li><b>Losing the exploration data.</b> It is the only evidence on new items that the greedy ranker did not filter out; log it with its propensities so it can be reweighted later.</li></ul>
+<p>Sources: Andrew Schein, Alexandrin Popescul, Lyle Ungar and David Pennock, <a href="https://dl.acm.org/doi/10.1145/564376.564421">Methods and Metrics for Cold-Start Recommendations</a> (SIGIR 2002); William R. Thompson, On the likelihood that one unknown probability exceeds another in view of the evidence of two samples (Biometrika, 1933); Olivier Chapelle and Lihong Li, An Empirical Evaluation of Thompson Sampling (NIPS 2011); Lihong Li, Wei Chu, John Langford and Robert Schapire, A Contextual-Bandit Approach to Personalized News Article Recommendation (WWW 2010), for exploration with features; Maksims Volkovs, Guangwei Yu and Tomi Poutanen, DropoutNet: Addressing Cold Start in Recommender Systems (NIPS 2017); Paul Covington, Jay Adams and Emre Sargin, <a href="https://dl.acm.org/doi/10.1145/2959100.2959190">Deep Neural Networks for YouTube Recommendations</a> (RecSys 2016). For a wider tour of bandit algorithms, Lilian Weng's <a href="https://lilianweng.github.io/posts/2018-01-23-multi-armed-bandit/">The Multi-Armed Bandit Problem and Its Solutions</a> (2018).</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

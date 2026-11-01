@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformers and LLMs: the key engineering ideas · r03922123</title>
+<meta name="description" content="The ideas that make large language models affordable to run and train, each reduced to a small experiment: the KV cache and its memory bill, multi-query and grouped-query attention, speculative decoding and why it is exact, FlashAttention&#x27;s online softmax, mixed precision, loss masking for instruction tuning, and why long contexts are not read evenly.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · LLMs and generative AI</p>
+<header class="post-head">
+  <h1>Transformers and LLMs: the key engineering ideas</h1>
+  <div class="meta">November 1, 2026 · 14 min read · transformers · LLM · inference · KV cache · speculative decoding · mixed precision</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-generation-is-slow">Why generation is slow</a></li><li><a href="#the-kv-cache">The KV cache</a></li><li><a href="#how-big-the-cache-gets">How big the cache gets</a></li><li><a href="#sharing-keys-and-values-mqa-and-gqa">Sharing keys and values: MQA and GQA</a></li><li><a href="#speculative-decoding">Speculative decoding</a></li><li><a href="#attention-without-the-n-by-n-matrix">Attention without the N-by-N matrix</a></li><li><a href="#mixed-precision-training">Mixed precision training</a></li><li><a href="#instruction-tuning-and-cheap-fine-tuning">Instruction tuning and cheap fine-tuning</a></li><li><a href="#long-contexts-are-not-read-evenly">Long contexts are not read evenly</a></li><li><a href="#pitfalls">Pitfalls</a></li><li><a href="#references">References</a></li></ol></nav>
+<p>A transformer language model is a short stack of ideas: attention, an MLP, residual connections, normalization, and a next-token loss. What makes such a model affordable to train and serve is a second set of ideas, mostly about memory. This post covers the ones that matter most, each with the reason it exists, the mechanism, and a small experiment whose assertions check the claim.</p>
+<p>Throughout, \(L\) is the number of layers, \(H\) the number of query heads, \(d_h\) the size of one head, \(N\) the number of tokens in the sequence, and \(p\) and \(q\) are probability distributions over the vocabulary.</p>
+<h2 id="why-generation-is-slow">Why generation is slow</h2>
+<p>Text is produced one token at a time. Processing the prompt (the prefill) is one big parallel pass that keeps the GPU busy. Each generation step (the decode) does little arithmetic per weight but must read every weight from GPU memory.</p>
+<p>A 7-billion-parameter model in 16-bit floats is about 14 GB. At batch size one, a decode step reads those 14 GB to do roughly \(2 \times 7 \times 10^9\) operations, about one per byte. A data-centre GPU reads roughly 2 TB/s but computes over a hundred times more operations per second than that, so bandwidth sets the limit: about \(2 \times 10^{12} / 1.4 \times 10^{10} \approx 140\) steps per second at best. Most ideas below either move fewer bytes per token or produce more tokens per pass over the weights.</p>
+<h2 id="the-kv-cache">The KV cache</h2>
+<p>In causal attention, the key and value vectors of token \(i\) depend only on tokens \(1, \dots, i\), so they never change once computed. Keep each layer's keys and values in a cache; at step \(t\), compute the query, key and value of the new token only, append the key and value, and attend from the one new query over all \(t\) cached keys.</p>
+<p>Per layer, a step then costs \(O(d^2)\) for the new token's projections and MLP plus \(O(t\,d)\) for attention over the cache. Without the cache, step \(t\) would redo the projections and MLP for all \(t\) tokens and the full \(t \times t\) score matrix. With it, attention is still linear in \(t\) per step and quadratic over a whole generation: the cache removes recomputation over the prefix, but it does not make attention any cheaper than one new row of scores per step. The code builds a one-layer model (whose attention allows fewer key/value heads than query heads, for later), decodes with and without a cache, and checks they agree.</p>
+<pre><code class="language-python">import numpy as np
+import torch
+import torch.nn.functional as F
+
+torch.set_default_dtype(torch.float64)
+torch.manual_seed(0)
+d_model, n_heads, vocab = 64, 8, 50
+d_head = d_model // n_heads
+
+
+class TinyLM(torch.nn.Module):
+    """Embedding, one causal attention layer with n_kv key/value heads, unembedding."""
+
+    def __init__(self, n_kv):
+        super().__init__()
+        self.n_kv = n_kv
+        self.emb = torch.nn.Embedding(vocab, d_model)
+        self.wq = torch.nn.Linear(d_model, n_heads * d_head, bias=False)
+        self.wkv = torch.nn.Linear(d_model, 2 * n_kv * d_head, bias=False)
+        self.wo = torch.nn.Linear(n_heads * d_head, d_model, bias=False)
+        self.out = torch.nn.Linear(d_model, vocab, bias=False)
+        self.rows_projected = 0                                    # token rows pushed through wq/wkv
+
+    def forward(self, tokens, cache=None):
+        x = self.emb(tokens)                                       # (T, d_model), only the new tokens
+        T = x.shape[0]
+        self.rows_projected += T
+        q = self.wq(x).view(T, n_heads, d_head).transpose(0, 1)    # (H, T, d_head)
+        k, v = self.wkv(x).view(T, 2, self.n_kv, d_head).permute(1, 2, 0, 3)
+        if cache is not None:                                      # prepend cached keys and values
+            k, v = torch.cat([cache[0], k], dim=1), torch.cat([cache[1], v], dim=1)
+        S = k.shape[1]                                             # total tokens so far
+        group = n_heads // self.n_kv                               # query heads per key/value head
+        kk, vv = k.repeat_interleave(group, 0), v.repeat_interleave(group, 0)
+        scores = q @ kk.transpose(1, 2) / d_head ** 0.5            # (H, T, S)
+        pos_q = torch.arange(S - T, S)[:, None]                    # absolute positions of the queries
+        scores = scores.masked_fill(torch.arange(S)[None, :] &gt; pos_q, float("-inf"))
+        ctx = (torch.softmax(scores, -1) @ vv).transpose(0, 1).reshape(T, -1)
+        return self.out(x + self.wo(ctx)), (k, v)
+
+
+def generate(model, prompt, steps, use_cache):
+    tokens, cache, logits_seen = list(prompt), None, []
+    logits, cache = model(torch.tensor(tokens))
+    for _ in range(steps):
+        logits_seen.append(logits[-1])
+        tokens.append(int(logits[-1].argmax()))                    # greedy decoding
+        if use_cache:
+            logits, cache = model(torch.tensor(tokens[-1:]), cache)
+        else:
+            logits, _ = model(torch.tensor(tokens))                # recompute the whole prefix
+    return tokens, torch.stack(logits_seen)
+
+
+model = TinyLM(n_kv=n_heads)
+prompt, steps = [3, 14, 15, 9, 2], 40
+slow, slow_logits = generate(model, prompt, steps, use_cache=False)
+rows_slow, model.rows_projected = model.rows_projected, 0
+fast, fast_logits = generate(model, prompt, steps, use_cache=True)
+assert slow == fast and torch.allclose(slow_logits, fast_logits, atol=1e-12)
+assert rows_slow == sum(len(prompt) + i for i in range(steps + 1))   # quadratic in length
+assert model.rows_projected == len(prompt) + steps                   # linear in length
+print(f"token rows projected: {rows_slow} without a cache, {model.rows_projected} with one")</code></pre>
+<h2 id="how-big-the-cache-gets">How big the cache gets</h2>
+<p>Each layer stores one key and one value vector per key/value head per token, so</p>
+\[ \text{KV bytes} = 2 \times L \times H_{kv} \times d_h \times N \times \text{bytes per number}, \]
+<p>per sequence, where \(H_{kv}\) is the number of key/value heads (\(H\) in standard multi-head attention). It grows with context length and batch size and competes with the weights for GPU memory:</p>
+<table><thead><tr><th>Configuration</th><th>Per token</th><th>4,096 tokens</th><th>8 sequences of 4,096</th></tr></thead><tbody><tr><td>32 layers, 32 KV heads of 128 (Llama 2 7B)</td><td>512 KiB</td><td>2 GiB</td><td>16 GiB</td></tr><tr><td>32 layers, 8 KV heads of 128 (Llama 3 8B)</td><td>128 KiB</td><td>512 MiB</td><td>4 GiB</td></tr></tbody></table>
+<p>At eight concurrent 4k-token requests, the first model's cache outweighs its 13 GB of weights. Batch size and context length trade against each other through this number.</p>
+<pre><code class="language-python">def kv_bytes(layers, kv_heads, d_h, tokens, bytes_per=2):
+    return 2 * layers * kv_heads * d_h * tokens * bytes_per
+
+
+KiB, GiB = 2 ** 10, 2 ** 30
+assert kv_bytes(32, 32, 128, 1) == 512 * KiB
+assert kv_bytes(32, 32, 128, 4096) == 2 * GiB
+assert kv_bytes(32, 32, 128, 8 * 4096) == 16 * GiB &gt; 6.7e9 * 2      # cache outweighs fp16 weights
+assert kv_bytes(32, 8, 128, 1) == 128 * KiB
+assert kv_bytes(32, 8, 128, 8 * 4096) == 4 * GiB</code></pre>
+<p>The cache also fragments: requests end at unpredictable lengths, so reserving contiguous space for the maximum wastes most of it. PagedAttention (Kwon et al., the paper behind vLLM) stores the cache in fixed-size blocks addressed through a table, like virtual memory pages. Waste drops to the last partly filled block, and requests sharing a prefix can share its blocks. The paper reports 2 to 4 times the throughput of earlier serving systems at the same latency. More in <a href="../llm-inference/">LLM inference</a>.</p>
+<h2 id="sharing-keys-and-values-mqa-and-gqa">Sharing keys and values: MQA and GQA</h2>
+<p>Multi-head attention (MHA) gives each of the \(H\) query heads its own key and value head. Multi-query attention (MQA, Shazeer, 2019) has all query heads share one key/value head, cutting the cache by a factor of \(H\), sometimes at a cost in quality. Grouped-query attention (GQA, Ainslie et al., 2023) splits the query heads into \(G\) groups that each share one key/value head: MHA is \(G = H\), MQA is \(G = 1\). With \(H = 32\) and \(G = 8\), the cache is 4 times smaller than MHA's and 8 times larger than MQA's. The GQA paper converts an MHA checkpoint by averaging the key and value heads within each group, then continuing pretraining with about 5% of the original compute.</p>
+<p>Only keys and values shrink; every query head keeps its own attention pattern. The check compares the layer above with PyTorch's built-in grouped attention for MHA, GQA and MQA.</p>
+<pre><code class="language-python">x_tokens = torch.tensor(prompt + fast[len(prompt):])
+for n_kv in [8, 2, 1]:                                             # MHA, GQA with 4 heads per group, MQA
+    m = TinyLM(n_kv)
+    logits, (k, v) = m(x_tokens)
+    assert k.shape == (n_kv, len(x_tokens), d_head)                # the cache shrinks with n_kv
+    x = m.emb(x_tokens)
+    q = m.wq(x).view(-1, n_heads, d_head).transpose(0, 1)
+    ref = F.scaled_dot_product_attention(q[None], k[None], v[None], is_causal=True, enable_gqa=True)[0]
+    ref_logits = m.out(x + m.wo(ref.transpose(0, 1).reshape(len(x_tokens), -1)))
+    assert torch.allclose(logits, ref_logits, atol=1e-10)</code></pre>
+<h2 id="speculative-decoding">Speculative decoding</h2>
+<p>Since a decode step is limited by reading the weights, checking several tokens in one pass costs about as much as producing one. Speculative decoding (Leviathan et al., 2023, and independently Chen et al., 2023) exploits this. A small draft model proposes \(k\) tokens cheaply; the target model scores all \(k\) positions in one forward pass, giving its distribution \(p\) at each position where the draft had \(q\). Left to right, each draft token \(x\) is accepted with probability \(\min(1, p(x)/q(x))\); at the first rejection, a replacement is drawn from the leftover distribution</p>
+\[ p'(x) = \frac{\max\big(0,\; p(x) - q(x)\big)}{\sum_y \max\big(0,\; p(y) - q(y)\big)}, \]
+<p>and the round ends. If all \(k\) are accepted, the target's distribution at position \(k + 1\) gives a bonus token.</p>
+<p>The output is distributed exactly as if the target had sampled alone. Let \(\beta = \sum_x \min(p(x), q(x))\) be the probability that a draft token is accepted. Token \(x\) comes out by being drafted and accepted, with probability \(q(x)\min(1, p(x)/q(x)) = \min(p(x), q(x))\), or by a rejection and a draw from \(p'\), with probability \((1 - \beta)\,p'(x)\). The normalizer of \(p'\) is \(\sum_y (p(y) - \min(p(y), q(y))) = 1 - \beta\), so the second term is \(p(x) - \min(p(x), q(x))\) and the two add to \(p(x)\). The draft's quality affects only speed. If each token is accepted independently with probability \(\alpha\), a round produces \((1 - \alpha^{k+1})/(1 - \alpha)\) tokens per target pass on average: 2.5 tokens at \(\alpha = 0.7, k = 3\).</p>
+<p>The experiment checks one step against \(p\), the tokens-per-pass formula, and the full algorithm on toy bigram models against the target's exact distribution of three-token continuations. Sampling noise alone puts the total variation distance near 0.03 at this sample size, so the check also runs a broken variant, one that redraws a rejected token from \(p\) instead of the leftover \(p'\), to show the test can tell the difference.</p>
+<pre><code class="language-python">rng = np.random.default_rng(0)
+V = 6
+p = rng.dirichlet(np.ones(V))                                      # target
+q = 0.6 * p + 0.4 * rng.dirichlet(np.ones(V))                      # a decent but imperfect draft
+
+
+def sample(dist, u):                                               # inverse-CDF sampling, vectorized
+    return np.minimum(np.searchsorted(np.cumsum(dist), u), len(dist) - 1)
+
+
+n = 400_000
+drafted = sample(q, rng.random(n))
+accepted = rng.random(n) &lt; np.minimum(1, p[drafted] / q[drafted])
+residual = np.maximum(p - q, 0)
+out = np.where(accepted, drafted, sample(residual / residual.sum(), rng.random(n)))
+assert np.abs(np.bincount(out, minlength=V) / n - p).max() &lt; 0.003           # exactly p
+assert abs(accepted.mean() - np.minimum(p, q).sum()) &lt; 0.003                 # acceptance = beta
+
+alpha, k = 0.7, 3                                                  # tokens per round, i.i.d. acceptance
+acc = rng.random((n, k)) &lt; alpha
+run = np.where(acc.all(1), k, acc.argmin(1))                       # accepted before first rejection
+assert abs((run + 1).mean() - (1 - alpha ** (k + 1)) / (1 - alpha)) &lt; 0.01   # +1: fix-up or bonus
+
+P = rng.dirichlet(np.ones(V), size=V)                              # target bigram: P[prev] -&gt; next
+Q = 0.5 * P + 0.5 * rng.dirichlet(np.ones(V), size=V)              # draft bigram
+
+
+def speculative(start, n_new, k, rng, fix_up="leftover"):
+    seq, passes = [start], 0
+    while len(seq) &lt; n_new + 1:
+        draft = []
+        for _ in range(k):                                         # cheap: k draft steps
+            draft.append(sample(Q[(seq + draft)[-1]], rng.random()))
+        passes += 1                                                # one target pass scores all k + 1
+        for x in draft:
+            p_i, q_i = P[seq[-1]], Q[seq[-1]]                      # both conditioned on the same prefix
+            if rng.random() &lt; min(1, p_i[x] / q_i[x]):
+                seq.append(x)
+                continue
+            r = np.maximum(p_i - q_i, 0) if fix_up == "leftover" else p_i
+            seq.append(sample(r / r.sum(), rng.random()))
+            break
+        else:
+            seq.append(sample(P[seq[-1]], rng.random()))           # all accepted: bonus token
+    return seq[1:n_new + 1], passes
+
+
+def continuation_tv(fix_up, runs=20_000):
+    counts, passes = np.zeros((V, V, V)), 0
+    for _ in range(runs):
+        (a, b, c), used = speculative(0, 3, 3, rng, fix_up)
+        counts[a, b, c] += 1
+        passes += used
+    exact = np.einsum("a,ab,bc-&gt;abc", P[0], P, P)                 # P(a|0) P(b|a) P(c|b)
+    return 0.5 * np.abs(counts / runs - exact).sum(), passes / runs  # total variation distance
+
+
+tv, per_run = continuation_tv("leftover")
+tv_bad, _ = continuation_tv("target")                              # wrong fix-up: redraw from p
+assert tv &lt; 0.06 &lt; 0.1 &lt; tv_bad                                    # noise ~0.03; the bug ~0.15
+assert per_run &lt; 2                                                 # 3 tokens in under 2 passes
+print(f"TV {tv:.3f} (broken fix-up: {tv_bad:.3f}); 3 tokens in {per_run:.2f} target passes")</code></pre>
+<h2 id="attention-without-the-n-by-n-matrix">Attention without the N-by-N matrix</h2>
+<p>In training and prefill, standard attention writes each head's \(N \times N\) score matrix to GPU memory and reads it back, more than once. FlashAttention (Dao et al., 2022) computes the same output without storing it. It streams blocks of keys and values through fast on-chip memory and keeps, per query, a running maximum, softmax denominator and weighted sum of values, rescaling the old sums by \(e^{m_{\text{old}} - m_{\text{new}}}\) when the maximum grows. That online softmax predates it (Milakov and Gimelshein, 2018); FlashAttention's contribution was organizing the computation around memory traffic, and FlashAttention-2 (Dao, 2023) split the work better across the GPU. The result is exact, with extra memory linear in \(N\). Details in <a href="../flashattention/">FlashAttention</a>.</p>
+<pre><code class="language-python">def blockwise_attention(q, k, v, block=16):
+    m = torch.full((q.shape[0], 1), float("-inf"))                 # running max per query
+    l = torch.zeros(q.shape[0], 1)                                 # running softmax denominator
+    acc = torch.zeros(q.shape[0], v.shape[1])                      # running weighted sum of values
+    for j in range(0, k.shape[0], block):
+        s = q @ k[j:j + block].T / q.shape[1] ** 0.5
+        m_new = torch.maximum(m, s.max(1, keepdim=True).values)
+        scale = torch.exp(m - m_new)                               # rescale what was summed so far
+        e = torch.exp(s - m_new)
+        l, acc, m = l * scale + e.sum(1, keepdim=True), acc * scale + e @ v[j:j + block], m_new
+    return acc / l
+
+
+qa, ka, va = torch.randn(100, 32), torch.randn(237, 32) * 4, torch.randn(237, 32)
+full = torch.softmax(qa @ ka.T / 32 ** 0.5, dim=1) @ va             # materializes 100 x 237
+assert torch.allclose(blockwise_attention(qa, ka, va), full, atol=1e-12)</code></pre>
+<h2 id="mixed-precision-training">Mixed precision training</h2>
+<p>Training in 32-bit floats everywhere wastes memory and leaves fast 16-bit matrix units idle. Mixed precision training (Micikevicius et al., 2018) runs forward and backward matrix multiplications in 16 bits and keeps a 32-bit master copy of the weights for the optimizer. The two 16-bit formats fail differently:</p>
+<table><thead><tr><th></th><th>Exponent bits</th><th>Mantissa bits</th><th>Largest value</th><th>Gap above 1.0</th></tr></thead><tbody><tr><td>float16</td><td>5</td><td>10</td><td>65,504</td><td>\(2^{-10} \approx 10^{-3}\)</td></tr><tr><td>bfloat16</td><td>8</td><td>7</td><td>\(\approx 3.4 \times 10^{38}\)</td><td>\(2^{-7} \approx 8 \times 10^{-3}\)</td></tr></tbody></table>
+<p>float16 has little range: small gradients round to zero and large activations overflow. Loss scaling multiplies the loss by a large factor before the backward pass and divides the gradients by it before the update (PyTorch's <code>torch.amp.GradScaler</code> picks the factor and skips steps that overflow). bfloat16 has float32's range and needs no scaling, at the cost of precision. Neither format is a safe place to accumulate the weights. An update is often a thousandth of the weight or less, and any update smaller than half the gap between neighbouring values (about \(2^{-11}\) of the weight in float16, \(2^{-8}\) in bfloat16) rounds away, so adding it changes nothing. That is swamping, not underflow, and it is why master weights stay in 32 bits.</p>
+<pre><code class="language-python">f16, bf16 = torch.finfo(torch.float16), torch.finfo(torch.bfloat16)
+assert f16.max == 65504 and bf16.max &gt; 3.3e38
+assert f16.eps == 2 ** -10 and bf16.eps == 2 ** -7
+assert torch.tensor(70_000.0).half().isinf()                       # fp16 overflow
+g = torch.tensor(1e-8)                                             # a small gradient
+assert g.half() == 0 and g.bfloat16() != 0                         # fp16 underflow, bf16 fine
+scale = 2.0 ** 16                                                  # loss scaling rescues it
+assert abs((g * scale).half().double() / scale - 1e-8) &lt; 1e-11
+
+w16, w32 = torch.tensor(1.0, dtype=torch.bfloat16), torch.tensor(1.0, dtype=torch.float32)
+for _ in range(1000):                                              # 1000 updates of 1e-3
+    w16, w32 = w16 + 1e-3, w32 + 1e-3
+assert w16 == 1.0 and abs(w32.item() - 2.0) &lt; 1e-3                 # bf16 weight never moved
+
+torch.manual_seed(0)                                               # bf16 autocast, fp32 master weights
+X = torch.randn(512, 20, dtype=torch.float32)
+y = X @ torch.randn(20, 1, dtype=torch.float32)
+lin = torch.nn.Linear(20, 1, dtype=torch.float32)
+opt = torch.optim.SGD(lin.parameters(), lr=0.1)
+for step in range(200):
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        pred = lin(X)                                              # matmul runs in bf16
+    loss = ((pred.float() - y) ** 2).mean()
+    opt.zero_grad()
+    loss.backward()
+    opt.step()
+assert pred.dtype == torch.bfloat16 and lin.weight.dtype == torch.float32
+assert loss.item() &lt; 1e-3</code></pre>
+<h2 id="instruction-tuning-and-cheap-fine-tuning">Instruction tuning and cheap fine-tuning</h2>
+<p>A pretrained model continues text; instruction tuning fine-tunes it on prompt and response pairs. FLAN (Wei et al., 2022) showed that training on many tasks phrased as instructions improves zero-shot performance on unseen tasks; InstructGPT (Ouyang et al., 2022) added a reward model and reinforcement learning from human preferences (see <a href="../rlhf-alignment/">RLHF and alignment</a>). One detail matters: in the usual setup the loss covers response tokens only. Prompt positions get the label \(-100\), which PyTorch's cross-entropy ignores.</p>
+<pre><code class="language-python">T_prompt, T_resp = 7, 5
+logits = torch.randn(T_prompt + T_resp, vocab)
+targets = torch.randint(vocab, (T_prompt + T_resp,))
+labels = targets.clone()
+labels[:T_prompt] = -100                                           # no loss on the prompt
+masked = F.cross_entropy(logits, labels, ignore_index=-100)
+assert torch.allclose(masked, F.cross_entropy(logits[T_prompt:], targets[T_prompt:]))
+assert not torch.allclose(masked, F.cross_entropy(logits, targets))</code></pre>
+<p>(In a real model the labels are also shifted by one position, so that position \(i\) predicts token \(i + 1\).)</p>
+<p>Full fine-tuning leaves one full checkpoint per task. LoRA (Hu et al., 2022) freezes the pretrained weight \(W_0\) and learns a low-rank update, \(h = W_0 x + \frac{\alpha}{r} B A x\), with \(B\) initialized to zero so training starts at the pretrained model; afterwards \(\frac{\alpha}{r} BA\) is added into \(W_0\) at no inference cost. Rank 8 on a 7B model's query and value projections trains about 4 million parameters. A full build, with asserts, is in <a href="/posts/lora-from-scratch/">LoRA from scratch</a>, and the wider family in <a href="../parameter-efficient-fine-tuning/">parameter-efficient fine-tuning</a>.</p>
+<h2 id="long-contexts-are-not-read-evenly">Long contexts are not read evenly</h2>
+<p>A longer window does not mean the model uses all of it equally. Liu et al. (2023) moved one relevant document among distractors and found a U-shaped curve: accuracy is highest when it sits near the start or end of the context and drops in the middle, and longer-window models were no better at this. For retrieval-augmented generation, put the strongest passages first or last and prefer fewer, better chunks (see <a href="../rag-architecture/">RAG architecture</a>).</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Treating the KV cache as free.</b> Its memory grows with every token of every request and often limits batch size before compute does.</li><li><b>Thinking speculative decoding changes outputs.</b> With the rule above it does not; a poor draft only slows it down. Looser rules, such as accepting any token the target ranks highly, do change the distribution.</li><li><b>Expecting speculative decoding to help a busy server.</b> It spends idle compute. At large batch sizes decoding is no longer memory-bound and the gain shrinks.</li><li><b>Using float16 without loss scaling.</b> Gradients below about \(3 \times 10^{-8}\) become zero. Prefer bfloat16 where supported.</li><li><b>Forgetting the prompt mask.</b> The model then also learns to imitate users, diluting the signal on responses.</li></ul>
+<p>For the basic building blocks see <a href="../attention-scaling/">why attention divides by the square root of d</a> and <a href="../batchnorm-vs-layernorm/">BatchNorm vs LayerNorm</a>.</p>
+<h2 id="references">References</h2>
+<ol><li>Vaswani et al., <a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a>, NeurIPS 2017.</li><li>Shazeer, <a href="https://arxiv.org/abs/1911.02150">Fast Transformer Decoding: One Write-Head is All You Need</a>, 2019. Multi-query attention.</li><li>Ainslie et al., <a href="https://arxiv.org/abs/2305.13245">GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints</a>, EMNLP 2023.</li><li>Kwon et al., <a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for Large Language Model Serving with PagedAttention</a>, SOSP 2023.</li><li>Leviathan, Kalman and Matias, <a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a>, ICML 2023.</li><li>Chen et al., <a href="https://arxiv.org/abs/2302.01318">Accelerating Large Language Model Decoding with Speculative Sampling</a>, 2023.</li><li>Milakov and Gimelshein, <a href="https://arxiv.org/abs/1805.02867">Online normalizer calculation for softmax</a>, 2018.</li><li>Dao et al., <a href="https://arxiv.org/abs/2205.14135">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a>, NeurIPS 2022, and Dao, <a href="https://arxiv.org/abs/2307.08691">FlashAttention-2</a>, 2023.</li><li>Micikevicius et al., <a href="https://arxiv.org/abs/1710.03740">Mixed Precision Training</a>, ICLR 2018.</li><li>Wei et al., <a href="https://arxiv.org/abs/2109.01652">Finetuned Language Models Are Zero-Shot Learners</a>, ICLR 2022.</li><li>Ouyang et al., <a href="https://arxiv.org/abs/2203.02155">Training Language Models to Follow Instructions with Human Feedback</a>, NeurIPS 2022.</li><li>Hu et al., <a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a>, ICLR 2022.</li><li>Liu et al., <a href="https://arxiv.org/abs/2307.03172">Lost in the Middle: How Language Models Use Long Contexts</a>, TACL 2024.</li></ol>
+<p>I studied these topics in Stanford's CME295 course, Transformers and Large Language Models; the explanations and experiments here are my own.</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

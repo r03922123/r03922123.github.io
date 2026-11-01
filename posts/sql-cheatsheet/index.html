@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL on one page: evaluation order, NULLs, joins, window functions and the classic patterns · r03922123</title>
+<meta name="description" content="A working SQL reference: the order a query is really evaluated in, how NULLs bend counting and NOT IN, joins and anti-joins, window functions and their frames, then Nth highest, top N per group, gaps and islands and deduplication. Every query runs against SQLite with asserts, and PostgreSQL-only syntax is marked.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · Coding and data</p>
+<header class="post-head">
+  <h1>SQL on one page: evaluation order, NULLs, joins, window functions and the classic patterns</h1>
+  <div class="meta">November 1, 2026 · 21 min read · SQL · window functions · PostgreSQL · SQLite · reference</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-tables">The tables</a></li><li><a href="#the-order-a-query-is-evaluated-in">The order a query is evaluated in</a></li><li><a href="#nulls-counting-comparing-and-not-in">NULLs: counting, comparing and NOT IN</a></li><li><a href="#arithmetic-casts-and-case">Arithmetic, casts and CASE</a></li><li><a href="#joins-self-joins-and-anti-joins">Joins, self joins and anti-joins</a></li><li><a href="#window-functions">Window functions</a></li><li><a href="#patterns-worth-knowing-by-heart">Patterns worth knowing by heart</a></li><li><a href="#phrasebook-postgresql-and-sqlite-side-by-side">Phrasebook: PostgreSQL and SQLite side by side</a></li><li><a href="#pitfalls-checklist">Pitfalls checklist</a></li></ol></nav>
+<p>SQL looks like English, which is exactly why it misleads: you write <code>SELECT</code> first, but the database runs it almost last. Most SQL bugs come from a handful of places where the written order, NULLs or a default setting do something you did not expect. This page collects them, together with the window functions and query shapes that come up again and again in analytics work.</p>
+<p>Nothing here is taken on trust. Each query is shown as plain SQL, then run against an in-memory SQLite database from Python, with asserts on the result. The queries are written in the large subset that PostgreSQL and SQLite share. Where the two differ, the PostgreSQL form is given in a block whose first line says <b>PostgreSQL only</b>, and the phrasebook near the end lines up the date, string and cast functions side by side.</p>
+<h2 id="the-tables">The tables</h2>
+<p>Three small tables carry most of the examples. <code>employees</code> has a self-reference (<code>manager_id</code>) and one missing salary:</p>
+<table><thead><tr><th>id</th><th>name</th><th>dept</th><th>salary</th><th>manager_id</th></tr></thead><tbody><tr><td>1</td><td>Ana</td><td>eng</td><td>120</td><td>NULL</td></tr><tr><td>2</td><td>Ben</td><td>eng</td><td>100</td><td>1</td></tr><tr><td>3</td><td>Cy</td><td>eng</td><td>100</td><td>1</td></tr><tr><td>4</td><td>Dee</td><td>sales</td><td>90</td><td>1</td></tr><tr><td>5</td><td>Eve</td><td>sales</td><td>70</td><td>4</td></tr><tr><td>6</td><td>Fay</td><td>ops</td><td>NULL</td><td>4</td></tr><tr><td>7</td><td>Gus</td><td>ops</td><td>60</td><td>4</td></tr></tbody></table>
+<p><code>orders</code> holds seven orders from two shops across three months, with two orders on the same day so ties show up. <code>logins</code> holds one row per login.</p>
+<pre><code class="language-python">import sqlite3
+
+import numpy as np
+import pandas as pd
+from scipy.spatial.distance import pdist
+
+db = sqlite3.connect(":memory:")
+db.executescript("""
+CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT, dept TEXT, salary INTEGER, manager_id INTEGER);
+INSERT INTO employees VALUES
+  (1, 'Ana', 'eng', 120, NULL), (2, 'Ben', 'eng', 100, 1), (3, 'Cy', 'eng', 100, 1),
+  (4, 'Dee', 'sales', 90, 1), (5, 'Eve', 'sales', 70, 4), (6, 'Fay', 'ops', NULL, 4),
+  (7, 'Gus', 'ops', 60, 4);
+
+CREATE TABLE orders (id INTEGER PRIMARY KEY, shop TEXT, day TEXT, amount INTEGER);
+INSERT INTO orders VALUES
+  (1, 'A', '2026-01-05', 10), (2, 'A', '2026-01-20', 20), (3, 'A', '2026-01-20', 5),
+  (4, 'A', '2026-02-03', 30), (5, 'A', '2026-03-11', 15),
+  (6, 'B', '2026-01-07', 7), (7, 'B', '2026-02-14', 3);
+
+CREATE TABLE logins (user_id TEXT, day TEXT);
+INSERT INTO logins VALUES
+  ('u1', '2026-01-01'), ('u1', '2026-01-02'), ('u1', '2026-01-02'), ('u1', '2026-01-03'),
+  ('u1', '2026-01-05'), ('u1', '2026-01-06'), ('u2', '2026-01-02');
+""")
+
+
+def q(sql, params=()):
+    return db.execute(sql, params).fetchall()
+
+
+assert sqlite3.sqlite_version_info &gt;= (3, 44)   # window functions, FILTER, NULLS LAST, IS NOT DISTINCT FROM, concat()</code></pre>
+<h2 id="the-order-a-query-is-evaluated-in">The order a query is evaluated in</h2>
+<p>A <code>SELECT</code> statement is written in one order and evaluated, logically, in another:</p>
+<pre><code class="language-plaintext">1. FROM, JOIN          build the rows
+2. WHERE               keep some rows
+3. GROUP BY            form groups
+4. aggregates, HAVING  compute COUNT, SUM, ... per group, then keep some groups
+5. window functions    computed over the rows that survived steps 1 to 4
+6. SELECT list         compute output columns and name them
+7. DISTINCT
+8. UNION, INTERSECT, EXCEPT
+9. ORDER BY            the only clause that can always use SELECT aliases
+10. LIMIT, OFFSET      (standard SQL spells it FETCH FIRST n ROWS ONLY)</code></pre>
+<p>The optimizer is free to do the work in any order that gives the same answer; this list says what each clause can see. Four rules follow from it:</p>
+<ul><li><code>WHERE</code> runs before grouping, so it cannot filter on an aggregate. That is what <code>HAVING</code> is for, and in the text <code>HAVING</code> must come after <code>GROUP BY</code>.</li><li>Window functions run after <code>WHERE</code> and <code>HAVING</code>, so neither clause can filter on a window result. Compute the window in a subquery or CTE and filter outside it.</li><li>Because windows run after aggregation, a window can wrap an aggregate: <code>SUM(COUNT(*)) OVER ()</code> is the total of the group counts.</li><li>An alias defined in <code>SELECT</code> does not exist yet in <code>WHERE</code>. PostgreSQL rejects <code>WHERE alias &gt; 0</code>. SQLite quietly accepts it, which is a classic way for a query to pass locally and fail in production.</li></ul>
+<p>The query below gives each department's share of the salaried employees. Read it in evaluation order: <code>WHERE</code> drops Fay, grouping gives eng 3, sales 2 and ops 1, <code>HAVING</code> drops ops, and only then does the window add up the remaining counts.</p>
+<pre><code class="language-sql">SELECT dept,
+       COUNT(*) AS n,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) AS pct_of_kept,
+       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM employees WHERE salary IS NOT NULL), 1) AS pct_of_all
+FROM employees
+WHERE salary IS NOT NULL
+GROUP BY dept
+HAVING COUNT(*) &gt;= 2
+ORDER BY n DESC;</code></pre>
+<p>The two percentage columns differ for exactly that reason. The window total sees only the groups that survived <code>HAVING</code> (5 people), while the scalar subquery counts everyone with a salary (6 people). Decide which denominator you mean before writing either.</p>
+<pre><code class="language-python">share = """
+SELECT dept,
+       COUNT(*) AS n,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) AS pct_of_kept,
+       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM employees WHERE salary IS NOT NULL), 1) AS pct_of_all
+FROM employees
+WHERE salary IS NOT NULL
+GROUP BY dept
+HAVING COUNT(*) &gt;= 2
+ORDER BY n DESC;
+"""
+assert q(share) == [("eng", 3, 60.0, 50.0), ("sales", 2, 40.0, 33.3)]
+
+# a window result cannot be filtered in WHERE: it does not exist yet
+try:
+    q("SELECT name FROM employees WHERE RANK() OVER (ORDER BY salary DESC) = 1")
+    raise AssertionError("expected an error")
+except sqlite3.OperationalError as e:
+    assert "misuse of window function" in str(e)
+
+# SQLite lets WHERE see a SELECT alias; PostgreSQL would say the column does not exist
+assert q("SELECT name, salary * 2 AS doubled FROM employees WHERE doubled &gt; 200") == [("Ana", 240)]</code></pre>
+<h2 id="nulls-counting-comparing-and-not-in">NULLs: counting, comparing and NOT IN</h2>
+<p>NULL means "unknown", and almost every operator that touches an unknown returns unknown. Five consequences cover most surprises:</p>
+<ul><li><code>COUNT(*)</code> counts rows, whatever they contain. <code>COUNT(col)</code> counts the rows where <code>col</code> is not NULL, and <code>COUNT(DISTINCT col)</code> counts distinct non-NULL values.</li><li><code>AVG</code>, <code>SUM</code>, <code>MIN</code> and <code>MAX</code> skip NULLs. The average salary is 540 / 6 = 90, not 540 / 7. If a missing value should count as zero, say so with <code>COALESCE(salary, 0)</code>.</li><li><code>x = NULL</code> is never true, not even when <code>x</code> is NULL. Test with <code>IS NULL</code>, or compare two nullable columns with <code>IS NOT DISTINCT FROM</code>, which treats two NULLs as equal.</li><li><code>x NOT IN (subquery)</code> returns no rows at all if the subquery yields a single NULL, because <code>x &lt;&gt; NULL</code> is unknown. Use <code>NOT EXISTS</code> instead (next section).</li><li>PostgreSQL sorts NULL as larger than every value, so it comes last in ascending order and <b>first</b> in <code>ORDER BY ... DESC</code>. SQLite does the opposite. Write <code>NULLS LAST</code> or <code>NULLS FIRST</code> whenever NULLs can appear in a sort key.</li></ul>
+<pre><code class="language-sql">SELECT COUNT(*), COUNT(salary), COUNT(DISTINCT salary), AVG(salary), AVG(COALESCE(salary, 0))
+FROM employees;
+
+-- employees who manage nobody: returns nothing, because manager_id contains a NULL
+SELECT name FROM employees
+WHERE id NOT IN (SELECT manager_id FROM employees);</code></pre>
+<pre><code class="language-python">n_rows, n_salary, n_distinct, avg, avg_zero = q("""
+SELECT COUNT(*), COUNT(salary), COUNT(DISTINCT salary), AVG(salary), AVG(COALESCE(salary, 0))
+FROM employees;
+""")[0]
+assert (n_rows, n_salary, n_distinct, avg) == (7, 6, 5, 90.0)
+assert abs(avg_zero - 540 / 7) &lt; 1e-12
+
+assert q("""
+SELECT name FROM employees
+WHERE id NOT IN (SELECT manager_id FROM employees);
+""") == []
+assert q("SELECT COUNT(*) FROM employees WHERE manager_id = NULL") == [(0,)]
+assert q("SELECT COUNT(*) FROM employees WHERE manager_id IS NULL") == [(1,)]
+assert q("SELECT NULL IS NOT DISTINCT FROM NULL") == [(1,)]
+
+# NULL placement in a descending sort, made explicit
+assert q("SELECT name FROM employees ORDER BY salary DESC NULLS FIRST LIMIT 1") == [("Fay",)]
+assert q("SELECT name FROM employees ORDER BY salary DESC NULLS LAST LIMIT 1") == [("Ana",)]</code></pre>
+<h2 id="arithmetic-casts-and-case">Arithmetic, casts and CASE</h2>
+<p>An integer divided by an integer is an integer in both PostgreSQL and SQLite: <code>7 / 2</code> is 3. Make one side non-integer first, either with <code>1.0 * x / y</code> or <code>CAST(x AS REAL) / y</code>. Guard against division by zero with <code>NULLIF</code>: <code>x / NULLIF(y, 0)</code> returns NULL instead of an error.</p>
+<p>PostgreSQL also has the shorthand cast <code>x::numeric</code>, and one rule that catches people: two-argument <code>ROUND(x, n)</code> exists only for <code>numeric</code>, so rounding a <code>double precision</code> result, such as anything from <code>SQRT</code>, needs a cast first.</p>
+<pre><code class="language-sql">-- PostgreSQL only
+SELECT ROUND(SQRT(2)::numeric, 2);   -- 1.41
+SELECT ROUND(SQRT(2), 2);            -- error: function round(double precision, integer) does not exist</code></pre>
+<p><code>CASE</code> is SQL's if-else, and inside an aggregate it turns rows into columns, often called conditional aggregation or a pivot. The standard <code>FILTER</code> clause says the same thing more directly and works in both databases.</p>
+<pre><code class="language-sql">SELECT dept,
+       SUM(CASE WHEN salary &gt;= 90 THEN 1 ELSE 0 END) AS senior,
+       COUNT(*) FILTER (WHERE salary &lt; 90) AS junior,
+       CASE WHEN MAX(salary) &gt;= 100 THEN 'high' ELSE 'normal' END AS band
+FROM employees
+GROUP BY dept
+ORDER BY dept;</code></pre>
+<pre><code class="language-python">assert q("SELECT 7 / 2, 1.0 * 7 / 2, CAST(7 AS REAL) / 2, 7 / NULLIF(0, 0)") == [(3, 3.5, 3.5, None)]
+
+assert q("""
+SELECT dept,
+       SUM(CASE WHEN salary &gt;= 90 THEN 1 ELSE 0 END) AS senior,
+       COUNT(*) FILTER (WHERE salary &lt; 90) AS junior,
+       CASE WHEN MAX(salary) &gt;= 100 THEN 'high' ELSE 'normal' END AS band
+FROM employees
+GROUP BY dept
+ORDER BY dept;
+""") == [("eng", 3, 0, "high"), ("ops", 0, 1, "normal"), ("sales", 1, 1, "normal")]</code></pre>
+<p>Fay's NULL salary falls through every <code>CASE</code> branch to <code>ELSE 0</code>, and fails the <code>FILTER</code> test too, so ops counts one junior and no seniors.</p>
+<h2 id="joins-self-joins-and-anti-joins">Joins, self joins and anti-joins</h2>
+<p><code>INNER JOIN</code> keeps matching pairs, <code>LEFT JOIN</code> also keeps unmatched left rows with NULLs on the right, <code>FULL JOIN</code> keeps unmatched rows from both sides, and <code>CROSS JOIN</code> pairs every row with every row. A self join is an ordinary join of a table with itself under two aliases, here to put each employee next to their manager:</p>
+<pre><code class="language-sql">SELECT e.name, m.name AS manager
+FROM employees AS e
+LEFT JOIN employees AS m ON m.id = e.manager_id
+ORDER BY e.id;</code></pre>
+<p>With a <code>LEFT JOIN</code>, where a condition goes matters. A condition on the right table in <code>ON</code> decides which rows match; the same condition in <code>WHERE</code> runs after the join, throws away the NULL-padded rows and quietly turns the query into an inner join. And <code>COUNT(*)</code> counts the padded row, so count a right-side column instead.</p>
+<pre><code class="language-sql">-- well-paid direct reports per employee
+SELECT m.name, COUNT(r.id) AS reports
+FROM employees AS m
+LEFT JOIN employees AS r ON r.manager_id = m.id AND r.salary &gt;= 80
+GROUP BY m.id, m.name
+ORDER BY m.id;</code></pre>
+<p>An <b>anti-join</b> keeps rows with no match. <code>NOT EXISTS</code> is the safe default: it is immune to the NULL trap above, and most planners run it as an efficient anti-join. A <code>LEFT JOIN ... WHERE right.key IS NULL</code> gives the same rows. For the positive case, <code>EXISTS</code> and <code>IN</code> usually get the same plan in a modern database; what differs is the NULL behaviour of <code>NOT IN</code>, not speed.</p>
+<pre><code class="language-sql">SELECT e.name
+FROM employees AS e
+WHERE NOT EXISTS (SELECT 1 FROM employees AS r WHERE r.manager_id = e.id)
+ORDER BY e.id;</code></pre>
+<p>A cross join with a filter compares every pair of rows, for example to find the closest two points. Pair rows by <code>a.id &lt; b.id</code>: it skips each row against itself and visits each pair once. Excluding self-pairs by comparing coordinates instead would also skip two different points that sit at the same place, and miss a true distance of zero.</p>
+<pre><code class="language-sql">SELECT ROUND(MIN(SQRT(POWER(a.x - b.x, 2) + POWER(a.y - b.y, 2))), 2) AS shortest
+FROM points AS a
+JOIN points AS b ON a.id &lt; b.id;
+-- PostgreSQL only: ROUND(MIN(SQRT(...))::numeric, 2)</code></pre>
+<pre><code class="language-python">assert q("""
+SELECT e.name, m.name AS manager
+FROM employees AS e
+LEFT JOIN employees AS m ON m.id = e.manager_id
+ORDER BY e.id;
+""") == [("Ana", None), ("Ben", "Ana"), ("Cy", "Ana"), ("Dee", "Ana"),
+         ("Eve", "Dee"), ("Fay", "Dee"), ("Gus", "Dee")]
+
+on_version = q("""
+SELECT m.name, COUNT(r.id) AS reports
+FROM employees AS m
+LEFT JOIN employees AS r ON r.manager_id = m.id AND r.salary &gt;= 80
+GROUP BY m.id, m.name
+ORDER BY m.id;
+""")
+assert on_version == [("Ana", 3), ("Ben", 0), ("Cy", 0), ("Dee", 0), ("Eve", 0), ("Fay", 0), ("Gus", 0)]
+
+where_version = q("""SELECT m.name, COUNT(r.id) FROM employees AS m
+LEFT JOIN employees AS r ON r.manager_id = m.id WHERE r.salary &gt;= 80
+GROUP BY m.id, m.name ORDER BY m.id""")
+assert where_version == [("Ana", 3)]                  # everyone else vanished
+
+count_star = q("""SELECT m.name, COUNT(*) FROM employees AS m
+LEFT JOIN employees AS r ON r.manager_id = m.id AND r.salary &gt;= 80
+GROUP BY m.id, m.name ORDER BY m.id""")
+assert dict(count_star)["Ben"] == 1                   # the NULL-padded row was counted
+
+not_exists = q("""
+SELECT e.name
+FROM employees AS e
+WHERE NOT EXISTS (SELECT 1 FROM employees AS r WHERE r.manager_id = e.id)
+ORDER BY e.id;
+""")
+left_join_null = q("""SELECT e.name FROM employees AS e
+LEFT JOIN employees AS r ON r.manager_id = e.id WHERE r.id IS NULL ORDER BY e.id""")
+assert not_exists == left_join_null == [("Ben",), ("Cy",), ("Eve",), ("Fay",), ("Gus",)]
+
+pts = [(1, 0, 0), (2, 3, 4), (3, 1, 1), (4, 5, 5), (5, 3, 4)]   # points 2 and 5 coincide
+db.execute("CREATE TABLE points (id INTEGER PRIMARY KEY, x REAL, y REAL)")
+db.executemany("INSERT INTO points VALUES (?, ?, ?)", pts)
+shortest = q("""
+SELECT ROUND(MIN(SQRT(POWER(a.x - b.x, 2) + POWER(a.y - b.y, 2))), 2) AS shortest
+FROM points AS a
+JOIN points AS b ON a.id &lt; b.id;
+""")[0][0]
+assert shortest == round(pdist(np.array(pts)[:, 1:]).min(), 2) == 0.0
+by_coords = q("""SELECT ROUND(MIN(SQRT(POWER(a.x - b.x, 2) + POWER(a.y - b.y, 2))), 2)
+FROM points AS a, points AS b WHERE (a.x, a.y) &lt;&gt; (b.x, b.y)""")[0][0]
+assert by_coords == 1.41                              # the coincident pair was skipped</code></pre>
+<h2 id="window-functions">Window functions</h2>
+<p>A window function computes a value for each row from a set of related rows, without collapsing them the way <code>GROUP BY</code> does. The full shape, supported by PostgreSQL 11 and later and SQLite 3.30 and later (SQLite gained the <code>GROUPS</code> and <code>EXCLUDE</code> frame options in 3.28 and <code>NULLS FIRST | LAST</code> in 3.30):</p>
+<pre><code class="language-plaintext">function(args) OVER (
+    [PARTITION BY expr, ...]                                -- separate windows, like GROUP BY
+    [ORDER BY expr [ASC | DESC] [NULLS FIRST | LAST], ...]  -- order inside each window
+    [ROWS | RANGE | GROUPS BETWEEN frame_start AND frame_end]
+    [EXCLUDE NO OTHERS | CURRENT ROW | GROUP | TIES]
+)
+frame_start, frame_end:  UNBOUNDED PRECEDING | n PRECEDING | CURRENT ROW
+                         | n FOLLOWING | UNBOUNDED FOLLOWING</code></pre>
+<h3 id="ranking">Ranking</h3>
+<p><code>ROW_NUMBER</code> numbers rows 1, 2, 3 with no ties. <code>RANK</code> gives tied rows the same number and then skips (1, 2, 2, 4). <code>DENSE_RANK</code> does not skip (1, 2, 2, 3). <code>NTILE(k)</code> deals rows into <code>k</code> buckets as evenly as possible by row count, so it ignores ties: two equal salaries can land in different quartiles. Give <code>ROW_NUMBER</code> and <code>NTILE</code> a unique sort key, or the result can change between runs.</p>
+<pre><code class="language-sql">SELECT name, salary,
+       ROW_NUMBER() OVER (ORDER BY salary DESC, id) AS row_num,
+       RANK()       OVER (ORDER BY salary DESC)     AS rnk,
+       DENSE_RANK() OVER (ORDER BY salary DESC)     AS dense,
+       NTILE(4)     OVER (ORDER BY salary DESC, id) AS quartile
+FROM employees
+WHERE salary IS NOT NULL
+ORDER BY salary DESC, id;</code></pre>
+<pre><code class="language-python">assert q("""
+SELECT name, salary,
+       ROW_NUMBER() OVER (ORDER BY salary DESC, id) AS row_num,
+       RANK()       OVER (ORDER BY salary DESC)     AS rnk,
+       DENSE_RANK() OVER (ORDER BY salary DESC)     AS dense,
+       NTILE(4)     OVER (ORDER BY salary DESC, id) AS quartile
+FROM employees
+WHERE salary IS NOT NULL
+ORDER BY salary DESC, id;
+""") == [("Ana", 120, 1, 1, 1, 1), ("Ben", 100, 2, 2, 2, 1), ("Cy", 100, 3, 2, 2, 2),
+         ("Dee", 90, 4, 4, 3, 2), ("Eve", 70, 5, 5, 4, 3), ("Gus", 60, 6, 6, 5, 4)]</code></pre>
+<p>Six rows into four buckets gives sizes 2, 2, 1, 1: the remainder goes to the first buckets.</p>
+<h3 id="frames-rows-range-and-the-default">Frames: ROWS, RANGE and the default</h3>
+<p>An aggregate used as a window, such as <code>SUM(...) OVER (...)</code>, adds up the rows in the current row's <b>frame</b>. With no <code>ORDER BY</code> the frame is the whole partition. With an <code>ORDER BY</code> and no frame clause, the default is <code>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code>, and <code>RANGE</code> includes the current row's <b>peers</b>, the rows that tie with it on the sort key. A running total over a key with ties therefore jumps by the whole tied group at once. <code>ROWS</code> counts physical rows instead, and <code>GROUPS</code> counts peer groups.</p>
+<pre><code class="language-sql">SELECT id, day, amount,
+       SUM(amount) OVER (ORDER BY day) AS range_total,
+       SUM(amount) OVER (ORDER BY day, id
+                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rows_total,
+       AVG(amount) OVER (ORDER BY day, id
+                         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS moving_avg_3
+FROM orders
+WHERE shop = 'A'
+ORDER BY day, id;</code></pre>
+<p>The default frame is also why <code>LAST_VALUE</code> looks broken: the frame ends at the current row, or at its last peer when the sort key has ties, so the "last value" is the current row's own value (or a tied row's). Widen the frame to the whole partition, or use <code>FIRST_VALUE</code> with the order reversed.</p>
+<pre><code class="language-sql">SELECT shop, id,
+       LAST_VALUE(amount) OVER (PARTITION BY shop ORDER BY day, id) AS default_frame,
+       LAST_VALUE(amount) OVER (PARTITION BY shop ORDER BY day, id
+                                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_in_shop
+FROM orders
+ORDER BY shop, day, id;</code></pre>
+<pre><code class="language-python">frames = q("""
+SELECT id, day, amount,
+       SUM(amount) OVER (ORDER BY day) AS range_total,
+       SUM(amount) OVER (ORDER BY day, id
+                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rows_total,
+       AVG(amount) OVER (ORDER BY day, id
+                         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS moving_avg_3
+FROM orders
+WHERE shop = 'A'
+ORDER BY day, id;
+""")
+ids, days, amounts, range_total, rows_total, moving = map(list, zip(*frames))
+assert range_total == [10, 35, 35, 65, 80]            # the two 2026-01-20 orders arrive together
+assert rows_total == [10, 30, 35, 65, 80]
+
+# the same three columns from pandas
+a = pd.DataFrame({"day": days, "amount": amounts})
+assert rows_total == a.amount.cumsum().tolist()
+assert range_total == a.groupby("day").amount.sum().cumsum().reindex(a.day).tolist()
+assert np.allclose(moving, a.amount.rolling(3, min_periods=1).mean())
+
+assert q("""
+SELECT shop, id,
+       LAST_VALUE(amount) OVER (PARTITION BY shop ORDER BY day, id) AS default_frame,
+       LAST_VALUE(amount) OVER (PARTITION BY shop ORDER BY day, id
+                                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_in_shop
+FROM orders
+ORDER BY shop, day, id;
+""") == [("A", 1, 10, 15), ("A", 2, 20, 15), ("A", 3, 5, 15), ("A", 4, 30, 15), ("A", 5, 15, 15),
+         ("B", 6, 7, 3), ("B", 7, 3, 3)]
+
+# GROUPS counts peer groups: the previous date that has orders plus the current date, whatever the row count
+# with ties on the sort key the default frame ends at the last peer, so both 2026-01-20 orders
+# get the same LAST_VALUE, and at least one of them is not its own amount
+tied = dict(q("""SELECT id, LAST_VALUE(amount) OVER (ORDER BY day) FROM orders
+WHERE shop = 'A' AND day = '2026-01-20'"""))
+assert tied[2] == tied[3] and tied[2] in (20, 5)
+
+assert [r[0] for r in q("""SELECT SUM(amount) OVER (ORDER BY day GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW)
+FROM orders WHERE shop = 'A' ORDER BY day, id""")] == [10, 35, 35, 55, 45]</code></pre>
+<h3 id="looking-back-with-lag">Looking back with LAG</h3>
+<p><code>LAG(x, n, default)</code> reads <code>x</code> from <code>n</code> rows earlier in the partition and <code>LEAD</code> reads ahead. They replace the old self join on <code>id = previous.id + 1</code>, which breaks the moment an id is missing. Month-over-month change is the standard use. The <code>WINDOW</code> clause names a window once so it can be reused:</p>
+<pre><code class="language-sql">WITH monthly AS (
+    SELECT strftime('%Y-%m', day) AS month, SUM(amount) AS revenue
+    FROM orders
+    GROUP BY month
+)
+SELECT month, revenue,
+       revenue - LAG(revenue) OVER w AS change,
+       ROUND(100.0 * (revenue - LAG(revenue) OVER w) / LAG(revenue) OVER w, 1) AS pct_change
+FROM monthly
+WINDOW w AS (ORDER BY month)
+ORDER BY month;</code></pre>
+<p>In PostgreSQL write <code>TO_CHAR(day, 'YYYY-MM')</code> or <code>DATE_TRUNC('month', day)</code> for the month. <code>LAG</code> means the previous <b>row</b>, not the previous month: if a month has no orders it has no row, and the comparison silently spans two months. Join to a calendar of months first when gaps are possible.</p>
+<pre><code class="language-python">assert q("""
+WITH monthly AS (
+    SELECT strftime('%Y-%m', day) AS month, SUM(amount) AS revenue
+    FROM orders
+    GROUP BY month
+)
+SELECT month, revenue,
+       revenue - LAG(revenue) OVER w AS change,
+       ROUND(100.0 * (revenue - LAG(revenue) OVER w) / LAG(revenue) OVER w, 1) AS pct_change
+FROM monthly
+WINDOW w AS (ORDER BY month)
+ORDER BY month;
+""") == [("2026-01", 42, None, None), ("2026-02", 33, -9, -21.4), ("2026-03", 15, -18, -54.5)]</code></pre>
+<h2 id="patterns-worth-knowing-by-heart">Patterns worth knowing by heart</h2>
+<h3 id="nth-highest-value">Nth highest value</h3>
+<p>"Second highest salary" (LeetCode <a href="https://leetcode.com/problems/second-highest-salary/">176</a>) has two traps: ties, and the case where there is no second value, which should give NULL rather than no row. <code>DENSE_RANK</code> handles ties, and an outer <code>MAX</code> turns "no rows" into a single NULL, because an aggregate over an empty set still returns one row. Remember the alias on the subquery: PostgreSQL before version 16 requires one on every subquery in <code>FROM</code>.</p>
+<pre><code class="language-sql">SELECT MAX(salary) AS nth_highest
+FROM (
+    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS r
+    FROM employees
+    WHERE salary IS NOT NULL
+) AS ranked
+WHERE r = :n;</code></pre>
+<h3 id="top-n-per-group">Top N per group</h3>
+<p>The same ranking with <code>PARTITION BY</code> gives the top earners per department. Choose the function by what a tie should do: <code>ROW_NUMBER</code> returns at most N rows per group, never more even with ties, <code>DENSE_RANK</code> returns everyone in the top N salary levels.</p>
+<pre><code class="language-sql">SELECT dept, name, salary
+FROM (
+    SELECT dept, name, salary,
+           DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS r
+    FROM employees
+    WHERE salary IS NOT NULL
+) AS ranked
+WHERE r &lt;= 2
+ORDER BY dept, salary DESC, name;</code></pre>
+<pre><code class="language-python">nth_sql = """
+SELECT MAX(salary) AS nth_highest
+FROM (
+    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS r
+    FROM employees
+    WHERE salary IS NOT NULL
+) AS ranked
+WHERE r = :n;
+"""
+distinct_desc = sorted({s for (s,) in q("SELECT salary FROM employees WHERE salary IS NOT NULL")}, reverse=True)
+for n in range(1, 8):                                  # brute force, including n past the end
+    expected = distinct_desc[n - 1] if n &lt;= len(distinct_desc) else None
+    assert q(nth_sql, {"n": n}) == [(expected,)]
+assert q(nth_sql, {"n": 2}) == [(100,)]
+
+assert q("""
+SELECT dept, name, salary
+FROM (
+    SELECT dept, name, salary,
+           DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS r
+    FROM employees
+    WHERE salary IS NOT NULL
+) AS ranked
+WHERE r &lt;= 2
+ORDER BY dept, salary DESC, name;
+""") == [("eng", "Ana", 120), ("eng", "Ben", 100), ("eng", "Cy", 100),
+         ("ops", "Gus", 60), ("sales", "Dee", 90), ("sales", "Eve", 70)]</code></pre>
+<h3 id="gaps-and-islands-consecutive-streaks">Gaps and islands: consecutive streaks</h3>
+<p>To find runs of consecutive days, number each user's days in order and subtract the number from the date. Within a run both go up by one per row, so the difference stays constant, and it changes at every gap. Grouping by that difference gives one row per streak. Remove duplicate days first, or a repeated day breaks the arithmetic.</p>
+<pre><code class="language-sql">WITH days AS (
+    SELECT DISTINCT user_id, day FROM logins
+),
+numbered AS (
+    SELECT user_id, day,
+           julianday(day) - ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY day) AS island
+    FROM days
+)
+SELECT user_id, MIN(day) AS start, COUNT(*) AS length
+FROM numbered
+GROUP BY user_id, island
+ORDER BY user_id, start;</code></pre>
+<p>In PostgreSQL, with <code>day</code> a <code>date</code> column, write <code>day - (ROW_NUMBER() OVER (...))::int</code>, which is again a date.</p>
+<pre><code class="language-python">islands = q("""
+WITH days AS (
+    SELECT DISTINCT user_id, day FROM logins
+),
+numbered AS (
+    SELECT user_id, day,
+           julianday(day) - ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY day) AS island
+    FROM days
+)
+SELECT user_id, MIN(day) AS start, COUNT(*) AS length
+FROM numbered
+GROUP BY user_id, island
+ORDER BY user_id, start;
+""")
+assert islands == [("u1", "2026-01-01", 3), ("u1", "2026-01-05", 2), ("u2", "2026-01-02", 1)]
+
+# brute force: walk each user's sorted days and cut at every gap
+from datetime import date
+
+brute = []
+for user in ["u1", "u2"]:
+    ds = sorted({date.fromisoformat(d) for (d,) in q("SELECT day FROM logins WHERE user_id = ?", (user,))})
+    start = prev = ds[0]
+    for d in ds[1:] + [None]:
+        if d is None or (d - prev).days != 1:
+            brute.append((user, start.isoformat(), (prev - start).days + 1))
+            start = d
+        prev = d
+assert brute == islands</code></pre>
+<h3 id="finding-and-removing-duplicates">Finding and removing duplicates</h3>
+<p><code>GROUP BY</code> the identifying columns with <code>HAVING COUNT(*) &gt; 1</code> lists the duplicates. To delete all but the first copy, delete every row that has an earlier twin. Normalize before comparing: here emails differ only in case.</p>
+<pre><code class="language-sql">SELECT LOWER(email) AS email, COUNT(*) AS copies
+FROM contacts
+GROUP BY LOWER(email)
+HAVING COUNT(*) &gt; 1;
+
+DELETE FROM contacts
+WHERE EXISTS (
+    SELECT 1 FROM contacts AS keep
+    WHERE LOWER(keep.email) = LOWER(contacts.email)
+      AND keep.id &lt; contacts.id
+);</code></pre>
+<pre><code class="language-sql">-- PostgreSQL only: DELETE ... USING joins the table to itself
+DELETE FROM contacts AS dup
+USING contacts AS keep
+WHERE LOWER(dup.email) = LOWER(keep.email)
+  AND dup.id &gt; keep.id;</code></pre>
+<pre><code class="language-python">db.execute("CREATE TABLE contacts (id INTEGER PRIMARY KEY, email TEXT)")
+db.executemany("INSERT INTO contacts VALUES (?, ?)",
+               [(1, "a@x.org"), (2, "b@x.org"), (3, "A@x.org"), (4, "a@x.org"), (5, "b@x.org")])
+assert q("""
+SELECT LOWER(email) AS email, COUNT(*) AS copies
+FROM contacts
+GROUP BY LOWER(email)
+HAVING COUNT(*) &gt; 1;
+""") == [("a@x.org", 3), ("b@x.org", 2)]
+db.execute("""
+DELETE FROM contacts
+WHERE EXISTS (
+    SELECT 1 FROM contacts AS keep
+    WHERE LOWER(keep.email) = LOWER(contacts.email)
+      AND keep.id &lt; contacts.id
+);
+""")
+assert q("SELECT id, email FROM contacts ORDER BY id") == [(1, "a@x.org"), (2, "b@x.org")]</code></pre>
+<p>Run the <code>SELECT</code> first and the <code>DELETE</code> inside a transaction, so a wrong condition can be rolled back.</p>
+<h2 id="phrasebook-postgresql-and-sqlite-side-by-side">Phrasebook: PostgreSQL and SQLite side by side</h2>
+<p>Dates, strings and casts are where dialects drift furthest. The PostgreSQL column is not run here; the SQLite column is checked below.</p>
+<table><thead><tr><th>Task</th><th>PostgreSQL</th><th>SQLite</th></tr></thead><tbody><tr><td>Year-month text</td><td><code>TO_CHAR(d, 'YYYY-MM')</code></td><td><code>strftime('%Y-%m', d)</code></td></tr><tr><td>Truncate to month</td><td><code>DATE_TRUNC('month', d)</code></td><td><code>date(d, 'start of month')</code></td></tr><tr><td>Year as a number</td><td><code>EXTRACT(YEAR FROM d)</code></td><td><code>CAST(strftime('%Y', d) AS INTEGER)</code></td></tr><tr><td>Minute of a timestamp</td><td><code>EXTRACT(MINUTE FROM ts)</code></td><td><code>CAST(strftime('%M', ts) AS INTEGER)</code></td></tr><tr><td>Days between dates</td><td><code>d2 - d1</code> on two <code>date</code> values</td><td><code>julianday(d2) - julianday(d1)</code></td></tr><tr><td>Add a month</td><td><code>d + INTERVAL '1 month'</code></td><td><code>date(d, '+1 month')</code></td></tr><tr><td>Day of week</td><td><code>TO_CHAR(d, 'FMDay')</code> gives <code>Monday</code></td><td><code>strftime('%w', d)</code> gives 0 to 6, Sunday is 0</td></tr><tr><td>Current time</td><td><code>NOW()</code>, in the session time zone</td><td><code>datetime('now')</code>, in UTC</td></tr><tr><td>Cast</td><td><code>x::numeric</code> or <code>CAST(x AS numeric)</code></td><td><code>CAST(x AS REAL)</code></td></tr><tr><td>Largest of several columns</td><td><code>GREATEST(a, b, c)</code></td><td><code>MAX(a, b, c)</code></td></tr><tr><td>Substring position</td><td><code>POSITION('at' IN 'data')</code></td><td><code>instr('data', 'at')</code></td></tr><tr><td>Substring</td><td><code>SUBSTRING(s FROM 2 FOR 3)</code></td><td><code>substr(s, 2, 3)</code></td></tr><tr><td>Replace text</td><td><code>REPLACE('data', 'a', 'x')</code> gives <code>dxtx</code></td><td>the same</td></tr></tbody></table>
+<p>Three rows hide real differences, not just spelling. <code>GREATEST</code> skips NULLs in PostgreSQL, while SQLite's multi-argument <code>MAX</code> returns NULL if any argument is NULL. Adding a month to January 31 gives February 28 in PostgreSQL but overflows to March 3 in SQLite. And the <code>||</code> operator returns NULL if either side is NULL, while <code>CONCAT</code> skips NULLs, in both databases. PostgreSQL's <code>AGE(a, b)</code>, which returns a calendar interval such as <code>10 mons 9 days</code>, has no SQLite counterpart.</p>
+<pre><code class="language-python">d = "2025-11-10 15:47:00"
+assert q("SELECT strftime('%Y-%m', ?), date(?, 'start of month')", (d, d)) == [("2025-11", "2025-11-01")]
+assert q("SELECT CAST(strftime('%Y', ?) AS INTEGER), CAST(strftime('%M', ?) AS INTEGER)", (d, d)) == [(2025, 47)]
+assert q("SELECT julianday('2025-11-10') - julianday('2025-01-01')") == [(313.0,)]
+assert (date(2025, 11, 10) - date(2025, 1, 1)).days == 313
+assert q("SELECT strftime('%w', '2025-11-10')") == [("1",)] and date(2025, 11, 10).strftime("%A") == "Monday"
+assert q("SELECT MAX(2, 8, 3), MIN(2, 8, 3), MAX(1, NULL)") == [(8, 2, None)]
+assert q("SELECT instr('data', 'at'), substr('abcdef', 2, 3), replace('data', 'a', 'x')") == [(2, "bcd", "dxtx")]
+assert q("SELECT date('2026-01-31', '+1 month')") == [("2026-03-03",)]
+assert q("SELECT 'a' || NULL, concat('a', NULL)") == [(None, "a")]
+assert q("SELECT CAST('123' AS INTEGER) + 1") == [(124,)]</code></pre>
+<h2 id="pitfalls-checklist">Pitfalls checklist</h2>
+<ul><li>Filtering on an aggregate in <code>WHERE</code>, or on a window result in <code>WHERE</code> or <code>HAVING</code>. Use <code>HAVING</code> for the first and a CTE for the second.</li><li>Integer division: <code>COUNT(*) / total</code> is 0 for any share under 100%. Multiply by <code>100.0</code> first.</li><li><code>NOT IN</code> against a column that can hold NULL. Use <code>NOT EXISTS</code>.</li><li>A right-table condition in the <code>WHERE</code> of a <code>LEFT JOIN</code>, and <code>COUNT(*)</code> over a <code>LEFT JOIN</code>. Move the condition into <code>ON</code> and count a right-side column.</li><li>Forgetting the default frame. With <code>ORDER BY</code> it is <code>RANGE ... CURRENT ROW</code>, so ties move together and <code>LAST_VALUE</code> returns the current row's value (or its last peer's).</li><li><code>ROW_NUMBER</code> or <code>NTILE</code> without a unique sort key: the output can change between runs.</li><li>NULL sort order: last in ascending PostgreSQL sorts, first in descending ones, the reverse in SQLite. Say <code>NULLS LAST</code>.</li><li><code>LAG</code> steps back one row, not one period. Fill in missing periods first.</li><li>A query that only works because SQLite is lenient, such as a <code>SELECT</code> alias used in <code>WHERE</code>. Test on the database you will deploy to.</li></ul>
+<p>The same operations in pandas are in the <a href="../pandas-cheatsheet/">pandas cheatsheet</a>. The free interactive book <a href="https://selectstarsql.com/">Select Star SQL</a> and the PostgreSQL and SQLite documentation on window functions informed this page; the examples, data and explanations here are written fresh.</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

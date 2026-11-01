@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoRA explained: why low rank, how it starts, and where it goes · r03922123</title>
+<meta name="description" content="The ideas behind low-rank adaptation rather than the code: why a fine-tuning update can be squeezed into two thin matrices, what that costs when it cannot, why B starts at zero, what the alpha over r scale really does, which layers to adapt, and the variants that change each of these choices.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · LLMs and generative AI</p>
+<header class="post-head">
+  <h1>LoRA explained: why low rank, how it starts, and where it goes</h1>
+  <div class="meta">November 1, 2026 · 12 min read · LoRA · fine-tuning · PEFT · LLM</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-bet-the-update-is-low-rank">The bet: the update is low rank</a></li><li><a href="#what-it-saves">What it saves</a></li><li><a href="#initialization-why-b-starts-at-zero-and-a-does-not">Initialization: why B starts at zero and A does not</a></li><li><a href="#the-alpha-over-r-scale-is-a-learning-rate-knob">The alpha over r scale is a learning-rate knob</a></li><li><a href="#where-to-put-the-adapters">Where to put the adapters</a></li><li><a href="#merge-or-keep-the-adapter-separate">Merge, or keep the adapter separate</a></li><li><a href="#variants">Variants</a></li><li><a href="#when-to-use-it-and-pitfalls">When to use it, and pitfalls</a></li><li><a href="#references">References</a></li></ol></nav>
+<p>Fine-tuning a 7-billion-parameter model the ordinary way means a gradient and two optimizer moments for every parameter, and a full copy of the model per task. LoRA (Hu et al., 2021) freezes the pretrained weights and learns each layer's change as the product of two thin matrices. The trainable part shrinks by a factor of hundreds to thousands, and afterwards the change can be folded back into the weights, so the merged model runs exactly as fast as the original.</p>
+<p>The implementation, step by step with asserts, is in <a href="/posts/lora-from-scratch/">LoRA from scratch</a>. This post is the conceptual companion: why the trick works, what it gives up, and what each design choice (initialization, the \(\alpha / r\) scale, which layers to adapt) does to training.</p>
+<h2 id="the-bet-the-update-is-low-rank">The bet: the update is low rank</h2>
+<p>Take one linear layer with pretrained weight \(W_0 \in \mathbb{R}^{d \times k}\). Fine-tuning replaces it with \(W_0 + \Delta W\). LoRA restricts the change to rank \(r\):</p>
+\[ h = W_0 x + \frac{\alpha}{r} B A x, \qquad B \in \mathbb{R}^{d \times r},\; A \in \mathbb{R}^{r \times k},\; r \ll \min(d, k). \]
+<p>\(W_0\) is frozen; only \(A\) and \(B\) train. The product \(BA\) is a \(d \times k\) matrix, but its rank is at most \(r\): every column of \(BA\) is a combination of the \(r\) columns of \(B\). So the layer can only move its outputs within an \(r\)-dimensional subspace, which the training itself chooses.</p>
+<p>Why should that be enough? Work on <b>intrinsic dimension</b> suggested it would be. Li et al. (2018) found that many networks reach 90% of their usual performance while optimizing only a random low-dimensional slice of their parameters, and Aghajanyan et al. (2021) found that fine-tuning pretrained language models needs very few dimensions, fewer the larger the model. The pretrained model already holds the features, and a task mostly reweights a few directions. In the LoRA paper's GPT-3 experiments, adapters of rank 1 to 8 were competitive with full fine-tuning.</p>
+<p>It is a bet, not a theorem. A rank-\(r\) update can only capture as much of the ideal update as its top \(r\) singular values. By the Eckart–Young theorem, the best rank-\(r\) approximation keeps the \(r\) largest singular values and drops the rest, so the relative error is</p>
+\[ \frac{\lVert \Delta W - \Delta W_r \rVert_F}{\lVert \Delta W \rVert_F} = \sqrt{\frac{\sum_{i &gt; r} \sigma_i^2}{\sum_i \sigma_i^2}} . \]
+<p>With fast-decaying singular values a small \(r\) loses almost nothing; with a flat spectrum, rank 8 of 64 keeps an eighth of the energy. The block builds both kinds of "ideal update" and trains a rank-4 LoRA on each. Training reaches the Eckart–Young optimum and no further: the rank, not the optimizer, sets the limit.</p>
+<pre><code class="language-python">import math
+import torch
+import torch.nn as nn
+
+torch.set_num_threads(1)
+torch.manual_seed(0)
+d = k = 64
+
+
+def matrix_with_spectrum(sv):
+    U, _ = torch.linalg.qr(torch.randn(d, d))
+    V, _ = torch.linalg.qr(torch.randn(k, k))
+    return U @ torch.diag(sv / sv.norm()) @ V.T          # unit Frobenius norm
+
+
+def best_rank_r_error(M, r):                              # Eckart-Young, relative
+    s = torch.linalg.svdvals(M)
+    return (s[r:].norm() / s.norm()).item()
+
+
+i = torch.arange(d, dtype=torch.float32)
+decaying = matrix_with_spectrum(0.7 ** i)
+flat = matrix_with_spectrum(torch.ones(d))
+
+assert best_rank_r_error(decaying, 8) &lt; 0.06               # rank 8: under 6% error
+assert best_rank_r_error(flat, 8) &gt; 0.93                   # rank 8: over 93% error
+assert abs(best_rank_r_error(flat, 8) - math.sqrt(1 - 8 / 64)) &lt; 1e-4
+
+
+def fit_lora(target, r, steps=1500):
+    A = nn.Parameter(torch.randn(r, k) / math.sqrt(k))
+    B = nn.Parameter(torch.zeros(d, r))
+    opt = torch.optim.Adam([A, B], lr=1e-2)
+    for _ in range(steps):
+        loss = ((B @ A - target) ** 2).sum()
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    with torch.no_grad():
+        assert torch.linalg.matrix_rank(B @ A) &lt;= r
+        return ((B @ A - target).norm() / target.norm()).item()
+
+
+for target in (decaying, flat):
+    trained, optimum = fit_lora(target, r=4), best_rank_r_error(target, 4)
+    assert optimum - 1e-4 &lt;= trained &lt; optimum + 1e-3      # reaches the bound, cannot beat it</code></pre>
+<p>In a real model the ideal update is unknown, and nothing guarantees a decaying spectrum. Tasks close to what the model already does (a format, a style, a label set) tend to suit LoRA; absorbing a lot of new knowledge, such as a new language, likely needs a higher-rank change.</p>
+<h2 id="what-it-saves">What it saves</h2>
+<p>The savings are easy to count. One \(4096 \times 4096\) projection has 16,777,216 entries. At \(r = 8\), \(A\) and \(B\) together have \(8 \times (4096 + 4096) = 65{,}536\), exactly 256 times fewer. Across a model shaped like Llama 2 7B (32 blocks, hidden size 4096, MLP width 11008, a 32,000-token vocabulary):</p>
+<table><thead><tr><th>Adapted matrices</th><th>Rank</th><th>Trainable parameters</th><th>Share of the model</th><th>Adapter file (bf16)</th></tr></thead><tbody><tr><td>Query and value</td><td>8</td><td>4.2M</td><td>0.06%</td><td>8 MB</td></tr><tr><td>All seven linear layers per block</td><td>8</td><td>20.0M</td><td>0.30%</td><td>40 MB</td></tr><tr><td>All seven linear layers per block</td><td>64</td><td>159.9M</td><td>2.4%</td><td>320 MB</td></tr></tbody></table>
+<p>Memory is where this pays. Mixed-precision Adam costs about 16 bytes per trained parameter: bf16 weights and gradients (2 + 2), an fp32 master copy (4) and two fp32 moments (8), over 100 GB for 6.7B parameters before activations. With LoRA the frozen base costs 2 bytes per parameter and only the adapters pay 16. On GPT-3 175B the LoRA paper reports 10,000 times fewer trainable parameters and a third of the GPU memory.</p>
+<p>LoRA does <b>not</b> make the forward pass cheaper, nor the half of the backward pass that propagates gradients to the activations: those still flow through every frozen layer, and most activations are still stored. The compute saved is the frozen matrices' weight gradients, at most about a third of a training step; the LoRA paper measured a 25% training speedup on GPT-3 175B.</p>
+<pre><code class="language-python">hidden, mlp_width, n_layers, vocab = 4096, 11008, 32, 32_000
+attn_shapes = {name: (hidden, hidden) for name in ["q", "k", "v", "o"]}
+mlp_shapes = {"gate": (mlp_width, hidden), "up": (mlp_width, hidden), "down": (hidden, mlp_width)}
+all_shapes = {**attn_shapes, **mlp_shapes}
+
+linear = n_layers * sum(dd * kk for dd, kk in all_shapes.values())
+total = linear + 2 * vocab * hidden + (2 * n_layers + 1) * hidden   # untied embeddings, norms
+assert abs(total / 1e9 - 6.74) &lt; 0.01
+
+
+def lora_count(names, r):
+    return n_layers * sum(r * sum(all_shapes[n]) for n in names)
+
+
+assert 4096 * 4096 == 256 * (lora_count(["q"], 8) // n_layers)    # one matrix, 256x fewer
+qv8, all8, all64 = lora_count(["q", "v"], 8), lora_count(all_shapes, 8), lora_count(all_shapes, 64)
+assert qv8 == 4_194_304 and all8 == 19_988_480 and all64 == 8 * all8
+assert round(100 * qv8 / total, 2) == 0.06 and round(100 * all8 / total, 2) == 0.30
+assert round(2 * all8 / 1e6) == 40                                  # MB at 2 bytes per value
+
+full_ft_gb = 16 * total / 1e9                                       # weights, grads, master, moments
+lora_gb = (2 * total + 16 * all8) / 1e9
+assert full_ft_gb &gt; 100 and lora_gb &lt; 14</code></pre>
+<h2 id="initialization-why-b-starts-at-zero-and-a-does-not">Initialization: why B starts at zero and A does not</h2>
+<p>LoRA initializes \(A\) randomly (a Gaussian in the paper, Kaiming-uniform in common implementations) and \(B\) to zero. First, that makes \(BA = 0\), so training starts from exactly the pretrained model rather than a randomly perturbed one. Second, the gradients are asymmetric. With \(G = \partial L / \partial h\) for one input,</p>
+\[ \frac{\partial L}{\partial B} = \frac{\alpha}{r}\, G\, (Ax)^\top, \qquad \frac{\partial L}{\partial A} = \frac{\alpha}{r}\, B^\top G\, x^\top . \]
+<p>At \(B = 0\), \(A\) gets no gradient but \(B\) does, because \(Ax \neq 0\); after one step both train. If both started at zero, both gradients would stay zero forever: the origin is a stationary point of the factorization. Zero \(A\) with random \(B\) also starts from the pretrained model and trains, with the roles reversed, but the two are not equivalent in practice: Hayou, Ghosh and Yu (2024) showed that the standard choice (zero \(B\)) tolerates larger learning rates.</p>
+<pre><code class="language-python">def lora_layer(d_out, d_in, r, zero_A=False):
+    W0 = torch.randn(d_out, d_in) / math.sqrt(d_in)          # frozen
+    A = nn.Parameter(torch.zeros(r, d_in) if zero_A else torch.empty(r, d_in))
+    if not zero_A:
+        nn.init.kaiming_uniform_(A, a=math.sqrt(5))
+    B = nn.Parameter(torch.zeros(d_out, r))
+    return W0, A, B
+
+
+x, y = torch.randn(32, 48), torch.randn(32, 40)
+W0, A, B = lora_layer(40, 48, r=4)
+scale = 8 / 4
+h = x @ W0.T + scale * (x @ A.T) @ B.T
+assert torch.equal(h, x @ W0.T)                                 # the adapter adds exactly zero
+((h - y) ** 2).mean().backward()
+assert A.grad.abs().max() == 0 and B.grad.abs().max() &gt; 0       # only B learns on step one
+
+W0, A, B = lora_layer(40, 48, r=4, zero_A=True)                  # both zero: stuck for good
+opt = torch.optim.Adam([A, B], lr=1e-2)
+for _ in range(20):
+    loss = ((x @ W0.T + scale * (x @ A.T) @ B.T - y) ** 2).mean()
+    opt.zero_grad()
+    loss.backward()
+    opt.step()
+assert A.abs().max() == 0 and B.abs().max() == 0</code></pre>
+<h2 id="the-alpha-over-r-scale-is-a-learning-rate-knob">The alpha over r scale is a learning-rate knob</h2>
+<p>The adapter's output is multiplied by \(s = \alpha / r\). It is easiest to understand through the optimizer. Adam's step size is set by the learning rate \(\eta\), not by the gradient's size. On the first step \(A\) has zero gradient and every entry of \(B\) moves by about \(\pm \eta\), so the layer's change \(sBA\) is proportional to \(s\eta\): on that step, doubling \(\alpha\) is exactly the same as doubling the learning rate. Later the match is only approximate, because \(A\)'s own steps scale with \(\eta\) but not with \(\alpha\). That is why the paper calls tuning \(\alpha\) roughly the same as tuning the learning rate, sets \(\alpha\) once, and tunes the learning rate.</p>
+<p>The \(1/r\) is meant to save retuning when \(r\) changes, but it overcorrects. Each entry of \(BA\) sums \(r\) terms of roughly random sign, so it grows like \(\sqrt{r}\), not \(r\). Dividing by \(r\) shrinks the effective step like \(1/\sqrt{r}\), so higher ranks learn more slowly and their extra capacity can go unused. Kalajdzievski (2023) made this argument formally and proposed <b>rsLoRA</b>, scaling by \(\alpha / \sqrt{r}\). The block measures one Adam step, then the loss after 60, on a full-rank target:</p>
+<pre><code class="language-python">def run(r, s, lr=1e-3, steps=1, d_=128, seed=0):
+    torch.manual_seed(seed)
+    X = torch.randn(256, d_)
+    Y = X @ (torch.randn(d_, d_) / math.sqrt(d_)).T            # a full-rank change to learn
+    A = nn.Parameter(torch.empty(r, d_))
+    nn.init.kaiming_uniform_(A, a=math.sqrt(5))
+    B = nn.Parameter(torch.zeros(d_, r))
+    opt = torch.optim.Adam([A, B], lr=lr)
+    for _ in range(steps):
+        loss = ((X @ (s * B @ A).T - Y) ** 2).mean()
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    with torch.no_grad():
+        return s * B @ A, ((X @ (s * B @ A).T - Y) ** 2).mean().item()
+
+
+dW_a, _ = run(16, s=2.0, lr=1e-3)                                # first step: alpha and lr trade off
+dW_b, _ = run(16, s=1.0, lr=2e-3)
+assert (dW_a - dW_b).norm() &lt; 1e-2 * dW_a.norm()                 # equal up to Adam's epsilon
+
+alpha, ranks = 16, [4, 16, 64]
+step_r = [run(r, alpha / r)[0].norm().item() for r in ranks]
+step_rs = [run(r, alpha / math.sqrt(r))[0].norm().item() for r in ranks]
+assert step_r[0] / step_r[2] &gt; 3                                 # alpha / r: steps shrink with r
+assert max(step_rs) / min(step_rs) &lt; 1.3                         # alpha / sqrt(r): rank-stable
+
+loss_r = [run(r, alpha / r, steps=60)[1] for r in ranks]
+loss_rs = [run(r, alpha / math.sqrt(r), steps=60)[1] for r in ranks]
+assert loss_rs[2] &lt; 0.6 * loss_r[2]                              # at this lr, rank 64 does far better with rsLoRA
+assert loss_r[0] - loss_r[2] &lt; 0.5 * (loss_rs[0] - loss_rs[2])  # alpha / r gains much less from rank 4 to 64
+assert loss_rs[0] &gt; loss_rs[1] &gt; loss_rs[2]</code></pre>
+<p>A common habit is \(\alpha = r\) or \(\alpha = 2r\), which fixes \(s\) at 1 or 2 and quietly removes the \(1/r\), so the step grows like \(\sqrt{r}\). Whatever the convention, \(\alpha\) and the learning rate are coupled: change one, revisit the other, and store \(s\) with the adapter.</p>
+<h2 id="where-to-put-the-adapters">Where to put the adapters</h2>
+<p>The original paper adapted only attention projections. On GPT-3, with a fixed parameter budget, adapting \(W_q\) and \(W_v\) at low rank beat one matrix at higher rank: spreading the budget helped more than concentrating it. The QLoRA paper (Dettmers et al., 2023) went further and found adapters on <b>all</b> linear layers, MLP included, were needed to match full fine-tuning, with the number of adapted layers mattering more than the rank. That is now the usual default, at about five times the parameters of query-and-value alone.</p>
+<p>A <b>new output head</b> (say, a classifier) has no pretrained weights to adapt and must be trained in full, as must embedding rows for newly added tokens. Norm gains are tiny and are sometimes trained alongside at almost no cost.</p>
+<h2 id="merge-or-keep-the-adapter-separate">Merge, or keep the adapter separate</h2>
+<p>Computing \(W = W_0 + s BA\) once gives a model with exactly the base's shape and cost: the "no extra latency" claim. Keeping the adapter separate costs \(r(d + k)\) extra multiply-adds per token for each adapted matrix, under 1% of that matrix's \(dk\) at \(r = 8\), \(d = k = 4096\) (in FLOPs; the extra small matrix multiplies add some latency at small batch sizes), and allows <b>many adapters on one base</b>: one copy of the frozen weights, a small adapter per task, swapped per request or mixed within a batch.</p>
+<p>Unmerging by subtraction is only safe in high precision. In bf16 the merge rounds and subtracting does not undo it:</p>
+<pre><code class="language-python">torch.manual_seed(1)
+W0_bf16 = torch.randn(256, 256).to(torch.bfloat16)
+delta = (0.01 * torch.randn(256, 8) @ torch.randn(8, 256)).to(torch.bfloat16)
+restored = (W0_bf16 + delta) - delta
+changed = (restored != W0_bf16).float().mean().item()
+assert changed &gt; 0.01                                           # a few percent of weights drifted</code></pre>
+<p>Keep an untouched copy of the base, or merge into an fp32 copy and cast afterwards.</p>
+<h2 id="variants">Variants</h2>
+<p>Most variants change one of the choices above.</p>
+<table><thead><tr><th>Variant</th><th>What it changes</th></tr></thead><tbody><tr><td>QLoRA (Dettmers et al., 2023)</td><td>Stores the frozen base in 4-bit NormalFloat and trains bf16 adapters on top, so very large models fit on one GPU. Each forward pass dequantizes, so steps are slower than plain LoRA.</td></tr><tr><td>rsLoRA (Kalajdzievski, 2023)</td><td>Scales by \(\alpha / \sqrt{r}\) so that higher ranks keep learning at the same speed.</td></tr><tr><td>LoRA+ (Hayou, Ghosh and Yu, 2024)</td><td>Gives \(B\) a larger learning rate than \(A\), since the two factors play different roles.</td></tr><tr><td>AdaLoRA (Zhang et al., 2023)</td><td>Parameterizes the update in an SVD-like form and prunes singular values during training, so rank is spent where it helps.</td></tr><tr><td>DoRA (Liu et al., 2024)</td><td>Splits each weight into a magnitude and a direction, trains the magnitude directly and applies LoRA to the direction.</td></tr><tr><td>PiSSA (Meng et al., 2024)</td><td>Initializes \(A\) and \(B\) from the top singular vectors of \(W_0\) and freezes the residual, instead of starting the adapter at zero.</td></tr></tbody></table>
+<p>Other parameter-efficient methods, such as prefix and prompt tuning, train input vectors instead of weight updates. They often train fewer parameters, but they use up part of the context in every sequence and usually trail LoRA in quality. The <a href="../parameter-efficient-fine-tuning/">parameter-efficient fine-tuning</a> post compares the families.</p>
+<h2 id="when-to-use-it-and-pitfalls">When to use it, and pitfalls</h2>
+<p>LoRA is the default when the task is close to what the base model can already do (instruction following, a domain's tone, classification, extraction), when memory is tight, or when one model needs many task variants. Full fine-tuning earns its cost when the model must absorb a lot of new knowledge: Biderman et al. (2024) found that in continued pretraining on code and math LoRA learned noticeably less than full fine-tuning, and also forgot less of what the base model knew.</p>
+<p>Common ways it goes wrong:</p>
+<ul><li><b>Rank as the first knob.</b> Which layers are adapted and the learning rate usually matter more. Try all linear layers at a modest rank before raising \(r\).</li><li><b>A full fine-tuning learning rate.</b> Adapters typically use one about an order of magnitude higher, and \(\alpha\) multiplies it.</li><li><b>Something else left trainable.</b> Count trainable parameters before training; the <a href="/posts/lora-from-scratch/">from-scratch post</a> has an assert for this.</li><li><b>Misreading weight decay.</b> Decay on \(A\) and \(B\) pulls the model toward the base, not toward small weights (compare <a href="../regularization-l1-l2/">L1 and L2 regularization</a>).</li><li><b>Lossy merges.</b> Merge in higher precision and keep the original base.</li><li><b>Mismatched base.</b> An adapter is a delta against one exact checkpoint; on another, even a requantized one, it silently gives a different model.</li></ul>
+<p>For the surrounding architecture, see <a href="../transformers-and-llms-key-ideas/">transformers and LLMs: key ideas</a> and <a href="../foundation-models/">foundation models</a>.</p>
+<h2 id="references">References</h2>
+<ul><li>E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen. <a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a>. ICLR 2022.</li><li>C. Li, H. Farkhoor, R. Liu, J. Yosinski. <a href="https://arxiv.org/abs/1804.08838">Measuring the Intrinsic Dimension of Objective Landscapes</a>. ICLR 2018.</li><li>A. Aghajanyan, L. Zettlemoyer, S. Gupta. <a href="https://arxiv.org/abs/2012.13255">Intrinsic Dimensionality Explains the Effectiveness of Language Model Fine-Tuning</a>. ACL 2021.</li><li>T. Dettmers, A. Pagnoni, A. Holtzman, L. Zettlemoyer. <a href="https://arxiv.org/abs/2305.14314">QLoRA: Efficient Finetuning of Quantized LLMs</a>. NeurIPS 2023.</li><li>D. Kalajdzievski. <a href="https://arxiv.org/abs/2312.03732">A Rank Stabilization Scaling Factor for Fine-Tuning with LoRA</a>. 2023.</li><li>D. Biderman et al. <a href="https://arxiv.org/abs/2405.09673">LoRA Learns Less and Forgets Less</a>. TMLR 2024.</li></ul>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

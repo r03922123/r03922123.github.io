@@ -1,0 +1,233 @@
+---
+title: Causal inference without a randomized experiment
+summary: Why a raw comparison of treated and untreated users lies, and the toolkit for when you cannot randomize: adjusting for observed confounders, difference-in-differences, instrumental variables, regression discontinuity and synthetic control, each checked on a simulation where the true effect is known.
+group: Statistics and experimentation
+order: 4
+tags: causal inference · potential outcomes · difference-in-differences · instrumental variables
+---
+Users who turned on a new feature spend 19 more a month than users who did not. Did the feature cause that? Probably not much of it: the users who bother to turn on features are the engaged ones, and engaged users spent more before the feature existed. A **confounder**, something that drives both who gets the treatment and the outcome, can manufacture a gap out of nothing or hide a real one.
+
+A randomized experiment removes the problem by design, and when you can run one you should (see [A/B testing](../ab-testing/)). This post is about the cases where you cannot: a policy was already rolled out to some cities, a perk is granted by a score threshold, adoption is voluntary, or there is only one treated region. Each method below trades randomization for an assumption, and each is tested on a simulation where we know the true answer, so we can watch it work and watch it fail.
+
+## The missing column
+Write \(Y_i(1)\) for the outcome unit \(i\) would have with the treatment and \(Y_i(0)\) for the outcome without it. These are **potential outcomes**. The effect on unit \(i\) is \(Y_i(1) - Y_i(0)\), and the **average treatment effect** is
+
+\[ \text{ATE} = \mathbb{E}[Y(1) - Y(0)]. \]
+
+The fundamental problem is that each unit shows us only one of the two: \(Y_i(1)\) if treated, \(Y_i(0)\) if not. Causal inference is the business of filling in the missing column. The naive estimate compares the treated with the untreated, and a two-line rearrangement shows what it really measures:
+
+\[ \underbrace{\mathbb{E}[Y \mid T=1] - \mathbb{E}[Y \mid T=0]}_{\text{naive difference}} = \underbrace{\mathbb{E}[Y(1) - Y(0) \mid T=1]}_{\text{effect on the treated}} + \underbrace{\mathbb{E}[Y(0) \mid T=1] - \mathbb{E}[Y(0) \mid T=0]}_{\text{selection bias}}. \]
+
+Selection bias is how differently the treated group would have done **without** the treatment. Randomizing \(T\) makes it zero, because then \(T\) is independent of \(Y(0)\). The simulation below knows both columns, so it can check the identity exactly and show the bias.
+
+```python
+import numpy as np
+from scipy import optimize
+from sklearn.linear_model import LogisticRegression
+
+rng = np.random.default_rng(0)
+n = 200_000
+engaged = rng.random(n) < 0.4                       # the confounder
+y0 = 20 + 30 * engaged + rng.normal(0, 5, n)        # monthly spend without the feature
+y1 = y0 + 4                                         # the feature adds 4 for everyone
+adopt_prob = np.where(engaged, 0.7, 0.2)            # engaged users adopt far more often
+t = rng.random(n) < adopt_prob
+y = np.where(t, y1, y0)                             # what we actually observe
+
+ate = (y1 - y0).mean()
+naive = y[t].mean() - y[~t].mean()
+att = (y1 - y0)[t].mean()
+selection_bias = y0[t].mean() - y0[~t].mean()
+assert np.isclose(naive, att + selection_bias)      # the decomposition is an identity
+assert np.isclose(ate, 4) and naive > 18                     # the raw gap is mostly selection
+
+t_rand = rng.random(n) < 0.5                        # the same users, randomized
+y_rand = np.where(t_rand, y1, y0)
+assert abs(y_rand[t_rand].mean() - y_rand[~t_rand].mean() - ate) < 0.1
+```
+
+## When the confounder is measured
+If every confounder is observed, the fix is to compare like with like. Within engaged users, adoption is no longer related to baseline spend, so the within-group difference is causal; average the group differences by group size and you have the ATE. This is **stratification**, and it rests on the assumption of **no unmeasured confounding**, which no amount of data can verify.
+
+With many covariates, strata get thin, and the standard move is the **propensity score** \(e(x) = P(T = 1 \mid x)\). Weighting each treated unit by \(1/e(x)\) and each untreated one by \(1/(1 - e(x))\) builds a pseudo-population in which treatment is unrelated to \(x\):
+
+\[ \widehat{\text{ATE}}_{\text{IPW}} = \frac{1}{n}\sum_i \frac{T_i Y_i}{\hat e(x_i)} - \frac{1}{n}\sum_i \frac{(1 - T_i) Y_i}{1 - \hat e(x_i)}. \]
+
+It is the same inverse-propensity trick that corrects click logs in [position bias](/posts/position-bias/). Here the propensity comes from a logistic regression:
+
+```python
+strata = sum((y[t & (engaged == g)].mean() - y[~t & (engaged == g)].mean()) * (engaged == g).mean()
+             for g in (False, True))
+X = engaged.reshape(-1, 1).astype(float)
+e = LogisticRegression().fit(X, t).predict_proba(X)[:, 1]
+ipw = np.mean(t * y / e) - np.mean(~t * y / (1 - e))
+assert abs(strata - ate) < 0.15 and abs(ipw - ate) < 0.15
+```
+
+Most of the time the confounder is not measured, or not all of them are. Each remaining method swaps "no unmeasured confounding" for a different assumption you have to defend: trends that would have stayed parallel, an instrument that touches the outcome only through the treatment, outcomes that would have been smooth across a cutoff, or a weighted mix of untreated units that keeps tracking the treated one.
+
+## Difference-in-differences
+A policy launches in 10 of 40 cities. The treated cities were already bigger, so comparing them with the others after launch mixes the effect with the size gap; comparing them with themselves before launch mixes it with whatever changed over time for everyone. **Difference-in-differences** subtracts both:
+
+\[ \widehat{\tau}_{\text{DiD}} = \big(\bar Y_{\text{treated, post}} - \bar Y_{\text{treated, pre}}\big) - \big(\bar Y_{\text{control, post}} - \bar Y_{\text{control, pre}}\big). \]
+
+The control group's change stands in for the change the treated group would have seen without treatment. That is the **parallel trends** assumption: levels may differ, trends may not. In regression form, \(Y = \alpha + \beta\,\text{treated} + \gamma\,\text{post} + \tau\,\text{treated} \times \text{post}\), and on a balanced panel the interaction coefficient is exactly the four-mean formula.
+
+```python
+cities, periods, launch = 40, 12, 8
+is_treated = np.arange(cities) < 10
+post = np.arange(periods) >= launch
+
+
+def panel(treated_slope, effect=6.0):
+    level = np.where(is_treated, 130, 100) + rng.normal(0, 3, cities)     # treated cities are bigger
+    slope = np.where(is_treated, treated_slope, 1.5)
+    Y = level[:, None] + slope[:, None] * np.arange(periods) + rng.normal(0, 1, (cities, periods))
+    Y[np.ix_(is_treated, post)] += effect
+    return Y
+
+
+def did(Y, pre, post):
+    tr, co = Y[is_treated], Y[~is_treated]
+    return (tr[:, post].mean() - tr[:, pre].mean()) - (co[:, post].mean() - co[:, pre].mean())
+
+
+Y = panel(treated_slope=1.5)                                             # parallel trends hold
+est = did(Y, ~post, post)
+assert abs(est - 6) < 0.3
+assert Y[is_treated][:, post].mean() - Y[~is_treated][:, post].mean() > 30   # post-only comparison
+assert Y[is_treated][:, post].mean() - Y[is_treated][:, ~post].mean() > 12   # pre/post comparison
+
+g, p = np.meshgrid(is_treated, post, indexing="ij")                        # the regression form
+D = np.column_stack([np.ones(Y.size), g.ravel(), p.ravel(), (g & p).ravel()]).astype(float)
+coef = np.linalg.lstsq(D, Y.ravel(), rcond=None)[0]
+assert np.isclose(coef[3], est)
+```
+
+Parallel trends cannot be tested after launch, but the pre-period gives a check (passing it is evidence, not proof). Pretend the launch happened halfway through the pre-period and run the same estimator on pre-period data only; with no treatment there, it should find nothing. Below, the treated cities grow a little faster than the rest. DiD then credits the faster growth to the policy, and the placebo test catches it:
+
+```python
+pre_first, pre_second = np.arange(periods) < 4, (np.arange(periods) >= 4) & ~post
+assert abs(did(Y, pre_first, pre_second)) < 0.3            # parallel: placebo finds nothing
+
+Y_bad = panel(treated_slope=2.5)                           # treated cities grow faster
+assert did(Y_bad, ~post, post) > 10                        # DiD now roughly doubles the effect
+assert did(Y_bad, pre_first, pre_second) > 3               # and the placebo flags it
+```
+
+## Instrumental variables
+Users choose whether to adopt a feature, and their unobserved motivation drives both adoption and outcome. Suppose that, separately, a random half of users got an email encouraging adoption. The email is an **instrument** \(Z\) if it (1) actually moves adoption, (2) is as good as random, and (3) affects the outcome **only through** adoption, the **exclusion restriction**. Then the effect of the email on the outcome, divided by its effect on adoption, is the **Wald estimator**:
+
+\[ \widehat{\tau}_{\text{IV}} = \frac{\mathbb{E}[Y \mid Z=1] - \mathbb{E}[Y \mid Z=0]}{\mathbb{E}[T \mid Z=1] - \mathbb{E}[T \mid Z=0]}. \]
+
+The parentheses matter: it is a ratio of two differences. With a binary instrument it equals two-stage least squares, which regresses \(T\) on \(Z\) and then \(Y\) on the fitted \(T\).
+
+What does it estimate? Users fall into **always-takers** (adopt regardless), **never-takers**, and **compliers** (adopt only if emailed). The email changes behaviour only for compliers, so when effects differ across people the ratio recovers the **local average treatment effect**, the effect for compliers, assuming **monotonicity**: nobody adopts because they were not emailed (Imbens and Angrist, 1994). In the simulation the motivated always-takers gain 6, compliers gain 2 and never-takers would gain 4:
+
+```python
+n = 400_000
+motivation = rng.normal(0, 1, n)                           # unobserved
+always, never = motivation > 1.0, motivation < -0.5
+complier = ~always & ~never
+z = rng.random(n) < 0.5                                    # randomized encouragement
+t = always | (complier & z)
+effect = np.select([always, complier], [6.0, 2.0], default=4.0)
+y = 10 + 3 * motivation + effect * t + rng.normal(0, 2, n)
+
+ols = y[t].mean() - y[~t].mean()
+first_stage = t[z].mean() - t[~z].mean()
+wald = (y[z].mean() - y[~z].mean()) / first_stage
+assert ols > 7                                             # confounded by motivation
+assert abs(wald - 2) < 0.15                                # the complier effect
+assert abs(first_stage - complier.mean()) < 0.01           # the first stage is the complier share
+assert abs(effect.mean() - wald) > 1                       # LATE is not the population ATE
+
+Z = np.column_stack([np.ones(n), z])
+t_hat = Z @ np.linalg.lstsq(Z, t.astype(float), rcond=None)[0]
+tsls = np.linalg.lstsq(np.column_stack([np.ones(n), t_hat]), y, rcond=None)[0][1]
+assert np.isclose(tsls, wald)
+```
+
+The exclusion restriction is the weak point, and it is easy to break by accident. To estimate how demand responds to price, weather is tempting as an instrument for price, since bad weather raises prices. But bad weather also makes people want rides more, directly, so it fails exclusion and the estimate mixes the price effect with the weather effect. An instrument for price in a demand equation must shift price through **supply or cost**, without shifting what customers want.
+
+## Regression discontinuity
+Many treatments are given by a rule on a score: a perk for users with a loyalty score of at least 50, a scholarship above an exam cutoff. Users just above and just below the cutoff are nearly identical, so near the threshold, assignment is almost random. The formal assumption is that the potential outcomes change smoothly with the score at the cutoff, so any jump in the observed outcome there is the treatment. **Regression discontinuity**, introduced by Thistlethwaite and Campbell (1960), fits a line on each side within a bandwidth \(h\) and reads the jump at the cutoff:
+
+```python
+m = 60_000
+score = rng.uniform(0, 100, m)
+perk = score >= 50                                         # sharp rule
+y = 5 + 0.002 * score ** 2 + 3 * perk + rng.normal(0, 2, m)    # outcome rises with score anyway
+
+
+def intercept_at_cutoff(mask):
+    A = np.column_stack([np.ones(mask.sum()), score[mask] - 50])
+    return np.linalg.lstsq(A, y[mask], rcond=None)[0][0]
+
+
+h = 5
+rd = intercept_at_cutoff(perk & (score < 50 + h)) - intercept_at_cutoff(~perk & (score >= 50 - h))
+assert y[perk].mean() - y[~perk].mean() > 12               # above vs below: mostly the score itself
+assert abs(rd - 3) < 0.3
+```
+
+The estimate is local: it is the effect for users near a score of 50, not for everyone. The bandwidth trades bias (curvature inside the window) against variance (fewer points), and results should be shown for several bandwidths. The design also breaks if people can nudge their score across the line, which shows up as a pile of units just above the cutoff.
+
+## Synthetic control
+DiD wants a control group that trends like the treated one. With a single treated region and a pool of untreated ones, the plain average of the pool rarely does. **Synthetic control**, introduced by Abadie and Gardeazabal (2003) and developed by Abadie, Diamond and Hainmueller (2010), builds the comparison instead: nonnegative weights on the donor regions, summing to one, chosen so that the weighted series tracks the treated region before launch. After launch, the gap between the two is the estimated effect.
+
+```python
+donors_n, horizon, start = 20, 30, 20
+time = np.arange(horizon)
+slopes, amps = rng.uniform(0, 2, donors_n), rng.uniform(0, 4, donors_n)
+donors = 50 + slopes[:, None] * time + amps[:, None] * np.sin(time / 3) + rng.normal(0, 0.3, (donors_n, horizon))
+fast = np.argsort(slopes)[-3:]                             # the treated region grows like the fastest donors
+region = np.array([0.5, 0.3, 0.2]) @ donors[fast] + rng.normal(0, 0.3, horizon)
+region[start:] += 5                                        # true effect
+
+
+def synth_weights(target, pool):
+    k = len(pool)
+    loss = lambda w: np.sum((target[:start] - w @ pool[:, :start]) ** 2)
+    return optimize.minimize(loss, np.full(k, 1 / k), method="SLSQP", bounds=[(0, 1)] * k,
+                             constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1}]).x
+
+
+w = synth_weights(region, donors)
+gap = region - w @ donors
+avg = donors.mean(0)
+did_avg = (region[start:].mean() - region[:start].mean()) - (avg[start:].mean() - avg[:start].mean())
+assert np.isclose(w.sum(), 1) and w.min() > -1e-9
+assert abs(gap[start:].mean() - 5) < 1
+assert abs(did_avg - 5) > 5                                # the donor average is not parallel
+
+
+def post_pre_ratio(g):
+    return np.sqrt(np.mean(g[start:] ** 2) / np.mean(g[:start] ** 2))
+
+
+placebo = [post_pre_ratio(donors[j] - synth_weights(donors[j], np.delete(donors, j, 0)) @ np.delete(donors, j, 0))
+           for j in range(donors_n)]
+assert post_pre_ratio(gap) > max(placebo)                  # larger than every fake "treatment"
+```
+
+With one treated unit there is no sampling distribution in the usual sense, so inference comes from **placebos**: pretend each donor was treated, rerun the method, and see whether the real region's post-launch gap (relative to its pre-launch fit) stands out. Here it beats all 20, a rank-based p-value of \(1/21\).
+
+## Which method, and pitfalls
+| situation | method | key assumption |
+|---|---|---|
+| you can randomize | experiment | none beyond a correct setup |
+| all confounders measured | stratification, regression, propensity weighting | no unmeasured confounding |
+| rollout to some groups, data before and after | difference-in-differences | parallel trends |
+| a random nudge that shifts uptake | instrumental variables | exclusion restriction, monotonicity |
+| treatment given by a cutoff on a score | regression discontinuity | outcomes smooth at the cutoff, no manipulation of the score |
+| one or few treated units, many untreated series | synthetic control | pre-period fit carries over |
+
+- **Say which effect you estimated.** IV gives the complier effect, RD the effect at the cutoff, DiD the effect on the treated. None is automatically the population ATE.
+- **Do not control for things the treatment causes.** Adjusting for a mediator (sessions, when the feature works by raising sessions) removes part of the effect; adjusting for a common consequence of treatment and outcome can create bias where none existed.
+- **Check overlap.** Propensity weights near 0 or 1 mean some users are almost never comparable; the estimate then rests on a handful of heavily weighted rows.
+- **Watch for spillovers.** If drivers or buyers move between treated and control cities, the control group is contaminated and DiD understates or distorts the effect.
+- **Get the standard errors right.** Repeated observations of a city are not independent; cluster by the unit that was treated. A weak first stage in IV makes the ratio unstable and biased toward OLS.
+- **Run the falsification checks.** Pre-period placebos for DiD, placebo cutoffs and density checks for RD, placebo units for synthetic control. A method that cannot fail a check has not been checked.
+
+For deeper treatments, Hernán and Robins' free book Causal Inference: What If covers potential outcomes, adjustment and weighting, and Brady Neal's free Introduction to Causal Inference course covers causal graphs and estimation. The confounder-then-randomization framing of the opening follows the causality chapter of the Berkeley Data 8 textbook Computational and Inferential Thinking (Adhikari, DeNero and Wagner); the example here is new.

@@ -1,0 +1,339 @@
+---
+title: L1 and L2 regularization: shrinkage, sparsity and weight decay
+summary: Why an L2 penalty shrinks every weight while an L1 penalty sets some of them exactly to zero, worked out on a single weight and checked against scikit-learn. Then correlated features and the elastic net, the priors behind each penalty, and why weight decay under Adam needs AdamW.
+group: Machine learning fundamentals
+order: 7
+tags: regularization · ridge · lasso · weight decay
+---
+A model with enough freedom fits the noise in its training set as faithfully as the signal. Regularization puts a price on that freedom, and the most common price is on the size of the weights:
+
+\[ \mathcal{L}(w) = \text{data loss}(w) + \lambda\, \Omega(w), \qquad \lambda \ge 0 \]
+
+Two choices of \(\Omega\) cover most of practice: the squared L2 norm \(\lVert w \rVert_2^2 = \sum_i w_i^2\) (ridge regression, and weight decay in neural networks) and the L1 norm \(\lVert w \rVert_1 = \sum_i \lvert w_i \rvert\) (the lasso). They look alike, but L2 makes every weight smaller and leaves them all nonzero, while L1 sets some weights exactly to zero and so selects features. This post shows why on one weight solved by hand, checks it on real regressions, gives the Bayesian reading of each penalty, and ends with deep learning, where an L2 penalty and weight decay stop being the same thing under Adam.
+
+## One weight, solved exactly
+Strip the problem down to one weight whose unpenalized best value is \(z\), with data loss \(\tfrac12 (w - z)^2\). This is what each coefficient of a linear regression faces when the features are uncorrelated, as the next section checks. Adding each penalty and minimizing gives
+
+\[ \text{L2:}\quad \min_w\, \tfrac12 (w - z)^2 + \tfrac{\lambda}{2} w^2 \;\Rightarrow\; w^\star = \frac{z}{1 + \lambda} \]
+
+\[ \text{L1:}\quad \min_w\, \tfrac12 (w - z)^2 + \lambda \lvert w \rvert \;\Rightarrow\; w^\star = \operatorname{sign}(z)\, \max(\lvert z \rvert - \lambda,\, 0) \]
+
+L2 scales the weight by a constant factor. L1 subtracts a constant from its magnitude and stops at zero, an operation called **soft-thresholding**. With \(\lambda = 1\):
+
+| Unpenalized \(z\) | L2: \(z / (1 + \lambda)\) | L1: soft-threshold |
+|---|---|---|
+| 3.0 | 1.5 | 2.0 |
+| 1.5 | 0.75 | 0.5 |
+| 0.8 | 0.4 | 0 |
+| 0.2 | 0.1 | 0 |
+
+The table corrects two common one-line summaries. L2 takes more off a large weight than L1 does (1.5 against 1.0 at \(z = 3\); in general L2 removes \(\lambda \lvert z \rvert / (1 + \lambda)\), which exceeds L1's \(\lambda\) whenever \(\lvert z \rvert > 1 + \lambda\)), so "L1 punishes weights harder" is wrong exactly where weights are large. And L2 never reaches zero for any \(z \ne 0\), however large \(\lambda\) is.
+
+Only L1 produces exact zeros because of the penalty's slope near zero. The slope of the L2 penalty, \(\lambda w\), fades to nothing as \(w\) approaches 0, so any pull from the data, however weak, keeps the weight off zero. The slope of the L1 penalty stays at \(\lambda\) all the way down, and at \(w = 0\) it has a kink: its subgradient there is the whole interval \([-\lambda, \lambda]\). Zero is the minimum whenever the data's slope at zero, \(-z\), fits inside that interval, that is, whenever \(\lvert z \rvert \le \lambda\). A weight survives only if the data pushes on it harder than \(\lambda\).
+
+```python
+import numpy as np
+
+
+def shrink_l2(z, lam):
+    return z / (1 + lam)
+
+
+def soft_threshold(z, lam):
+    return np.sign(z) * np.maximum(np.abs(z) - lam, 0.0)
+
+
+grid = np.linspace(-4, 4, 800_001)                  # brute force: evaluate both objectives on a fine grid
+lam = 1.0
+for z in [-2.5, -0.7, 0.0, 0.3, 1.0, 3.2]:
+    l2 = 0.5 * (grid - z) ** 2 + 0.5 * lam * grid ** 2
+    l1 = 0.5 * (grid - z) ** 2 + lam * np.abs(grid)
+    assert abs(grid[l2.argmin()] - shrink_l2(z, lam)) < 1e-5
+    assert abs(grid[l1.argmin()] - soft_threshold(z, lam)) < 1e-5
+
+zs = np.array([3.0, 1.5, 0.8, 0.2])                  # the table above
+assert np.allclose(shrink_l2(zs, 1.0), [1.5, 0.75, 0.4, 0.1])
+assert np.allclose(soft_threshold(zs, 1.0), [2.0, 0.5, 0.0, 0.0])
+assert (shrink_l2(zs, 1e6) != 0).all()               # no lambda is large enough for L2 to reach zero
+for lam_ in [0.5, 1.0, 2.0]:                          # L2 removes more than L1 exactly when |z| > 1 + lambda
+    zz = np.linspace(0.01, 6, 600)
+    l2_takes_more = zz - shrink_l2(zz, lam_) > zz - soft_threshold(zz, lam_)
+    assert (l2_takes_more == (zz > 1 + lam_ + 1e-12)).all()
+```
+
+## Ridge and lasso on a regression
+For linear regression, ridge minimizes \(\lVert y - Xw \rVert^2 + \lambda \lVert w \rVert_2^2\) and has a closed form:
+
+\[ \hat w_{\text{ridge}} = (X^\top X + \lambda I)^{-1} X^\top y \]
+
+The added \(\lambda I\) makes the matrix invertible, and well conditioned, even when \(X^\top X\) is singular (more features than rows, or exactly collinear columns) or nearly so. Badly conditioned, nearly collinear designs were the original motivation for ridge. The lasso has no closed form in general; scikit-learn solves it by coordinate descent. With orthogonal columns, \(X^\top X = nI\), the problem splits into one problem per coefficient, and both methods reduce to the formulas above applied to the least-squares coefficients.
+
+Note one trap in the code: scikit-learn scales the two objectives differently. `Lasso` divides the squared error by \(2n\) and `Ridge` does not, so the same `alpha` means different strengths.
+
+```python
+from sklearn.linear_model import ElasticNet, Lasso, LassoCV, LinearRegression, Ridge, RidgeCV
+
+rng = np.random.default_rng(0)
+n, p = 200, 8
+Q, _ = np.linalg.qr(rng.normal(size=(n, p)))
+X = Q * np.sqrt(n)                                   # orthogonal columns with X^T X = n I
+assert np.allclose(X.T @ X, n * np.eye(p))
+y = X @ np.array([3, -2, 1.5, 0.4, -0.2, 0, 0, 0]) + rng.normal(size=n)
+
+ols = X.T @ y / n                                    # least squares, because X^T X = n I
+lasso = Lasso(alpha=0.5, fit_intercept=False, tol=1e-12, max_iter=100_000).fit(X, y)
+ridge = Ridge(alpha=0.5 * n, fit_intercept=False).fit(X, y)     # Ridge's loss is a sum, not a mean
+assert np.allclose(lasso.coef_, soft_threshold(ols, 0.5), atol=1e-8)
+assert np.allclose(ridge.coef_, shrink_l2(ols, 0.5))
+assert (lasso.coef_[3:] == 0).all() and (ridge.coef_ != 0).all()
+
+X_wide = rng.normal(size=(30, 100))                  # more features than rows
+y_wide = rng.normal(size=30)
+assert np.linalg.matrix_rank(X_wide.T @ X_wide) == 30          # singular: least squares has no unique answer
+w = np.linalg.solve(X_wide.T @ X_wide + 2.0 * np.eye(100), X_wide.T @ y_wide)
+assert np.allclose(w, Ridge(alpha=2.0, fit_intercept=False).fit(X_wide, y_wide).coef_)
+```
+
+The lasso removed all five small coefficients, including two (0.4 and −0.2) that are real but too weak to beat the noise at this \(\lambda\). Ridge kept all eight, the three pure-noise ones included.
+
+### Which one predicts better
+That depends on what the true weights look like. The next block fits 100 rows with 50 features, choosing \(\lambda\) by cross-validation, under two truths: **sparse** (5 strong effects, 45 zeros) and **dense** (50 small effects). The noise variance is 4, so a test MSE of 4 is the floor. Averaged over five draws:
+
+| Truth | Least squares | Ridge | Lasso |
+|---|---|---|---|
+| Sparse | 8.3 | 7.7 | 4.9 (about 16 of 50 weights kept) |
+| Dense | 8.3 | 6.2 | 6.4 |
+
+Least squares scores the same under both truths because its error here is pure variance: it does not depend on the true weights at all. The lasso wins easily when most features are irrelevant. When every feature carries a little signal, zeroing some of them costs more than it saves, and ridge comes out ahead.
+
+```python
+def test_mse(w_true, seed):
+    r = np.random.default_rng(seed)
+    X_tr, X_te = r.normal(size=(100, 50)), r.normal(size=(5000, 50))
+    y_tr = X_tr @ w_true + r.normal(scale=2.0, size=100)
+    y_te = X_te @ w_true + r.normal(scale=2.0, size=5000)
+    out = {}
+    for name, model in [("ols", LinearRegression()), ("ridge", RidgeCV(alphas=np.logspace(-2, 3, 30))),
+                        ("lasso", LassoCV(alphas=np.logspace(-2, 0.5, 30), cv=5))]:
+        model.fit(X_tr, y_tr)
+        out[name] = (np.mean((model.predict(X_te) - y_te) ** 2), np.sum(model.coef_ != 0))
+        if name == "lasso" and w_true[5:].max() == 0:
+            assert (model.coef_[:5] != 0).all()      # every true effect survives selection
+    return out
+
+
+sparse = np.zeros(50)
+sparse[:5] = [4, -3, 2.5, -2, 1.5]
+dense = np.random.default_rng(7).normal(scale=0.5, size=50)
+runs = {truth: [test_mse(w_true, s) for s in range(5)] for truth, w_true in [("sparse", sparse), ("dense", dense)]}
+avg = {t: {m: np.mean([r[m][0] for r in rs]) for m in rs[0]} for t, rs in runs.items()}
+kept = np.mean([r["lasso"][1] for r in runs["sparse"]])
+
+assert np.isclose(avg["sparse"]["ols"], avg["dense"]["ols"])      # least squares ignores the truth
+assert avg["sparse"]["lasso"] < avg["sparse"]["ridge"] < avg["sparse"]["ols"]
+assert avg["dense"]["ridge"] < avg["dense"]["lasso"] < avg["dense"]["ols"]
+assert 12 < kept < 20
+table = {(t, m): round(float(avg[t][m]), 1) for t in avg for m in avg[t]}
+assert table == {("sparse", "ols"): 8.3, ("sparse", "ridge"): 7.7, ("sparse", "lasso"): 4.9,
+                 ("dense", "ols"): 8.3, ("dense", "ridge"): 6.2, ("dense", "lasso"): 6.4}
+assert round(kept) == 16
+```
+
+## Correlated features and the elastic net
+The two penalties part ways most sharply when features are correlated. Take two near-copies of one feature, each with a true coefficient of 1. Least squares cannot tell them apart, so its split between them swings wildly with the noise. Ridge prefers to share: for a fixed total \(w_1 + w_2\), the sum of squares is smallest when the two are equal. The lasso is indifferent: every split of the same total with matching signs has the same L1 norm, so small quirks of the data decide, and sometimes it drops one copy entirely.
+
+The **elastic net** (Zou and Hastie, 2005) adds both penalties. In scikit-learn's parametrization, with `l1_ratio` written \(\rho\):
+
+\[ \Omega(w) = \alpha \rho \lVert w \rVert_1 + \frac{\alpha (1 - \rho)}{2} \lVert w \rVert_2^2 \]
+
+The L2 part makes the objective strictly convex, so the solution is unique and correlated features get nearly equal weights, while the L1 part can still zero out whole groups of irrelevant ones.
+
+```python
+splits = {"ols": [], "lasso": [], "ridge": [], "enet": []}
+for seed in range(20):
+    r = np.random.default_rng(seed)
+    x1 = r.normal(size=500)
+    Xc = np.column_stack([x1, x1 + 0.05 * r.normal(size=500)])      # correlation about 0.999
+    yc = Xc.sum(axis=1) + r.normal(size=500)
+    for name, model in [("ols", LinearRegression()), ("lasso", Lasso(alpha=0.1)),
+                        ("ridge", Ridge(alpha=10)), ("enet", ElasticNet(alpha=0.1, l1_ratio=0.5))]:
+        splits[name].append(model.fit(Xc, yc).coef_)
+splits = {k: np.array(v) for k, v in splits.items()}
+gap = {k: np.abs(v[:, 0] - v[:, 1]).max() for k, v in splits.items()}
+
+assert gap["ols"] > 3                                # one fit gives roughly (-0.7, 2.8)
+assert (splits["lasso"][:, 0] == 0).any() and (splits["lasso"][:, 1] == 0).any()   # drops either copy
+assert gap["ridge"] < 0.25 and gap["enet"] < 0.12    # both share the weight
+```
+
+## The Bayesian reading
+Both penalties are priors in disguise. The maximum a posteriori (MAP) estimate maximizes likelihood times prior, and with Gaussian noise of variance \(\sigma^2\) (see [regression as maximum likelihood](../regression-as-maximum-likelihood/) and [MLE and MAP](../statistical-estimation-mle-map/)) that becomes
+
+\[ \hat w_{\text{MAP}} = \arg\min_w\; \frac{1}{2\sigma^2} \lVert y - Xw \rVert^2 - \log p(w) \]
+
+- A Gaussian prior \(w_i \sim \mathcal{N}(0, \tau^2)\) contributes \(\lVert w \rVert_2^2 / (2\tau^2)\), which is ridge with \(\lambda = \sigma^2 / \tau^2\).
+- A Laplace prior with density proportional to \(e^{-\lvert w_i \rvert / b}\) contributes \(\lVert w \rVert_1 / b\), which is the lasso with \(\lambda = 2\sigma^2 / b\) (both in the \(\lVert y - Xw \rVert^2 + \lambda\, \Omega(w)\) form).
+
+So \(\lambda\) is a ratio of noise to prior width: noisier data or a tighter prior both mean stronger regularization.
+
+One correction to a common reading: the Laplace prior does not say that most weights are zero. As a continuous density it gives the value 0 probability zero, and the posterior mean under it is not exactly zero unless the data are perfectly balanced around it. The sparsity comes from taking the posterior's mode, which sits on the kink. Priors that really put mass on zero, such as spike-and-slab, make the optimization much harder, and the L1 penalty is the convex stand-in.
+
+```python
+from scipy import integrate, optimize, stats
+
+rng = np.random.default_rng(0)
+n, p = 40, 6
+X = rng.normal(size=(n, p))
+y = X @ np.array([2, -1, 0.5, 0, 0, 0]) + rng.normal(size=n)
+sigma, tau, b = 1.0, 0.3, 0.1
+
+
+def neg_log_posterior(w, log_prior):
+    return -(stats.norm.logpdf(y, X @ w, sigma).sum() + log_prior(w).sum())
+
+
+w_map = optimize.minimize(neg_log_posterior, np.zeros(p), args=(lambda w: stats.norm.logpdf(w, 0, tau),)).x
+w_ridge = Ridge(alpha=sigma**2 / tau**2, fit_intercept=False).fit(X, y).coef_
+assert np.allclose(w_map, w_ridge, atol=1e-5)
+
+# Laplace MAP = lasso; scikit-learn's alpha absorbs its 1/(2n) scaling. Check the optimality conditions.
+w = Lasso(alpha=sigma**2 / (n * b), fit_intercept=False, tol=1e-12, max_iter=100_000).fit(X, y).coef_
+slope = -X.T @ (y - X @ w) / sigma**2               # gradient of the negative log-likelihood
+on = w != 0
+assert np.allclose(slope[on], -np.sign(w[on]) / b, atol=1e-6)   # balanced by the prior's constant pull
+assert (np.abs(slope[~on]) <= 1 / b).all() and (~on).sum() == 3  # too weak to escape the kink at zero
+
+# One weight, z = 0.5, lambda = 1: the posterior's mode is exactly 0, its mean is not
+post = lambda t: np.exp(-0.5 * (t - 0.5) ** 2 - abs(t))
+moment = lambda f: sum(integrate.quad(f, lo, hi)[0] for lo, hi in [(-np.inf, 0), (0, np.inf)])
+mean = moment(lambda t: t * post(t)) / moment(post)
+assert soft_threshold(0.5, 1.0) == 0 and 0.2 < mean < 0.3
+```
+
+## Weight decay in neural networks
+For plain gradient descent, the gradient of \(\tfrac{\lambda}{2} \lVert w \rVert^2\) is \(\lambda w\), so each step is
+
+\[ w \leftarrow w - \eta (\nabla \ell + \lambda w) = (1 - \eta \lambda)\, w - \eta \nabla \ell \]
+
+Every step multiplies the weights by \(1 - \eta\lambda\) and then takes the usual gradient step, so for SGD an L2 penalty and **weight decay** are the same thing. The shrink per step is \(\eta\lambda\): changing the learning rate changes the regularization too.
+
+Adam breaks the equivalence. It divides each coordinate's update by a running root-mean-square of that coordinate's past gradients. If the penalty's \(\lambda w\) is added to the gradient, which is what `torch.optim.Adam(weight_decay=...)` does, it is divided as well: a weight with a history of large gradients is barely regularized, and one with tiny gradients is regularized hard. Loshchilov and Hutter's [decoupled weight decay](https://arxiv.org/abs/1711.05101), AdamW, shrinks the weights directly, outside the adaptive scaling. PyTorch's version multiplies each weight by \(1 - \eta\lambda\), then takes an ordinary Adam step.
+
+```python
+import torch
+
+torch.set_default_dtype(torch.float64)
+torch.manual_seed(0)
+Xt = torch.randn(64, 5)
+yt = Xt @ torch.tensor([1.0, -2, 0.5, 0, 3]) + 0.1 * torch.randn(64)
+w0, lr, lam = torch.randn(5), 0.05, 0.1
+
+
+def train(opt_cls, weight_decay=0.0, l2_in_loss=0.0, decay_by_hand=0.0, steps=100):
+    w = w0.clone().requires_grad_()
+    opt = opt_cls([w], lr=lr, weight_decay=weight_decay)
+    for _ in range(steps):
+        opt.zero_grad()
+        loss = ((Xt @ w - yt) ** 2).mean() + l2_in_loss / 2 * (w**2).sum()
+        loss.backward()
+        with torch.no_grad():
+            w.mul_(1 - lr * decay_by_hand)
+        opt.step()
+    return w.detach()
+
+
+assert torch.allclose(train(torch.optim.SGD, weight_decay=lam), train(torch.optim.SGD, l2_in_loss=lam))
+assert torch.allclose(train(torch.optim.Adam, weight_decay=lam), train(torch.optim.Adam, l2_in_loss=lam))
+assert torch.allclose(train(torch.optim.AdamW, weight_decay=lam), train(torch.optim.Adam, decay_by_hand=lam))
+assert not torch.allclose(train(torch.optim.AdamW, weight_decay=lam), train(torch.optim.Adam, weight_decay=lam))
+
+
+def after_decay(opt_cls, steps=1000, reps=2000):
+    """Two weights start at 1 and see zero-mean gradient noise of very different sizes."""
+    torch.manual_seed(1)
+    w = torch.ones(reps, 2, requires_grad=True)
+    opt = opt_cls([w], lr=0.01, weight_decay=0.1)
+    for _ in range(steps):
+        w.grad = torch.tensor([10.0, 0.01]) * torch.randn(reps, 2)
+        opt.step()
+    return w.detach().mean(0)
+
+
+big, small = after_decay(torch.optim.Adam)
+assert big > 0.85 and small < 0.01                   # Adam + L2: strength depends on gradient size
+assert torch.allclose(after_decay(torch.optim.AdamW), torch.tensor(0.999**1000), atol=0.02)   # both shrink alike
+```
+
+Under Adam with an L2 penalty, the weight with large gradients ends at about 0.9 and the one with small gradients is driven to zero. Under AdamW, both end at \(0.999^{1000} \approx 0.37\), the decay alone.
+
+Three practical habits follow:
+
+- Exclude biases and normalization gains from decay. There are few of them, so decaying them does little against overfitting, and pulling a gain toward zero shrinks a whole layer's output. A common rule is to decay only parameters with two or more dimensions.
+- Weights that feed straight into a normalization layer are scale-invariant: multiplying them (and the bias, if there is one) by a positive constant leaves the output unchanged. Decay cannot simplify that function. It shrinks the weights' norm, which makes later gradient steps relatively larger, so it acts more like a learning-rate schedule (see [batch norm vs layer norm](../batchnorm-vs-layernorm/)).
+- PyTorch optimizers have no L1 flag, and adding \(\lambda \lVert w \rVert_1\) to the loss does not produce exact zeros (see the pitfalls). Sparse networks usually come from pruning.
+
+```python
+model = torch.nn.Sequential(torch.nn.Linear(16, 32), torch.nn.LayerNorm(32), torch.nn.ReLU(), torch.nn.Linear(32, 4))
+decay = [q for q in model.parameters() if q.ndim >= 2]           # the two weight matrices
+no_decay = [q for q in model.parameters() if q.ndim < 2]         # biases and the LayerNorm gain and shift
+opt = torch.optim.AdamW([{"params": decay, "weight_decay": 0.1},
+                         {"params": no_decay, "weight_decay": 0.0}], lr=3e-4)
+assert len(decay) == 2 and len(no_decay) == 4
+
+x, W = torch.randn(8, 16), torch.randn(32, 16)
+normed = lambda W: torch.nn.functional.layer_norm(x @ W.T, (32,))
+assert torch.allclose(normed(W), normed(5 * W), atol=1e-5)      # the output ignores the scale of W
+```
+
+## Pitfalls
+- **Unscaled features.** The penalty charges for the size of a coefficient, and that size depends on the feature's units. Measure a distance in kilometres instead of metres and its coefficient must be 1000 times larger to have the same effect, so the lasso drops it. Standardize first, inside the same pipeline so that cross-validation sees it too.
+- **A penalized intercept.** Shrinking the intercept pulls predictions toward zero instead of toward the mean of \(y\). scikit-learn's `Ridge`, `Lasso` and `ElasticNet` leave it unpenalized, but `LogisticRegression` with the `liblinear` solver does penalize it, and hand-written code often does too.
+- **Exact zeros from gradient descent.** Plain (sub)gradient descent on an L1 penalty pushes each weight across zero and back, so the weights rattle near zero and never land on it. Exact zeros need a solver that handles the kink: coordinate descent, or a proximal step that soft-thresholds after every gradient step (ISTA, below).
+- **Choosing \(\lambda\) by habit.** Its meaning depends on whether the loss is a sum or a mean, on the library's constant factors, and for PyTorch's weight decay on the learning rate. Too large underfits, too small does nothing, so tune it by cross-validation over a log-spaced grid (the [bias–variance trade-off](../bias-variance-tradeoff/) in one knob).
+- **Reading the lasso's choice as importance.** With correlated features, which one survives is close to arbitrary, as shown above. With more features than rows, the lasso keeps at most \(n\) of them (for features in general position, such as continuous random ones).
+
+```python
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+r = np.random.default_rng(3)
+dist_km, other = r.normal(scale=0.05, size=300), r.normal(size=300)
+y_units = 20 * dist_km + other + r.normal(scale=0.5, size=300)
+X_km, X_m = np.column_stack([dist_km, other]), np.column_stack([1000 * dist_km, other])
+assert Lasso(alpha=0.5).fit(X_km, y_units).coef_[0] == 0         # in kilometres: dropped
+assert Lasso(alpha=0.5).fit(X_m, y_units).coef_[0] != 0          # in metres: kept
+fit_km = make_pipeline(StandardScaler(), Lasso(alpha=0.5)).fit(X_km, y_units)
+fit_m = make_pipeline(StandardScaler(), Lasso(alpha=0.5)).fit(X_m, y_units)
+assert np.allclose(fit_km.predict(X_km), fit_m.predict(X_m))     # standardized: units no longer matter
+
+X_tr = r.normal(size=(100, 50))                                  # the lasso three ways, same objective
+y_tr = X_tr @ sparse + r.normal(scale=2.0, size=100)
+alpha = 0.3
+reference = Lasso(alpha=alpha, fit_intercept=False, tol=1e-12, max_iter=100_000).fit(X_tr, y_tr).coef_
+grad = lambda w: -X_tr.T @ (y_tr - X_tr @ w) / len(y_tr)
+step = 1 / np.linalg.eigvalsh(X_tr.T @ X_tr / len(y_tr)).max()
+w_sub, w_ista = np.zeros(50), np.zeros(50)
+for _ in range(5000):
+    w_sub = w_sub - step * (grad(w_sub) + alpha * np.sign(w_sub))          # subgradient descent
+    w_ista = soft_threshold(w_ista - step * grad(w_ista), step * alpha)    # proximal gradient (ISTA)
+assert np.allclose(w_ista, reference, atol=1e-8) and (w_ista == 0).sum() == (reference == 0).sum() > 30
+assert (w_sub == 0).sum() == 0 and np.abs(w_sub[reference == 0]).max() > 0.05
+
+for a in [0.001, 0.01]:                                         # 30 rows, 100 features: at most 30 survive
+    kept_wide = np.sum(Lasso(alpha=a, fit_intercept=False, tol=1e-12, max_iter=200_000).fit(X_wide, y_wide).coef_ != 0)
+    assert 0 < kept_wide <= 30
+```
+
+## When to use which
+| Situation | Choice | Why |
+|---|---|---|
+| Many features, each with a small effect | Ridge | Keeps everything and shrinks the noise |
+| A few strong effects among many irrelevant features | Lasso | Zeros the rest and gives a smaller model |
+| Correlated groups, and you still want selection | Elastic net | Keeps or drops a group together |
+| More features than rows, or collinear columns | Ridge or elastic net | Unique, stable solution |
+| Neural network trained with SGD | The optimizer's `weight_decay` | Identical to an L2 penalty |
+| Neural network trained with Adam | AdamW | Decay that does not depend on gradient size |
+
+Weight penalties are one tool among several against overfitting: the [overfitting playbook](../overfitting-playbook/) puts them next to the others, and [dropout](../dropout/) covers the main alternative in neural networks.
+
+The orthonormal-design comparison of ridge and lasso follows section 3.4 of Hastie, Tibshirani and Friedman's The Elements of Statistical Learning. Ridge regression is from Hoerl and Kennard (1970), the lasso from Tibshirani (1996), the elastic net from Zou and Hastie (2005), and AdamW from Loshchilov and Hutter (2019).

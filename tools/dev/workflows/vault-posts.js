@@ -80,6 +80,7 @@ Rules:
 - Every \`\`\`python block runs: all of a post's python blocks are concatenated in order and executed as one script (numpy, pandas, scipy, scikit-learn, torch, sqlite3 are installed; no network; keep runtime under ~20 s). Use asserts to prove what the prose claims; cross-check against a brute force or a library where feasible.
 - Structure: a short plain-words intro, sections that build the idea, worked examples, a "When to use it"/"Pitfalls" style section where it fits. Roughly 700-1600 words of prose plus code. Group: the one given. Order: the one given.
 - Links: sibling posts as [text](../<slug>/) only for these slugs: ${ALL_SLUGS}. Long-form posts as /posts/position-bias/, /posts/evaluating-ml-systems/, /posts/lora-from-scratch/, /posts/text-to-music-2026/. LeetCode as /leetcode/ or /leetcode/<slug>/ (see ${SITE}/tools/leetcode/src for slugs).
+- AUTHORSHIP: never imply the owner created a model, library, dataset or method they only studied or used (e.g. MusicGen, LoRA, FlashAttention); name the real authors.
 - PRIVACY, the site is public: no interview framing ("in an interview", "interviewer", "interview question"), no company names used as hiring targets, no "role-relevance", "company-demand" or "target-company" material, nothing personal, never mention the vault or Obsidian.
 - Do NOT edit any other file in the repo (another engineer is redesigning the site at the same time), and do NOT run git commands.
 Build and test your post with:  cd ${SITE} && python3 -I tools/posts/build.py . <slug>   (it runs the python blocks and renders posts/<slug>/index.html; it also rewrites posts/index.html, which is expected). Iterate until it prints "<slug>: N min, K python blocks pass" (or "no python").`
@@ -91,9 +92,19 @@ const REVIEW = { type: 'object', properties: { slug: { type: 'string' },
   issues: { type: 'array', items: { type: 'object', properties: { issue: { type: 'string' }, fixed: { type: 'boolean' } }, required: ['issue', 'fixed'] } },
   build_line: { type: 'string' } }, required: ['slug', 'issues', 'build_line'] }
 
+// Batches (owner's choice, 2026-11-01): args = { review: [slugs that already have a draft], write: [slugs to write] }.
+const reviewOnly = new Set((args && args.review) || [])
+const wanted = new Set([...reviewOnly, ...((args && args.write) || [])])
+const BATCH = POSTS.filter(p => wanted.has(p.slug))
+const unknown = [...wanted].filter(s => !POSTS.some(p => p.slug === s))
+if (unknown.length) log(`unknown slugs ignored: ${unknown.join(', ')}`)
+log(`batch: ${BATCH.length} posts (${BATCH.filter(p => reviewOnly.has(p.slug)).length} review-only)`)
+
 const results = await pipeline(
-  POSTS,
-  (p) => agent(`${RULES}
+  BATCH,
+  (p) => reviewOnly.has(p.slug)
+    ? { slug: p.slug, title: '(existing draft)', build_line: 'not rebuilt by a writer', note_issues: [] }
+    : agent(`${RULES}
 Your post: slug "${p.slug}", group "${p.group}", order ${p.order}. Source note (read it fully): ${V}/${p.note}
 ${p.extra ? 'Specific instructions: ' + p.extra : ''}
 Write ${P}/src/${p.slug}.md, build it until it passes, and return the structured summary.`,
@@ -106,5 +117,6 @@ Fix every real issue in the .md, rebuild until it passes, and return the structu
     { label: `review:${p.slug}`, phase: 'Review', schema: REVIEW }),
 )
 const done = results.filter(Boolean)
-log(`${done.length}/${POSTS.length} posts written and reviewed`)
+log(`${done.length}/${BATCH.length} posts in this batch written and reviewed`)
+return done
 return done.map(r => ({ slug: r.slug, build: r.build_line, fixed: r.issues.filter(i => i.fixed).length, open: r.issues.filter(i => !i.fixed).map(i => i.issue) }))

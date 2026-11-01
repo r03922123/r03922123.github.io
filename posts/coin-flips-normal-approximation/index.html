@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coin flips and the normal approximation: a binomial tail by hand · r03922123</title>
+<meta name="description" content="How likely is a fair coin to land heads at least 480 times in 900 flips? Solving it with nothing but a square root and the 68-95-99.7 rule, then checking how good that answer is: the continuity correction, why the rough answer is right partly by luck, where the approximation breaks, and a bound that never does.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · Probability</p>
+<header class="post-head">
+  <h1>Coin flips and the normal approximation: a binomial tail by hand</h1>
+  <div class="meta">November 1, 2026 · 11 min read · binomial · normal approximation · central limit theorem · continuity correction</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-a-bell-curve-shows-up">Why a bell curve shows up</a></li><li><a href="#solving-it-in-three-lines">Solving it in three lines</a></li><li><a href="#two-errors-that-cancel">Two errors that cancel</a></li><li><a href="#simulating-it">Simulating it</a></li><li><a href="#working-the-other-way-how-many-heads-is-surprising">Working the other way: how many heads is surprising?</a></li><li><a href="#where-the-approximation-breaks">Where the approximation breaks</a></li><li><a href="#a-bound-that-always-holds">A bound that always holds</a></li><li><a href="#summary">Summary</a></li></ol></nav>
+<p>Here is a question that looks like it needs a computer. A fair coin is flipped 900 times. What is the probability of getting <b>480 or more heads</b>?</p>
+<p>The exact answer is a sum of 421 binomial terms, each with a coefficient like \(\binom{900}{480}\), a number with more than 250 digits. Nobody sums that by hand. But 900 flips is a lot of flips, and the count of heads from many independent flips is very close to normally distributed. Once the problem is a normal one, it takes a square root, one subtraction and a fact you already know about bell curves.</p>
+<p>This post solves the question that way, then checks the answer against the exact binomial and asks the more useful questions: how far off is the quick answer, why, and when does the shortcut stop working?</p>
+<h2 id="why-a-bell-curve-shows-up">Why a bell curve shows up</h2>
+<p>The number of heads is \(X \sim \text{Binomial}(n, p)\), the sum of \(n\) independent coin flips that are each 1 (heads) with probability \(p\) and 0 otherwise. Its mean and variance follow from adding up the flips (see <a href="../bernoulli-binomial/">Bernoulli and binomial</a> for the derivation):</p>
+\[ \mathbb{E}[X] = np, \qquad \text{Var}(X) = np(1 - p). \]
+<p>The central limit theorem says a sum of many independent, identically distributed terms with finite variance is approximately normal once you centre it and scale it. For the binomial this special case is older than the general theorem: Abraham de Moivre worked it out for fair coins in 1733, and Laplace later extended it to any \(p\), which is why it is often called the de Moivre-Laplace theorem. In practice it means</p>
+\[ X \approx \mathcal{N}\big(np,\; np(1 - p)\big) \quad \text{when } np(1 - p) \text{ is not small.} \]
+<p>A common rule of thumb asks for \(np\) and \(n(1-p)\) both at least 5 or 10. Treat that as a minimum, not a guarantee; the last sections show where it is not enough.</p>
+<h2 id="solving-it-in-three-lines">Solving it in three lines</h2>
+<p><b>Step 1: centre and spread.</b> With \(n = 900\) and \(p = 1/2\):</p>
+\[ \mu = 900 \times \tfrac12 = 450, \qquad \sigma^2 = 900 \times \tfrac12 \times \tfrac12 = 225, \qquad \sigma = 15. \]
+<p>For a fair coin \(\sigma = \sqrt{n}/2\), so when \(n\) is a perfect square the standard deviation is a whole number. That is what makes this kind of question solvable in your head, and it is worth noticing which flip counts have this property: 100, 400, 900, 1600, 2500.</p>
+<p><b>Step 2: standardize.</b> 480 heads is 30 above the mean, which is</p>
+\[ z = \frac{480 - 450}{15} = 2 \]
+<p>standard deviations.</p>
+<p><b>Step 3: read the tail.</b> The 68-95-99.7 rule says about 95% of a normal distribution lies within two standard deviations of the mean. The remaining 5% is split evenly between the two tails by symmetry, and we only want the upper one: roughly <b>2.5%</b>.</p>
+<p>That is a fine answer to give quickly. It is also not quite the number the normal distribution gives, and the normal distribution is not quite the binomial. Both gaps are worth understanding.</p>
+<pre><code class="language-python">import math
+import numpy as np
+from scipy import stats
+
+n, p, k = 900, 0.5, 480
+mu, sigma = n * p, math.sqrt(n * p * (1 - p))
+assert mu == 450 and sigma == 15 == math.sqrt(n) / 2
+z = (k - mu) / sigma
+assert z == 2
+
+# the exact answer: P(X &gt;= 480) = sum of the PMF from 480 to 900, in exact integer arithmetic
+exact = sum(math.comb(n, j) for j in range(k, n + 1)) / 2 ** n
+assert math.isclose(exact, stats.binom.sf(k - 1, n, p), rel_tol=1e-9)
+assert round(exact, 4) == 0.0246
+assert len(str(math.comb(n, k))) &gt; 250                 # the coefficients are enormous
+
+empirical_rule = (1 - 0.95) / 2
+assert math.isclose(empirical_rule, 0.025)</code></pre>
+<h2 id="two-errors-that-cancel">Two errors that cancel</h2>
+<p>The quick answer of 2.5% is within 0.05 percentage points of the exact 2.46%. That looks like the normal approximation is excellent, but it is partly a coincidence, because two separate errors point in opposite directions.</p>
+<p><b>The 95% is rounded.</b> The share of a normal distribution within two standard deviations is 95.45%, not 95%. The "95" in the 68-95-99.7 rule really belongs to \(z = 1.96\). Using the true value, the upper tail beyond \(z = 2\) is</p>
+\[ P(Z \ge 2) = \frac{1 - 0.9545}{2} \approx 2.28\%, \]
+<p>which is further from the exact answer than the rough 2.5% was.</p>
+<p><b>A discrete count is not a continuous curve.</b> The binomial puts its probability on the integers 0, 1, ..., 900. If you draw it as a histogram, the bar for 480 covers the interval from 479.5 to 480.5. "At least 480 heads" therefore corresponds to the normal area from <b>479.5</b> upward, not from 480. Cutting at 480 throws away half of the 480 bar, which is about 0.2 percentage points here. This half-unit shift is the <b>continuity correction</b>:</p>
+\[ P(X \ge 480) \approx P\!\left(Z \ge \frac{479.5 - 450}{15}\right) = P(Z \ge 1.967) \approx 2.46\%. \]
+<p>With the correction the normal answer matches the exact one to about 0.003 percentage points. So the order of quality is: corrected normal (excellent), the 68-95-99.7 shortcut (good by luck), uncorrected normal (a little low). The table collects them.</p>
+<table><thead><tr><th>method</th><th>value of \(P(X \ge 480)\)</th></tr></thead><tbody><tr><td>exact binomial sum</td><td>2.458%</td></tr><tr><td>normal with continuity correction, cut at 479.5</td><td>2.461%</td></tr><tr><td>68-95-99.7 rule, \((1 - 0.95)/2\)</td><td>2.5%</td></tr><tr><td>normal without correction, cut at 480</td><td>2.275%</td></tr></tbody></table>
+<pre><code class="language-python">uncorrected = stats.norm.sf((k - mu) / sigma)
+corrected = stats.norm.sf((k - 0.5 - mu) / sigma)
+assert round(uncorrected, 5) == 0.02275
+assert math.isclose(stats.norm.cdf(2) - stats.norm.cdf(-2), 0.9545, abs_tol=1e-4)
+assert abs(corrected - exact) &lt; 4e-5                    # about 0.003 percentage points
+assert abs(empirical_rule - exact) &lt; abs(uncorrected - exact)   # the rough answer wins, by luck
+assert uncorrected &lt; exact &lt; corrected &lt; empirical_rule
+
+# the half-unit really is half of the bar at 480
+half_bar = stats.binom.pmf(k, n, p) / 2
+assert math.isclose(corrected - uncorrected, half_bar, rel_tol=0.05)</code></pre>
+<p>The correction matters most when \(\sigma\) is small, since half a unit is then a bigger slice of a standard deviation. With 100 flips and "at least 60 heads", \(z\) is again exactly 2, but now the exact tail is 2.84%, the uncorrected normal still says 2.28%, and only the corrected version (2.87%) gets close. With 2,500 flips and at least 1,300 heads, also \(z = 2\), the uncorrected error shrinks to about 0.1 percentage points.</p>
+<pre><code class="language-python">for flips, heads in [(100, 60), (900, 480), (2500, 1300)]:
+    m, s = flips / 2, math.sqrt(flips) / 2
+    assert (heads - m) / s == 2                         # every case sits exactly 2 sd out
+    ex = stats.binom.sf(heads - 1, flips, 0.5)
+    err_plain = abs(stats.norm.sf((heads - m) / s) - ex)
+    err_cc = abs(stats.norm.sf((heads - 0.5 - m) / s) - ex)
+    assert err_cc &lt; err_plain / 10                      # the correction wins by an order of magnitude
+    print(f"{flips:5d} flips: exact {ex:.4%}  plain error {err_plain:.4%}  corrected error {err_cc:.4%}")</code></pre>
+<h2 id="simulating-it">Simulating it</h2>
+<p>A third check needs no formulas at all: flip the coin. Half a million simulated runs of 900 flips should land on at least 480 heads about 2.46% of the time, and the spread of the head counts should come out at 15.</p>
+<pre><code class="language-python">rng = np.random.default_rng(7)
+heads = rng.binomial(n, p, size=500_000)
+sim = (heads &gt;= k).mean()
+se = math.sqrt(exact * (1 - exact) / heads.size)
+assert abs(sim - exact) &lt; 4 * se
+assert abs(heads.std() - 15) &lt; 0.1
+
+# and the histogram is close to the bell curve at every count within 3 sd, not only at 480
+counts = np.arange(400, 501)
+assert np.abs(stats.binom.pmf(counts, n, p) - stats.norm.pdf(counts, mu, sigma)).max() &lt; 2e-4</code></pre>
+<h2 id="working-the-other-way-how-many-heads-is-surprising">Working the other way: how many heads is surprising?</h2>
+<p>Often the useful question runs backwards: given \(n\) flips of a coin you believe is fair, where should alarm start? By the normal approximation about 2.3% of runs land two or more standard deviations above the mean, and about 0.13% land three or more above. (Because the count is discrete, the exact share at a whole-number threshold is a little higher: 2.46% rather than 2.28% at 900 flips, as computed above.) So with a fair coin</p>
+\[ \text{two sd above} = \frac{n}{2} + \sqrt{n}, \qquad \text{three sd above} = \frac{n}{2} + 1.5\sqrt{n}. \]
+<p>For 900 flips those are 480 and 495 heads. Notice what scales: the margin grows with \(\sqrt{n}\) while the number of flips grows with \(n\), so as a <b>proportion</b> the threshold shrinks toward one half. Two standard deviations is 53.3% heads at 900 flips but only 51% at 10,000 flips.</p>
+<p>The same arithmetic answers a common evaluation question. A binary classifier is scored on 2,500 balanced test examples and gets 52% right. Is that better than guessing? A guesser's correct count is \(\text{Binomial}(2500, 1/2)\) with mean 1,250 and \(\sigma = 25\); 1,300 correct is \(z = 2\), and a guesser does that well about 2.4% of the time. Suggestive, not conclusive, especially if several models were tried and this is the best one. <a href="../is-this-coin-fair/">Is this coin fair?</a> and <a href="../p-values/">p-values</a> take that line of reasoning further.</p>
+<pre><code class="language-python">def two_sd_threshold(flips):
+    return flips / 2 + math.sqrt(flips)
+
+
+assert two_sd_threshold(900) == 480
+assert 900 / 2 + 1.5 * math.sqrt(900) == 495
+assert round(two_sd_threshold(900) / 900, 3) == 0.533
+assert two_sd_threshold(10_000) / 10_000 == 0.51
+
+assert round(stats.binom.sf(1299, 2500, 0.5), 3) == 0.024
+assert round(stats.norm.sf(3), 4) == 0.0013
+assert math.isclose(stats.binom.sf(494, 900, 0.5), stats.norm.sf(2.967), rel_tol=0.01)</code></pre>
+<h2 id="where-the-approximation-breaks">Where the approximation breaks</h2>
+<p><b>Far tails.</b> The approximation is good in absolute terms everywhere, but tails are tiny, so the right measure there is the <b>relative</b> error. With 900 flips the corrected normal is within 1% of the exact tail at three standard deviations and within 6% at five, which is fine for a sanity check. Without the correction it is about 10% low throughout. With only 100 flips the corrected normal is about 23% too high at four standard deviations and 70% too high at five. Anyone computing the probability of a rare event, a one-in-a-million false alarm say, should use the exact binomial tail rather than a bell curve.</p>
+<p><b>Skewed coins.</b> Everything above used \(p = 1/2\), where the binomial is perfectly symmetric. When \(p\) is small the binomial is lopsided, with a long right tail, while the normal stays symmetric. Take 500 trials with a 2% success rate. The mean is \(np = 10\), so even the stricter form of the rule of thumb is met, and \(\sigma \approx 3.13\). Yet for 20 or more successes, about 3.2 standard deviations out, the exact tail is 0.31% while the corrected normal gives 0.12%, too low by a factor of more than two. On the other side the normal errs the opposite way: it puts 3.9% on 4 or fewer successes, against an exact 2.8%. A Poisson with \(\lambda = np = 10\) gets the right tail within about 10%, and it is the better approximation whenever \(p\) is small; see <a href="../poisson-distribution/">the Poisson distribution</a>.</p>
+<pre><code class="language-python"># far tails: relative error of the corrected normal at 3, 4 and 5 sd above the mean (900 flips)
+for zz in (3, 4, 5):
+    kk = int(mu + zz * sigma)
+    ex = stats.binom.sf(kk - 1, n, p)
+    approx = stats.norm.sf((kk - 0.5 - mu) / sigma)
+    assert abs(approx / ex - 1) &lt; {3: 0.01, 4: 0.03, 5: 0.06}[zz]
+    assert -0.12 &lt; stats.norm.sf(zz) / ex - 1 &lt; -0.09      # uncorrected: about 10% low
+
+# with only 100 flips the corrected tail drifts far off
+assert round(stats.norm.sf(69.5, 50, 5) / stats.binom.sf(69, 100, 0.5) - 1, 2) in (0.22, 0.23)   # 4 sd
+assert round(stats.norm.sf(74.5, 50, 5) / stats.binom.sf(74, 100, 0.5) - 1, 2) == 0.70            # 5 sd
+
+# a skewed binomial that passes the rule of thumb: n = 500, p = 0.02, np = 10
+n2, p2 = 500, 0.02
+m2, s2 = n2 * p2, math.sqrt(n2 * p2 * (1 - p2))
+assert m2 &gt;= 10 and n2 * (1 - p2) &gt;= 10 and round(s2, 2) == 3.13
+ex_tail = stats.binom.sf(19, n2, p2)                   # P(X &gt;= 20)
+normal_tail = stats.norm.sf(19.5, m2, s2)
+poisson_tail = stats.poisson.sf(19, m2)
+assert round(ex_tail, 4) == 0.0031 and round(normal_tail, 4) == 0.0012
+assert ex_tail &gt; 2 * normal_tail                       # normal badly underestimates the long tail
+assert abs(poisson_tail / ex_tail - 1) &lt; 0.12          # Poisson is within about 10%
+ex_left, normal_left = stats.binom.cdf(4, n2, p2), stats.norm.cdf(4.5, m2, s2)
+assert round(ex_left, 3) == 0.028 and round(normal_left, 3) == 0.039   # and overstates the short one</code></pre>
+<h2 id="a-bound-that-always-holds">A bound that always holds</h2>
+<p>The normal approximation is an estimate with no guarantee attached. When you need a guarantee, Hoeffding's inequality (Wassily Hoeffding, 1963) gives one for any number of flips: for the share of heads \(\hat p = X/n\) and any \(t &gt; 0\),</p>
+\[ P(\hat p - p \ge t) \le e^{-2nt^2}. \]
+<p>For our question \(t = 30/900 = 1/30\), so the bound is \(e^{-2} \approx 13.5\%\). That is true, but more than five times larger than the real 2.46%. Bounds like this are what learning theory uses, because they hold for every \(n\) and every distribution of bounded variables; for a numerical answer to a specific question, the corrected normal or the exact sum is far sharper.</p>
+<pre><code class="language-python">t = 30 / 900
+hoeffding = math.exp(-2 * n * t ** 2)
+assert math.isclose(hoeffding, math.exp(-2))
+assert hoeffding &gt; exact and hoeffding / exact &gt; 5
+
+# the bound holds for every n and every threshold we try, including small n where the normal is poor
+for flips in (10, 30, 100, 900):
+    for heads_needed in range(flips // 2 + 1, flips + 1):
+        tt = heads_needed / flips - 0.5
+        assert stats.binom.sf(heads_needed - 1, flips, 0.5) &lt;= math.exp(-2 * flips * tt ** 2) + 1e-12</code></pre>
+<h2 id="summary">Summary</h2>
+<ul><li><b>The recipe:</b> for \(X \sim \text{Binomial}(n, p)\), use \(\mu = np\) and \(\sigma = \sqrt{np(1-p)}\), standardize, and read the tail of a standard normal. For a fair coin \(\sigma = \sqrt{n}/2\).</li><li><b>Tails to remember:</b> \(P(Z \ge 1) \approx 16\%\), \(P(Z \ge 2) \approx 2.3\%\), \(P(Z \ge 3) \approx 0.13\%\). The "95" in 68-95-99.7 is really 95.45%.</li><li><b>Continuity correction:</b> cut at 479.5, not 480, when approximating "at least 480". It matters most when \(\sigma\) is small.</li><li><b>Know when to stop:</b> use the exact binomial for far tails and the Poisson when \(p\) is small; use Hoeffding when you need a bound that cannot fail.</li></ul>
+<p>The <a href="../normal-distribution/">normal distribution</a> post covers the bell curve itself, and the <a href="../probability-cheatsheet/">probability cheatsheet</a> has these tail values on one page. The question at the top of this post was inspired by a coin-flipping probability problem on InterviewQuery, rewritten here with different numbers.</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

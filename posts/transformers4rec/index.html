@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformers4Rec: session-based recommendation as language modeling · r03922123</title>
+<meta name="description" content="Treat a browsing session as a sentence and its items as tokens, then predict the next one. Turning an event log into sequences, a small session Transformer with tied embeddings trained from scratch, Recall@k and NDCG@k against popularity and last-item baselines, the four training objectives, side features, and how the NVIDIA Merlin libraries package all of it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · Recommender systems</p>
+<header class="post-head">
+  <h1>Transformers4Rec: session-based recommendation as language modeling</h1>
+  <div class="meta">November 1, 2026 · 12 min read · session-based recommendation · Transformers · next-item prediction · PyTorch</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#sessions-as-sentences">Sessions as sentences</a></li><li><a href="#from-an-event-log-to-sequences">From an event log to sequences</a></li><li><a href="#a-session-transformer-from-scratch">A session Transformer from scratch</a></li><li><a href="#measuring-it-recall-k-and-ndcg-k">Measuring it: Recall@k and NDCG@k</a></li><li><a href="#four-ways-to-train-the-same-model">Four ways to train the same model</a></li><li><a href="#side-information">Side information</a></li><li><a href="#the-same-pipeline-with-merlin">The same pipeline with Merlin</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<p>Many visitors to a shop or a travel site never log in. All the system knows about them is what they did in the last few minutes: a pair of running shoes, then another pair, then a sports watch. Session-based recommendation predicts the next item from that short trail alone. Even when the user is known, the current session often says more about what they want right now than their history from last year.</p>
+<p>A session is an ordered list of item ids, and predicting the next id given the earlier ones is the same problem as predicting the next word in a sentence. Transformers4Rec is a library from the NVIDIA Merlin team (Moreira, Rabhi, Lee, Ak and Oldridge, RecSys 2021) that takes that analogy literally. It connects the Transformer architectures in Hugging Face Transformers to recommendation inputs, losses and metrics. This post builds the core idea from scratch in PyTorch, measures it properly, and then shows how the library packages the same pieces.</p>
+<h2 id="sessions-as-sentences">Sessions as sentences</h2>
+<p>Write a session as \(s = (i_1, i_2, \dots, i_T)\), where each \(i_t\) is an item from a catalog of \(N\) items. A next-item model learns</p>
+\[ P(i_{t+1} \mid i_1, \dots, i_t) = \operatorname{softmax}(h_t W^\top)_{i_{t+1}} \]
+<p>where \(h_t\) is a \(d\)-dimensional summary of the session so far and \(W\) is an \(N \times d\) matrix with one output vector per item. Training minimizes cross-entropy on every position of every session, exactly like a language model (see <a href="../cross-entropy-vs-mse/">cross-entropy vs MSE</a>).</p>
+<p>The summary \(h_t\) is where models differ. GRU4Rec (Hidasi et al., 2016) used a recurrent network. SASRec (Kang and McAuley, 2018) replaced it with causal self-attention, the GPT recipe. BERT4Rec (Sun et al., 2019) trained a bidirectional encoder by masking items, the BERT recipe. Transformers4Rec makes these choices configurable rather than inventing a new architecture.</p>
+<h2 id="from-an-event-log-to-sequences">From an event log to sequences</h2>
+<p>Raw data is a log of events: a session id, an item id, a timestamp, often a price and a category. Turning it into training sequences takes four steps.</p>
+<ol><li>Sort by session and time. Logs arrive out of order, and every later step assumes they are in order.</li><li>Drop consecutive repeats. Refreshing a page logs the same item twice, and a model that learns "the next item is the current one" scores well offline and helps nobody.</li><li>Group into one list per session, and drop sessions with a single event, because they have no target.</li><li>Keep the most recent \(L\) items, since attention cost grows with length and old clicks matter less.</li></ol>
+<pre><code class="language-python">import numpy as np
+import pandas as pd
+
+events = pd.DataFrame({
+    "session": ["a", "b", "a", "a", "b", "a", "c", "b", "a"],
+    "item":    [ 7,   3,   7,   9,   3,   9,   5,   4,   2 ],
+    "ts":      [ 1,   2,   3,   4,   5,   6,   7,   8,   9 ],
+}).sample(frac=1, random_state=0)                          # logs rarely arrive in order
+
+
+def to_sequences(df, max_len):
+    df = df.sort_values(["session", "ts"], kind="stable")
+    prev = df.groupby("session")["item"].shift()           # previous item in the same session, NaN at the start
+    df = df[df["item"] != prev]                            # drop consecutive repeats
+    seqs = df.groupby("session")["item"].agg(list)
+    seqs = seqs[seqs.map(len) &gt;= 2]                        # an input and at least one target
+    return seqs.map(lambda s: s[-max_len:])                # the most recent max_len items
+
+
+seqs = to_sequences(events, max_len=20)
+assert seqs.to_dict() == {"a": [7, 9, 2], "b": [3, 4]}     # c had one event; the repeats in a and b are gone
+
+unsorted = events[events["item"] != events["item"].shift()]   # comparing rows of the raw, shuffled log
+assert ((unsorted["session"] == "a") &amp; (unsorted["item"] == 9)).sum() == 2   # a repeat survives</code></pre>
+<p>The last two lines show the usual mistake. Shifting the whole log, without sorting and without grouping by session, compares each row with an unrelated neighbour, so real repeats survive and the first event of one session gets compared with the last event of another.</p>
+<p>Time features need care too. Day of week as the integers 0 to 6 puts Sunday as far from Monday as it can be. The usual fix maps it onto a circle with \(\sin(2\pi x / P)\) and \(\cos(2\pi x / P)\), and the period \(P\) must be the number of distinct values, 7, not the largest value, 6:</p>
+<pre><code class="language-python">def cyclical(x, period):
+    angle = 2 * np.pi * np.asarray(x) / period
+    return np.stack([np.sin(angle), np.cos(angle)], axis=-1)
+
+
+days = cyclical(np.arange(7), period=7)                    # Monday = 0 ... Sunday = 6
+steps = np.linalg.norm(np.diff(days, axis=0), axis=1)
+assert np.allclose(steps, np.linalg.norm(days[6] - days[0]))   # Sunday to Monday is one step like any other
+assert np.allclose(cyclical(6, period=6), cyclical(0, period=6))   # with period 6, Sunday becomes Monday</code></pre>
+<h2 id="a-session-transformer-from-scratch">A session Transformer from scratch</h2>
+<p>To see whether attention over the whole session helps, the data needs structure that the last item alone cannot reveal. In this simulation each session has a hidden intent: one of 10 categories of 10 items, walked through in order. With probability 0.65 the next event is the next item of that walk. Otherwise it is a detour to a random item anywhere in the catalog, after which the walk resumes. After a detour the last item says nothing about the intent, but the earlier items do.</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+torch.manual_seed(0)
+torch.set_num_threads(2)
+rng = np.random.default_rng(0)
+N_CAT, PER_CAT, L = 10, 10, 20
+N_ITEMS = N_CAT * PER_CAT                                  # item ids 1..100; 0 is padding
+
+
+def make_session(length):
+    c, p, s = rng.integers(N_CAT), rng.integers(PER_CAT), []
+    for _ in range(length):
+        if rng.random() &lt; 0.65:
+            s.append(1 + c * PER_CAT + p)                  # next step of the hidden walk
+            p = (p + 1) % PER_CAT
+        else:
+            s.append(1 + rng.integers(N_ITEMS))            # a detour anywhere in the catalog
+    return s, c
+
+
+data = [make_session(rng.integers(4, L + 1)) for _ in range(4000)]
+train = [s for s, _ in data[:3000]]
+test, test_intent = [s for s, _ in data[3000:]], np.array([c for _, c in data[3000:]])
+
+
+def pad(batch):
+    x = torch.zeros(len(batch), L, dtype=torch.long)
+    for i, s in enumerate(batch):
+        x[i, :len(s)] = torch.tensor(s)
+    return x</code></pre>
+<p>The model is a small GPT: item and position embeddings, two pre-norm Transformer layers with a causal mask so position \(t\) only sees positions up to \(t\), and a padding mask so padded slots are ignored. The output layer reuses the input embedding table, <b>weight tying</b> (Press and Wolf, 2017; Inan et al., 2017). An item gets one vector that serves both as input and as output, which removes \(N \times d\) parameters. That matters when the catalog has millions of items, and items with few training examples learn from both directions.</p>
+<pre><code class="language-python">class SessionTransformer(nn.Module):
+    def __init__(self, n_items, d=48, heads=4, layers=2, max_len=L, tie=True):
+        super().__init__()
+        self.item = nn.Embedding(n_items + 1, d, padding_idx=0)
+        self.pos = nn.Embedding(max_len, d)
+        layer = nn.TransformerEncoderLayer(d, heads, 4 * d, dropout=0.1, batch_first=True, norm_first=True)
+        self.encoder = nn.TransformerEncoder(layer, layers, enable_nested_tensor=False)
+        self.norm = nn.LayerNorm(d)
+        self.out = nn.Linear(d, n_items + 1, bias=False)
+        if tie:
+            self.out.weight = self.item.weight             # one vector per item, used on both ends
+        nn.init.normal_(self.item.weight, std=0.02)        # small init: tied logits start near zero
+        nn.init.normal_(self.pos.weight, std=0.02)
+
+    def forward(self, x):
+        T = x.shape[1]
+        h = self.item(x) + self.pos(torch.arange(T))
+        causal = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)   # True = may not attend
+        h = self.encoder(h, mask=causal, src_key_padding_mask=(x == 0))
+        return self.out(self.norm(h))                       # (batch, T, n_items + 1) logits
+
+
+model, untied = SessionTransformer(N_ITEMS), SessionTransformer(N_ITEMS, tie=False)
+count = lambda m: sum(p.numel() for p in m.parameters())
+assert count(untied) - count(model) == (N_ITEMS + 1) * 48
+assert model.out.weight is model.item.weight
+
+opt = torch.optim.AdamW(model.parameters(), lr=3e-3)
+X = pad(train)
+for epoch in range(6):
+    model.train()
+    for idx in torch.randperm(len(X)).split(200):
+        x = X[idx]
+        logits = model(x[:, :-1])                          # predict position t + 1 from positions up to t
+        loss = F.cross_entropy(logits.reshape(-1, N_ITEMS + 1), x[:, 1:].reshape(-1), ignore_index=0)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+assert loss.item() &lt; np.log(N_ITEMS) - 1                   # well below a uniform guess over the catalog</code></pre>
+<p>The small initialization is not decoration. With tied weights, PyTorch's default embedding init (standard deviation 1) makes the initial logits large, and with the default init this model never got below the uniform loss of \(\log 101 \approx 4.6\) in the same six epochs.</p>
+<h2 id="measuring-it-recall-k-and-ndcg-k">Measuring it: Recall@k and NDCG@k</h2>
+<p>Evaluation hides the last item of each held-out session, scores the whole catalog from the prefix, and finds the rank \(r\) of the hidden item. With one relevant item per session the two standard metrics are</p>
+\[ \text{Recall@}k = \mathbb{1}[r \le k], \qquad \text{NDCG@}k = \frac{\mathbb{1}[r \le k]}{\log_2(1 + r)} \]
+<p>averaged over sessions. With a single target, Recall@k is the same as hit rate. The logarithm is base 2, so a hit at rank 1 scores exactly 1. With a natural logarithm, rank 1 would score \(1 / \ln 2 \approx 1.44\) and the metric would not be normalized.</p>
+<p>Two baselines keep the model honest. <b>Popularity</b> recommends the most frequent items to everyone. <b>Last item</b> recommends whatever most often followed the current item in training, a first-order Markov chain, which is hard to beat on many real datasets.</p>
+<pre><code class="language-python">from sklearn.metrics import ndcg_score
+
+
+def ranks_of(scores, targets):
+    """1-based rank of each target item in its row of scores."""
+    target_score = scores[np.arange(len(targets)), targets][:, None]
+    return 1 + (scores &gt; target_score).sum(axis=1)
+
+
+def recall_ndcg(ranks, k=10):
+    hit = ranks &lt;= k
+    return hit.mean(), np.where(hit, 1 / np.log2(1 + ranks), 0.0).mean()
+
+
+assert recall_ndcg(np.array([1]))[1] == 1.0 and recall_ndcg(np.array([3]))[1] == 0.5
+
+
+@torch.no_grad()
+def transformer_scores(prefixes):
+    model.eval()
+    logits = model(pad(prefixes))
+    last = torch.tensor([len(p) - 1 for p in prefixes])
+    return logits[torch.arange(len(prefixes)), last].numpy()   # the output at each session's last real item
+
+
+prefixes, targets = [s[:-1] for s in test], np.array([s[-1] for s in test])
+jitter = 1e-6 * rng.random((len(test), N_ITEMS + 1))          # break ties at random
+pop = np.bincount([i for s in train for i in s], minlength=N_ITEMS + 1).astype(float)
+follows = np.zeros((N_ITEMS + 1, N_ITEMS + 1))
+for s in train:
+    for a, b in zip(s, s[1:]):
+        follows[a, b] += 1
+
+scores = {"popularity": np.tile(pop, (len(test), 1)) + jitter,
+          "last item": follows[[p[-1] for p in prefixes]] + jitter,
+          "transformer": transformer_scores(prefixes)}
+for s in scores.values():
+    s[:, 0] = -np.inf                                         # never recommend padding
+
+detour = np.array([(p[-1] - 1) // PER_CAT != c for p, c in zip(prefixes, test_intent)])
+results = {}
+for name, s in scores.items():
+    r = ranks_of(s, targets)
+    results[name] = recall_ndcg(r) + (recall_ndcg(r[detour])[0],)
+    one_hot = np.eye(N_ITEMS + 1)[targets][:, 1:]
+    assert np.isclose(results[name][1], ndcg_score(one_hot, s[:, 1:], k=10))   # matches scikit-learn
+
+pop_r, last_r, tf_r = results["popularity"], results["last item"], results["transformer"]
+assert tf_r[0] &gt; last_r[0] + 0.1 &gt; pop_r[0] + 0.1             # Recall@10: transformer &gt; last item &gt; popularity
+assert tf_r[2] &gt; last_r[2] + 0.4                              # the gap is widest right after a detour
+on_track = {name: recall_ndcg(ranks_of(s[~detour], targets[~detour]))[0] for name, s in scores.items()}
+assert abs(on_track["transformer"] - on_track["last item"]) &lt; 0.05   # on track, the two are level</code></pre>
+<table><thead><tr><th>Model</th><th>Recall@10</th><th>NDCG@10</th><th>Recall@10 after a detour</th></tr></thead><tbody><tr><td>Popularity</td><td>0.10</td><td>0.05</td><td>0.09</td></tr><tr><td>Last item</td><td>0.49</td><td>0.46</td><td>0.08</td></tr><tr><td>Session Transformer</td><td>0.65</td><td>0.56</td><td>0.60</td></tr></tbody></table>
+<p>The table shows one run; about a third of the test prefixes end on a detour. Popularity knows nothing about the session. Last item is strong while the walk is on track and collapses after a detour to the level of popularity, because a random item says nothing about where the walk was going. The Transformer attends back past the detour to the items that reveal the intent. On prefixes that end on the walk the two are level on Recall@10 (about 0.68 each), so the Transformer's whole lead comes from the detours. It is also exactly the gap a Transformer should close and a bigram cannot.</p>
+<h2 id="four-ways-to-train-the-same-model">Four ways to train the same model</h2>
+<p>The model above trains with <b>causal language modeling (CLM)</b>: predict each item from the ones before it. Transformers4Rec supports three more objectives borrowed from NLP.</p>
+<ul><li><b>Masked language modeling (MLM)</b>, as in BERT4Rec: hide random items and predict them from both sides. Each session gives fewer targets per pass but richer context. At inference, a mask is placed after the last item. During training at least one item per session must be masked, or that session contributes no target and no loss.</li><li><b>Permutation language modeling (PLM)</b>, from XLNet: predict items in a random factorization order, which gives bidirectional context without a mask token.</li><li><b>Replacement token detection (RTD)</b>, from ELECTRA: a small generator replaces some items, and the main model learns to spot which ones were replaced, which turns every position into a training signal.</li></ul>
+<p>The Transformers4Rec paper compared these objectives on several e-commerce and news datasets. The useful takeaway is that the objective is a hyperparameter worth tuning, not a fixed property of the architecture.</p>
+<h2 id="side-information">Side information</h2>
+<p>Item ids alone ignore what the log knows about each event. Transformers4Rec builds an input vector per position from several feature sequences.</p>
+<ul><li><b>Categorical</b> features such as category or brand get their own embedding tables.</li><li><b>Continuous</b> features such as price or time since the previous event are projected to \(d\) dimensions by a linear layer. An alternative is a soft one-hot embedding: a linear layer and a softmax produce weights over a small embedding table, and the feature becomes a weighted mix of its rows.</li><li>The per-feature vectors are concatenated and passed through an MLP, or summed, before the Transformer.</li></ul>
+<p>Prices are long-tailed, so they are usually log-transformed and standardized, and a price relative to its category's average often carries more signal than the raw number. For regularization on these tables, <b>stochastic swap noise</b> replaces a feature value, with a small probability, by the same feature taken from another random row of the batch. Every value it inserts is a real value from the data, so it works for categorical features, and it creates new feature combinations the model has to be robust to. <a href="../dropout/">Dropout</a> and weight tying do the rest.</p>
+<h2 id="the-same-pipeline-with-merlin">The same pipeline with Merlin</h2>
+<p>In the Merlin stack, NVTabular does the ETL and Transformers4Rec builds the model. NVTabular runs on cuDF, so the full pipeline expects a GPU. The two blocks below are <b>not executed</b> here. They sketch the API as it appears in the project's README and examples, so check them against the release you install.</p>
+<pre><code class="language-plaintext"># ETL with NVTabular (not executed: needs the Merlin stack and a GPU)
+import nvtabular as nvt
+
+cats = ["item_id", "category"] &gt;&gt; nvt.ops.Categorify()     # contiguous ids; low ids reserved for null/unknown
+features = ["session_id", "timestamp"] + cats
+sessions = features &gt;&gt; nvt.ops.Groupby(
+    groupby_cols=["session_id"],
+    sort_cols=["timestamp"],                               # keep each session's list in time order
+    aggs={"item_id": ["list", "count"], "category": ["list"], "timestamp": ["first"]},
+    name_sep="-",
+)
+seq = sessions["item_id-list", "category-list"] &gt;&gt; nvt.ops.ListSlice(-20)   # the last 20 items
+workflow = nvt.Workflow(seq + sessions["item_id-count"])
+workflow.fit_transform(nvt.Dataset("events.parquet")).to_parquet("sessions/")</code></pre>
+<pre><code class="language-plaintext"># Model with Transformers4Rec (not executed)
+from transformers4rec import torch as tr
+from transformers4rec.torch.ranking_metric import NDCGAt, RecallAt
+
+# schema: the Merlin schema of the parquet files written by the NVTabular workflow
+inputs = tr.TabularSequenceFeatures.from_schema(
+    schema, max_sequence_length=20, continuous_projection=64,
+    aggregation="concat", masking="mlm",                   # or "clm", "plm", "rtd"
+)
+config = tr.XLNetConfig.build(d_model=64, n_head=4, n_layer=2, total_seq_length=20)
+body = tr.SequentialBlock(inputs, tr.MLPBlock([64]), tr.TransformerBlock(config, masking=inputs.masking))
+head = tr.Head(
+    body,
+    tr.NextItemPredictionTask(weight_tying=True,
+                              metrics=[NDCGAt(top_ks=[10, 20], labels_onehot=True),
+                                       RecallAt(top_ks=[10, 20], labels_onehot=True)]),
+    inputs=inputs,
+)
+model = tr.Model(head)</code></pre>
+<p>Each piece maps onto the from-scratch version: <code>TabularSequenceFeatures</code> is the embedding layer plus side features, <code>masking</code> chooses the training objective, <code>TransformerBlock</code> wraps a Hugging Face model in place of the hand-built encoder, and <code>NextItemPredictionTask(weight_tying=True)</code> is the tied output layer with its cross-entropy loss. The library also provides a Hugging Face style <code>Trainer</code>, and its examples train and evaluate incrementally over consecutive time windows.</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Sort before deduplicating.</b> Shifting an unsorted log, or shifting across session boundaries, removes the wrong rows without any error.</li><li><b>Split by time.</b> Train on earlier sessions and test on later ones. A random split leaks future popularity into training.</li><li><b>Always report the baselines.</b> A last-item Markov chain is often competitive, and on some datasets the Transformer only wins on long sessions.</li><li><b>Watch the special ids.</b> Padding and the null and out-of-vocabulary ids that <code>Categorify</code> reserves must never be scored as recommendations.</li><li><b>The full softmax gets expensive.</b> With millions of items, scoring the whole catalog per position dominates training. Sampled softmax or in-batch negatives, as in <a href="../contrastive-loss/">contrastive losses</a>, are the usual fix, and serving moves to approximate nearest-neighbour search (see <a href="../two-tower-retrieval/">two-tower retrieval</a> and <a href="../vector-databases/">vector databases</a>).</li><li><b>Sessions are not users.</b> For logged-in users with long histories, see <a href="../sequential-user-modeling/">sequential user modeling</a>, and for brand-new items and users, <a href="../cold-start/">cold start</a>.</li></ul>
+<p>The library and its training objectives are described in "Transformers4Rec: Bridging the Gap between NLP and Sequential / Session-Based Recommendation" (Moreira et al., RecSys 2021), the NVIDIA-Merlin/Transformers4Rec repository and the NVIDIA developer blog post on session-based recommendation. The prose and code here are written from scratch.</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

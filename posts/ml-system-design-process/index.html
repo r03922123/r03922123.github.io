@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The ML system design process, step by step · r03922123</title>
+<meta name="description" content="How to take a one-line request (&quot;recommend products on the home page&quot;) to a design that can be reviewed: clarify and size the problem, write the objective in one sentence, sketch the pipeline around a baseline, specify labels and features, choose a model on explicit axes, plan the evaluation and the serving path, then work through the edge cases and the monitoring. Small calculations size the traffic, check label agreement, size an A/B test, estimate a cache hit rate and compare exploration strategies for new items.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · ML systems and design</p>
+<header class="post-head">
+  <h1>The ML system design process, step by step</h1>
+  <div class="meta">November 1, 2026 · 11 min read · system design · design review · evaluation · serving</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#step-1-clarify-the-problem-and-size-it">Step 1: clarify the problem and size it</a></li><li><a href="#step-2-write-the-objective-in-one-sentence">Step 2: write the objective in one sentence</a></li><li><a href="#step-3-sketch-the-pipeline-around-a-baseline">Step 3: sketch the pipeline around a baseline</a></li><li><a href="#step-4-specify-the-labels-and-the-features">Step 4: specify the labels and the features</a></li><li><a href="#step-5-choose-the-model-on-explicit-axes">Step 5: choose the model on explicit axes</a></li><li><a href="#step-6-plan-the-evaluation">Step 6: plan the evaluation</a></li><li><a href="#step-7-plan-the-serving-path">Step 7: plan the serving path</a></li><li><a href="#step-8-the-deep-dive">Step 8: the deep dive</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<p>A design request usually arrives as one sentence: "we want personalised recommendations on the home page". Between that sentence and a model in production sit a dozen decisions, and bad designs usually make them in the wrong order or never write them down.</p>
+<p>The <a href="../ml-system-design-framework/">framework post</a> lists the questions a design has to answer. This one is the working process: the steps for writing or reviewing a design, what each should leave in the design document, and the small calculations that turn opinions into numbers. One running example is used throughout: an online shop with 5 million daily users wants a "recommended for you" row on its home page.</p>
+<h2 id="step-1-clarify-the-problem-and-size-it">Step 1: clarify the problem and size it</h2>
+<p>Before any modelling, pin down four things.</p>
+<ul><li><b>Who and what.</b> Which users see the row, on which surface, and what they are supposed to do next (open a product, add it to the cart, buy).</li><li><b>The current system.</b> If a bestseller list fills the row today, what is wrong with it? "Same items for everyone" and "stale by Friday" lead to different designs.</li><li><b>Scale.</b> Daily active users, peak requests per second, catalogue size, how fast the catalogue changes.</li><li><b>Constraints.</b> Real-time or batch, the latency budget for the whole request, privacy rules on which data may be used.</li></ul>
+<p>Scale deserves a back-of-envelope estimate, because it decides what fits in memory and what can be precomputed.</p>
+<pre><code class="language-python">import numpy as np
+from scipy import stats
+
+dau, visits_per_user, peak_factor = 5_000_000, 3, 3
+avg_qps = dau * visits_per_user / 86_400
+peak_qps = peak_factor * avg_qps                         # assume the busiest hour runs 3x the daily average
+n_items, n_users, dim = 2_000_000, 20_000_000, 64
+item_index_gb = n_items * dim * 4 / 1e9                  # float32 item embeddings
+user_table_gb = n_users * dim * 4 / 1e9
+impressions_per_day = dau * visits_per_user * 20         # 20 items in the row
+print(f"peak {peak_qps:.0f} QPS, item index {item_index_gb:.2f} GB, user table {user_table_gb:.1f} GB, "
+      f"{impressions_per_day / 1e6:.0f}M impression rows per day")
+assert 500 &lt; peak_qps &lt; 600
+assert item_index_gb &lt; 1 &lt; user_table_gb                 # the item index fits in RAM on every serving replica; the user table goes to a shared key-value store</code></pre>
+<p>A few hundred requests per second is modest; 300 million logged impressions a day is not.</p>
+<h2 id="step-2-write-the-objective-in-one-sentence">Step 2: write the objective in one sentence</h2>
+<p>Translate the business goal into a prediction, in a sentence of this shape: *build a [classification, regression or ranking] model that predicts [a probability, a value or an order] from [these inputs]*. For the example: "rank candidate products for a user by the probability that they add the product to the cart within the session, given their history, the product and the context."</p>
+<p>Then pair the offline metric that judges the model with the online metric that judges the product.</p>
+<table><thead><tr><th>Task</th><th>Offline metric</th><th>Online metric</th></tr></thead><tbody><tr><td>Ranking a list</td><td>NDCG@k, recall@k</td><td>click-through and add-to-cart rate, revenue per session</td></tr><tr><td>Rare-event classification</td><td>PR-AUC, recall at a fixed precision</td><td>caught events, false alarms handled per reviewer hour</td></tr><tr><td>Regression (delivery time)</td><td>MAE, calibration by bucket</td><td>complaints about lateness, cancellations</td></tr></tbody></table>
+<p>The rest of the design is checked against this sentence: a choice that cannot be traced back to it is suspect.</p>
+<h2 id="step-3-sketch-the-pipeline-around-a-baseline">Step 3: sketch the pipeline around a baseline</h2>
+<p>Draw the whole loop before any box gets detailed: how data is logged, how training data is built, how the model reaches serving, and how serving produces the next logs.</p>
+<pre><code class="language-plaintext">offline:  event logs -&gt; labelled examples -&gt; features -&gt; train -&gt; validate -&gt; model registry
+                                                                       \-&gt; item embeddings -&gt; ANN index
+online:   request -&gt; candidates (ANN + popular) -&gt; fetch features -&gt; rank -&gt; business rules -&gt; response
+                                                                                         \-&gt; impression log</code></pre>
+<p>Put a <b>baseline</b> in the diagram from the start: for recommendations, the most popular products in the user's region, refreshed hourly. It is cheap, it exercises logging and serving end to end, it is the fallback when the model times out, and it sets the number every later model must beat.</p>
+<h2 id="step-4-specify-the-labels-and-the-features">Step 4: specify the labels and the features</h2>
+<p><b>Training data.</b> Say where examples come from (existing logs, or new collection), how many are needed, and what a positive is. For the shop, implicit labels such as clicks and add-to-carts are plentiful but biased by what was shown and where; see <a href="/posts/position-bias/">position bias</a>. A smaller set of human judgements ("is this a sensible recommendation for this user?") is still useful for evaluation.</p>
+<p>Human labels can come from domain experts, a dedicated labelling team, written rules or an LLM; they trade cost, speed and consistency. Whoever labels, have a sample labelled twice and measure agreement. Raw agreement is misleading when one class dominates, which is why <b>Cohen's kappa</b> corrects it by the agreement expected by chance from each labeller's marginal rates:</p>
+\[ \kappa = \frac{p_o - p_e}{1 - p_e}, \qquad p_e = \sum_c p_{A}(c)\, p_{B}(c) . \]
+<pre><code class="language-python">from sklearn.metrics import cohen_kappa_score
+
+rng = np.random.default_rng(0)
+
+
+def kappa(a, b):
+    p_o = np.mean(a == b)
+    p_e = sum(np.mean(a == c) * np.mean(b == c) for c in np.union1d(a, b))
+    return (p_o - p_e) / (1 - p_e)
+
+
+truth = rng.random(5000) &lt; 0.10                           # 10% of judged pairs are truly relevant
+careless = [rng.random(5000) &lt; 0.10 for _ in range(2)]    # say "relevant" 10% of the time, at random
+careful = [truth ^ (rng.random(5000) &lt; 0.05) for _ in range(2)]   # right 95% of the time
+for name, (a, b) in {"careless": careless, "careful": careful}.items():
+    k = kappa(a, b)
+    assert abs(k - cohen_kappa_score(a, b)) &lt; 1e-9
+    print(f"{name:9s} raw agreement {np.mean(a == b):.2f}, kappa {k:.2f}")
+assert np.mean(careless[0] == careless[1]) &gt; 0.8 and abs(kappa(*careless)) &lt; 0.1
+assert kappa(*careful) &gt; 0.5</code></pre>
+<p>The careless pair agree on over 80% of items while ignoring the content; kappa shows they do no better than chance. A low kappa often means an ambiguous guideline, and the fix is then to rewrite it with examples.</p>
+<p><b>Features.</b> List each feature with how and when it is computed, how it is represented, and what happens when it is missing. <a href="../recsys-features/">Features for recommendation</a> covers how to build them; the design document only needs the spec.</p>
+<table><thead><tr><th>Feature</th><th>Computed</th><th>Representation</th><th>When missing</th></tr></thead><tbody><tr><td>Purchases by category, last 90 days</td><td>offline, daily</td><td>log counts per category</td><td>zeros plus a "new user" flag</td></tr><tr><td>Product price</td><td>offline, on change</td><td>log price relative to the category median</td><td>category median</td></tr><tr><td>Product title and description</td><td>offline, at publish</td><td>text embedding</td><td>never missing: required at publish</td></tr><tr><td>Products viewed this session</td><td>online, at request</td><td>last 20 product IDs as a sequence</td><td>empty sequence</td></tr><tr><td>Device, hour of day</td><td>online, at request</td><td>categorical; hour as sine and cosine</td><td>"unknown" category</td></tr></tbody></table>
+<p>Online features need a low-latency store, and every feature must be computed by the same code for training and serving, or the model is trained on one definition and served another.</p>
+<h2 id="step-5-choose-the-model-on-explicit-axes">Step 5: choose the model on explicit axes</h2>
+<p>Climb from the baseline only as far as the constraints allow: popularity, then collaborative filtering (matrix factorisation) or content similarity, then gradient-boosted trees on the feature table, then neural models. Judge each rung on the same axes.</p>
+<table><thead><tr><th>Axis</th><th>Question</th></tr></thead><tbody><tr><td>Quality</td><td>How much does it beat the previous rung offline, and is that worth the rest of this table?</td></tr><tr><td>Latency</td><td>Does it fit its share of the request budget (often a few tens of milliseconds, not the whole budget)?</td></tr><tr><td>Cost</td><td>Training time, serving hardware, how often it must be retrained</td></tr><tr><td>Interpretability</td><td>Must individual decisions be explained to users, auditors or the on-call engineer?</td></tr><tr><td>Maturity</td><td>Has the approach been run in production by others, with known failure modes?</td></tr></tbody></table>
+<p>For the shop, a sensible design is a two-tower model for retrieval (<a href="../two-tower-retrieval/">two-tower retrieval</a>) and boosted trees or a small neural ranker on top (<a href="../recommendation-ranking/">recommendation ranking</a>). If the ranker needs more capacity, well-studied architectures exist: Wide &amp; Deep (Cheng et al., 2016) combines memorised feature crosses with a deep network, DCN-V2 (Wang et al., 2021) learns explicit feature crosses, and MMoE (Ma et al., 2018) shares experts across several objectives such as click and purchase.</p>
+<h2 id="step-6-plan-the-evaluation">Step 6: plan the evaluation</h2>
+<p><a href="/posts/evaluating-ml-systems/">Evaluating ML systems</a> covers the metrics in depth; the design needs a plan. Offline: a time-based split, recall@k for retrieval and NDCG@k for ranking, each compared with the baseline. Online: an A/B test randomised by user, with one primary metric, a few guardrails (page latency, returns, the share of the catalogue ever shown), and a <b>minimum detectable effect</b> that fixes the sample size before the test starts.</p>
+<p>For a click-through rate of \(p_0 = 4\%\) and a relative lift worth detecting of 5% (\(p_1 = 4.2\%\)), at 5% significance and 80% power, each arm needs</p>
+\[ n = \frac{(z_{0.975} + z_{0.8})^2 \,[\,p_0(1-p_0) + p_1(1-p_1)\,]}{(p_1 - p_0)^2} \]
+<p>observations. The check below computes it and confirms by simulation that it delivers the promised power.</p>
+<pre><code class="language-python">p0, p1, alpha, power = 0.040, 0.042, 0.05, 0.80
+z = stats.norm.ppf(1 - alpha / 2) + stats.norm.ppf(power)
+n = int(np.ceil(z**2 * (p0 * (1 - p0) + p1 * (1 - p1)) / (p1 - p0) ** 2))
+
+
+def rejects(pa, pb, sims=4000):
+    a, b = rng.binomial(n, pa, sims) / n, rng.binomial(n, pb, sims) / n
+    pool = (a + b) / 2
+    zstat = (b - a) / np.sqrt(2 * pool * (1 - pool) / n)
+    return np.mean(np.abs(zstat) &gt; stats.norm.ppf(1 - alpha / 2))
+
+
+print(f"{n:,} per arm; simulated power {rejects(p0, p1):.2f}, false positive rate {rejects(p0, p0):.3f}")
+assert 150_000 &lt; n &lt; 160_000
+assert abs(rejects(p0, p1) - power) &lt; 0.03 and abs(rejects(p0, p0) - alpha) &lt; 0.015</code></pre>
+<p>If the unit is a user, about 155,000 per arm is roughly 6% of one day's 5 million users, so sample size is not the bottleneck; the test should still run for at least a full week to cover weekday patterns. The simulation treats each observation as independent; in practice impressions from the same user are correlated, so analyse per user (or with the delta method) as <a href="../ab-testing/">A/B testing</a> explains.</p>
+<h2 id="step-7-plan-the-serving-path">Step 7: plan the serving path</h2>
+<p>Decide what is computed per request and what is precomputed. The usual levers:</p>
+<ul><li><b>Precompute and cache.</b> Item embeddings and the ANN index are built offline; user embeddings can be cached with a time-to-live; popular results can be cached outright.</li><li><b>Shrink the model.</b> Distillation into a smaller model, INT8 quantization and pruning cut latency and cost, each with an offline quality check.</li><li><b>Infrastructure.</b> A feature store with online and offline sides, a model registry, and a <b>shadow</b> deployment that scores live traffic without serving it, to catch latency problems and skew early.</li></ul>
+<p>Caching pays because traffic is skewed. If product lookups follow a Zipf law, caching the top 1% of products serves most requests:</p>
+<pre><code class="language-python">ranks = np.arange(1, n_items + 1)
+weights = 1.0 / ranks                                     # Zipf with exponent 1
+share = weights / weights.sum()
+cached = n_items // 100
+analytic = share[:cached].sum()
+sample = rng.choice(n_items, size=1_000_000, p=share)
+simulated = np.mean(sample &lt; cached)
+print(f"caching 1% of products serves {analytic:.0%} of lookups (simulated {simulated:.0%})")
+harmonic = (np.log(cached) + np.euler_gamma) / (np.log(n_items) + np.euler_gamma)   # H_n ~ ln n + gamma
+assert abs(analytic - simulated) &lt; 0.005 and abs(analytic - harmonic) &lt; 1e-3 and analytic &gt; 0.65</code></pre>
+<p>The exponent is an assumption to measure on real logs; a flatter popularity curve makes the cache much less effective.</p>
+<h2 id="step-8-the-deep-dive">Step 8: the deep dive</h2>
+<p>With the main path agreed, go through what will break it.</p>
+<ul><li><b>Cold start.</b> A new product has no interactions, so retrieval leans on its content embedding, and it needs some exposure to collect its own data. A new user has no history, so use popularity, context (region, device, referral) and whatever they do in their first session. <a href="../cold-start/">Cold start</a> treats both.</li><li><b>Sparsity and seasonality.</b> Share information through content and category-level features; add time-aware features and retrain as fast as tastes move.</li><li><b>Selection bias.</b> The model only sees outcomes for what it chose to show. Correct training with inverse propensity weighting, and compare rankers online with interleaving, which is an evaluation method rather than a correction.</li><li><b>Scale.</b> Approximate nearest neighbour search (libraries such as FAISS or ScaNN; see <a href="../vector-databases/">vector databases</a>) for retrieval; data-parallel training with all-reduce when one machine is too slow, and sharded embedding tables when they no longer fit on one device.</li></ul>
+<p>Exposure for new products is an exploration problem. A greedy policy that always shows the product with the best observed click rate locks onto whichever got lucky first. <b>Thompson sampling</b> draws a click rate for each product from its <a href="../beta-uncertainty/">Beta posterior</a> and shows the highest draw, so uncertain products still get shown until their data says otherwise.</p>
+<pre><code class="language-python">runs, k, steps = 200, 20, 5000
+true_ctr = rng.beta(2, 40, (runs, k))                     # 20 new products per run, CTRs around 5%
+best = true_ctr.max(1)
+
+
+def regret(policy):
+    clicks, shown, lost = np.zeros((runs, k)), np.zeros((runs, k)), 0.0
+    for t in range(steps):
+        if policy == "greedy":
+            score = np.where(shown &gt; 0, clicks / np.maximum(shown, 1), np.inf)   # try each once, then exploit
+        else:
+            score = rng.beta(clicks + 1, shown - clicks + 1)
+        pick = score.argmax(1)
+        p = true_ctr[np.arange(runs), pick]
+        clicks[np.arange(runs), pick] += rng.random(runs) &lt; p
+        shown[np.arange(runs), pick] += 1
+        lost += (best - p).sum()
+    return lost / runs                                    # expected clicks lost per run vs always showing the best
+
+
+greedy, thompson = regret("greedy"), regret("thompson")
+print(f"clicks lost over {steps} impressions: greedy {greedy:.0f}, Thompson sampling {thompson:.0f}")
+assert thompson &lt; 0.6 * greedy</code></pre>
+<p><b>Monitoring and retraining.</b> Track model metrics (NDCG, calibration), product metrics (click-through, conversion, diversity of what is shown) and drift in the inputs and the scores; the <a href="../ml-system-design-framework/">framework post</a> computes a population stability index for the inputs. Alert when a metric falls below its floor or a drift score rises above its ceiling. An alert should start a diagnosis, not an automatic retrain: retraining fixes a model that has gone stale, but not a broken upstream pipeline or a label whose meaning has changed.</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Skipping the sizing.</b> Whether an index fits in memory follows from five minutes of arithmetic.</li><li><b>No baseline in the first diagram.</b> Without it there is no fallback and no number to beat.</li><li><b>An A/B test with no minimum detectable effect.</b> Tests that are stopped when they look good produce false wins.</li><li><b>Giving the model the whole latency budget.</b> Feature fetching, candidate generation and business rules need their share.</li><li><b>Treating a drift alarm as a retraining trigger.</b> Find out what changed first.</li></ul>
+<p>Sources: the order of the steps broadly tracks Chip Huyen, *Designing Machine Learning Systems* (O'Reilly, 2022), and the split into offline and online paths draws on Eugene Yan's <a href="https://eugeneyan.com/writing/system-design-for-discovery/">System Design for Recommendations and Search</a> (2021), both rewritten here. Architectures cited: Cheng et al., "Wide &amp; Deep Learning for Recommender Systems" (2016); Wang et al., "DCN V2: Improved Deep &amp; Cross Network and Practical Lessons for Web-scale Learning to Rank Systems" (2021); Ma et al., "Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts" (KDD 2018).</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

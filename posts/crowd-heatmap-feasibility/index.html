@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Is a city crowd heatmap feasible? A design exploration · r03922123</title>
+<meta name="description" content="Working through whether one developer on a laptop could build an app that shows, and forecasts, how crowded each part of a city is. Which public data can stand in for crowd counts, how to keep it private, a forecasting baseline ladder that a simulation tests, and a batch-first system sketch that carries over from Taipei to other cities.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · ML systems and design</p>
+<header class="post-head">
+  <h1>Is a city crowd heatmap feasible? A design exploration</h1>
+  <div class="meta">November 1, 2026 · 12 min read · system design · forecasting · geospatial · privacy</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#what-the-product-has-to-answer">What the product has to answer</a></li><li><a href="#the-hard-part-there-is-no-label">The hard part: there is no label</a></li><li><a href="#from-stations-to-a-heatmap">From stations to a heatmap</a></li><li><a href="#privacy">Privacy</a></li><li><a href="#forecasting-climb-a-ladder-of-baselines">Forecasting: climb a ladder of baselines</a></li><li><a href="#from-a-forecast-to-a-colour">From a forecast to a colour</a></li><li><a href="#a-system-that-fits-on-a-laptop">A system that fits on a laptop</a></li><li><a href="#pitfalls">Pitfalls</a></li><li><a href="#verdict">Verdict</a></li></ol></nav>
+<p>The idea is simple to state: open a map, see which parts of the city are packed right now and which will be in an hour, and go somewhere quieter. Taipei is the starting city, with the hope that the same design carries over to Tokyo or New York.</p>
+<p>This post is a feasibility study, not a launch report. Nothing here has been built. The point is to walk the idea through the questions in <a href="../ml-system-design-framework/">A framework for designing ML systems</a> and find out where it is easy, where it is hard, and where it might quietly not work at all. The constraints are deliberate: one developer, one laptop (an Apple-silicon MacBook Air), public data only, and a model cheap enough to retrain on that laptop.</p>
+<h2 id="what-the-product-has-to-answer">What the product has to answer</h2>
+<p>A user asks one of two questions: "is this place busy right now?" and "when should I go?". Both reduce to a number per place per hour, so the ML objective is a <b>forecast of a crowd index for each map cell, for each of the next few hours</b>.</p>
+<table><thead><tr><th>Piece</th><th>Choice</th></tr></thead><tbody><tr><td>Unit of space</td><td>A grid cell a few hundred metres across</td></tr><tr><td>Unit of time</td><td>One hour, forecast 1 to 12 hours ahead</td></tr><tr><td>Prediction</td><td>Expected crowd index per cell and hour</td></tr><tr><td>What the user sees</td><td>Quiet, normal or busy, relative to that place's usual level</td></tr><tr><td>Success metric</td><td>Users who check the map report fewer unpleasant crowds; offline, forecast error against baselines</td></tr></tbody></table>
+<p>The relative scale in the last-but-one row matters more than it looks. A side street at its busiest is still emptier than a main station on a quiet morning, so absolute counts would paint the same few hubs red forever. People want to know whether a place is <b>busier than usual</b>.</p>
+<h2 id="the-hard-part-there-is-no-label">The hard part: there is no label</h2>
+<p>Nobody publishes "people per square metre at Ximending, 3 pm". Every usable signal is a proxy for crowding, and each has a blind spot.</p>
+<table><thead><tr><th>Source</th><th>What it measures</th><th>Blind spot</th></tr></thead><tbody><tr><td>Metro ridership by station and hour</td><td>Entries and exits at stations</td><td>Published with a lag, not live; says nothing about people who walk or drive</td></tr><tr><td>Shared-bike dock availability, live</td><td>Bikes taken and returned per station</td><td>Small numbers; driven by rebalancing trucks as much as by people</td></tr><tr><td>Bus and rail real-time feeds</td><td>Vehicle positions, sometimes occupancy</td><td>Movement, not where people stop</td></tr><tr><td>Weather observations and forecasts</td><td>Rain, temperature</td><td>Context only, not a count</td></tr><tr><td>Event and holiday calendars</td><td>Concerts, games, markets, long weekends</td><td>Must be collected and cleaned by hand</td></tr><tr><td>Map points of interest (OpenStreetMap)</td><td>What each cell contains: malls, markets, offices</td><td>Static</td></tr></tbody></table>
+<p>For Taipei, the city's open data portal <a href="https://data.taipei/">data.taipei</a> and the national <a href="https://tdx.transportdata.tw/">TDX</a> transport platform cover the first three rows, and the Central Weather Administration publishes weather. Other cities publish different things, so each city needs its own small set of source adapters. New York publishes hourly subway ridership, for instance, while another city may offer only timetables. That is the main cost of "adapt to other cities", and it is a data cost, not a model cost.</p>
+<p>Two tempting sources are off the table. The busy-hours bars in commercial map apps are not exposed through an official API, and scraping them breaks the terms of service. Population counts derived from phone networks exist in some countries, but they are usually sold commercially, and where an aggregated version is released openly it tends to be averages over weeks or months rather than a live feed. That makes it useful for checking the crowd index, not for driving a live map. The design has to work without either source.</p>
+<p>The crowd index is therefore defined, not observed: a weighted blend of the proxies in each cell, rescaled to that cell's own history. This is the biggest risk in the project. A night market fed mostly by people walking in shows up only faintly in station counts, so the map will be most wrong exactly where crowds are a matter of taste rather than transit.</p>
+<h2 id="from-stations-to-a-heatmap">From stations to a heatmap</h2>
+<p>Proxies arrive at points (stations, docks) but the map shows cells. A Gaussian kernel spreads each station's count over nearby cells, with weights normalized so every station hands out exactly its own count. The open-source <a href="https://h3geo.org/">H3</a> hexagon grid is a common choice for real maps, because all six neighbours of a hexagon share an edge with it and sit at the same distance, which makes smoothing and neighbour features uniform. A square grid keeps the sketch dependency-free.</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+cell_m = 500                                            # cell side in metres
+nx, ny = 20, 16                                         # a 10 km x 8 km area
+cx, cy = np.meshgrid((np.arange(nx) + 0.5) * cell_m, (np.arange(ny) + 0.5) * cell_m)
+centres = np.c_[cx.ravel(), cy.ravel()]
+
+stations = rng.uniform([0, 0], [nx * cell_m, ny * cell_m], (40, 2))
+counts = rng.poisson(rng.uniform(50, 3000, 40))         # entries + exits in one hour
+
+
+def to_grid(points, values, centres, bandwidth=400.0):
+    d2 = ((points[:, None, :] - centres[None, :, :]) ** 2).sum(-1)
+    w = np.exp(-0.5 * d2 / bandwidth ** 2)
+    w /= w.sum(1, keepdims=True)                        # each station distributes exactly its own count
+    return values @ w
+
+
+heat = to_grid(stations, counts, centres)
+assert np.isclose(heat.sum(), counts.sum())             # nothing created or lost
+assert heat.shape == (nx * ny,)</code></pre>
+<p>The bandwidth is a product decision as much as a statistical one. Too narrow and the map is a scatter of dots on stations; too wide and every district blurs into one warm smear.</p>
+<h2 id="privacy">Privacy</h2>
+<p>With only aggregated public data, the app never holds anyone's location, and privacy risk is low. The risk arrives with the first feature that collects data from users: "share my location to improve the map", or a "was it crowded?" button that comes with GPS attached. Three rules keep that part safe.</p>
+<ol><li><b>Never store raw traces.</b> Turn a location into a cell and an hour on the device, or as soon as it reaches the server, and drop the coordinates.</li><li><b>Suppress small counts.</b> A cell-hour seen by three users can identify them; publish nothing below a threshold.</li><li><b>Add calibrated noise.</b> The Laplace mechanism of Dwork, McSherry, Nissim and Smith (2006) adds noise with scale \(1/\varepsilon\) to a count where each person contributes at most one, which gives \(\varepsilon\)-differential privacy for that release.</li></ol>
+<p>The noise is the same size whatever the count, so it is harmless for busy cells and badly distorts tiny ones. That is why rules 2 and 3 go together. One detail matters: decide what to suppress from the noisy count, not the true one, otherwise the decision to publish or hide a cell itself leaks the true count.</p>
+<pre><code class="language-python">eps = 1.0
+true = rng.integers(1, 2000, 5000)
+noisy = true + rng.laplace(0, 1 / eps, true.size)
+rel_err = np.abs(noisy - true) / true
+
+assert np.median(rel_err[true &gt;= 200]) &lt; 0.01           # busy cells: under 1% error
+assert np.median(rel_err[true &lt; 5]) &gt; 0.25              # tiny cells: errors of 25% and more
+k_min = 20
+published = np.where(noisy &gt;= k_min, np.round(noisy), np.nan)   # threshold the noisy count, never the true one
+assert np.isnan(published[true &lt; 10]).mean() &gt; 0.9</code></pre>
+<p>One caveat: the privacy budget adds up. Publishing the same cell every hour for a month spends \(\varepsilon\) on every release, so a real deployment needs per-user contribution limits over time, not just per release. Coarse cells and hourly buckets are themselves a privacy feature.</p>
+<h2 id="forecasting-climb-a-ladder-of-baselines">Forecasting: climb a ladder of baselines</h2>
+<p>Crowds are dominated by the clock: weekday commuting peaks, weekend afternoons, and the same pattern week after week. So the model should start with baselines that only know the clock and earn every step of complexity above them.</p>
+<ol><li><b>Seasonal naive:</b> same cell, same hour, one week ago.</li><li><b>Profile:</b> the average for this cell, weekday and hour over the training weeks.</li><li><b>Gradient-boosted trees</b> with lagged counts, calendar features, rain and an event flag, trained with a Poisson loss because the target is a count (see <a href="../poisson-distribution/">Poisson distribution</a> and <a href="../decision-trees-to-boosting/">from decision trees to boosting</a>).</li></ol>
+<p>The simulation below builds ten weeks of hourly counts for 30 cells. Each cell mixes a commuter pattern (weekday peaks at 8 am and 6 pm) with a leisure pattern (weekend afternoons, halved by rain), and 40 announced events triple a cell's crowd for an evening. The forecast horizon is three hours. The first week only supplies lag features, weeks two to eight train, and the last two weeks test.</p>
+<pre><code class="language-python">import pandas as pd
+from sklearn.ensemble import HistGradientBoostingRegressor
+from threadpoolctl import threadpool_limits
+
+threadpool_limits(1)                                    # data this small trains faster on one thread
+
+hours = pd.date_range("2026-03-02", periods=10 * 7 * 24, freq="h")   # ten weeks, starting on a Monday
+hod, dow = hours.hour.to_numpy(), hours.dayofweek.to_numpy()
+n_cells, weekend = 30, dow &gt;= 5
+
+
+def bump(h, centre, width):
+    return np.exp(-0.5 * ((h - centre) / width) ** 2)
+
+
+commute = np.where(weekend, 0.3, 1.0) * (bump(hod, 8, 1.0) + bump(hod, 18, 1.5))
+leisure = np.where(weekend, 1.6, 0.7) * bump(hod, 16, 3.5)
+
+rain = np.zeros(len(hours), bool)                       # rainy spells from a two-state Markov chain
+for t in range(1, len(hours)):
+    rain[t] = rng.random() &lt; (0.85 if rain[t - 1] else 0.03)
+
+event = np.zeros((len(hours), n_cells), bool)
+for _ in range(40):                                     # concerts, games, markets: known in advance
+    c, d = rng.integers(n_cells), rng.integers(70)
+    event[d * 24 + 18: d * 24 + 22, c] = True
+
+base, mix = rng.uniform(20, 400, n_cells), rng.uniform(0, 1, n_cells)   # mix 1 = commuter hub
+shape = mix * commute[:, None] + (1 - mix) * leisure[:, None] * np.where(rain, 0.5, 1.0)[:, None]
+y = rng.poisson(base * (0.1 + shape) * np.where(event, 3.0, 1.0))      # hours x cells
+
+df = pd.DataFrame({"t": np.repeat(np.arange(len(hours)), n_cells), "cell": np.tile(np.arange(n_cells), len(hours)),
+                   "hour": np.repeat(hod, n_cells), "dow": np.repeat(dow, n_cells),
+                   "rain": np.repeat(rain, n_cells), "event": event.ravel(), "y": y.ravel()})
+H = 3                                                   # forecast horizon in hours
+for lag in (H, 24, 168):                                # never a lag shorter than the horizon
+    df[f"lag{lag}"] = df.groupby("cell")["y"].shift(lag)
+df["rain_now"] = df.groupby("cell")["rain"].shift(H)   # rain observed when the forecast is issued
+df = df.dropna()
+train, test = df[df.t &lt; 8 * 168], df[df.t &gt;= 8 * 168]
+
+
+def wape(pred, true):                                   # weighted absolute percentage error
+    return np.abs(np.asarray(pred) - np.asarray(true)).sum() / np.asarray(true).sum()
+
+
+profile = train.groupby(["cell", "dow", "hour"]).y.mean().rename("prof")
+prof_pred = test.join(profile, on=["cell", "dow", "hour"]).prof
+
+
+def fit(cols):
+    m = HistGradientBoostingRegressor(loss="poisson", max_iter=200, random_state=0,
+                                      categorical_features=[c == "cell" for c in cols])
+    return m.fit(train[cols], train.y)
+
+
+clock_cols = ["cell", "hour", "dow", "lag3", "lag24", "lag168"]
+all_cols = clock_cols + ["rain_now", "event"]
+oracle_cols = clock_cols + ["rain", "event"]           # rain at the target hour: a perfect weather forecast
+gbm_clock, gbm, gbm_oracle = fit(clock_cols), fit(all_cols), fit(oracle_cols)
+
+preds = {"seasonal naive": test.lag168.to_numpy(), "profile": prof_pred.to_numpy(),
+         "boosting, clock only": gbm_clock.predict(test[clock_cols]),
+         "boosting + rain now + events": gbm.predict(test[all_cols]),
+         "boosting + perfect rain forecast + events": gbm_oracle.predict(test[oracle_cols])}
+ev = test.event.to_numpy()
+scores = {k: wape(p, test.y) for k, p in preds.items()}
+on_events = {k: wape(p[ev], test.y[ev]) for k, p in preds.items()}
+
+assert all(int(c[3:]) &gt;= H for c in all_cols if c.startswith("lag"))
+assert scores["profile"] &lt; scores["seasonal naive"]
+assert abs(scores["boosting, clock only"] - scores["profile"]) &lt; 0.02        # same information, same score
+assert scores["boosting + rain now + events"] &lt; 0.95 * scores["profile"]
+assert scores["boosting + perfect rain forecast + events"] &lt; scores["boosting + rain now + events"] - 0.01
+assert min(on_events[k] for k in ["seasonal naive", "profile", "boosting, clock only"]) &gt; 0.6
+assert on_events["boosting + rain now + events"] &lt; 0.5 * on_events["profile"]</code></pre>
+<table><thead><tr><th>Model (3 hours ahead)</th><th>WAPE, all test hours</th><th>WAPE, event hours</th></tr></thead><tbody><tr><td>Seasonal naive</td><td>0.18</td><td>0.69</td></tr><tr><td>Profile by cell, weekday, hour</td><td>0.14</td><td>0.67</td></tr><tr><td>Boosting, clock and lags only</td><td>0.14</td><td>0.64</td></tr><tr><td>Boosting + rain now + event flag</td><td>0.13</td><td>0.26</td></tr><tr><td>Same, with a perfect rain forecast</td><td>0.11</td><td>0.24</td></tr></tbody></table>
+<p>Averaging seven weeks beats copying one, because a single week carries that week's noise. Boosting on the same clock information adds nothing: the profile already captures it. The event calendar is where most of the gain is. On event evenings, the hours a crowd-avoidance app exists for, every clock-only method is off by about two thirds, and the event flag cuts that error to about a quarter. Rain helps less than it might, because a shower that starts after the forecast is issued is invisible to "is it raining now?". The last row feeds the model the actual rain at the target hour, which no real system has; it is an upper bound on what a good weather-forecast feed could add. The lesson for the real project: spend effort on the event calendar, then on weather forecasts, before spending it on the model.</p>
+<p>The first <code>assert</code> guards the easiest mistake to make here. A three-hour forecast cannot use the count from one hour ago, because at prediction time it does not exist yet. Build every feature from what is known at the moment the forecast is issued, which is why the honest model sees rain at issue time and the perfect-forecast row is labelled as such.</p>
+<h2 id="from-a-forecast-to-a-colour">From a forecast to a colour</h2>
+<p>The model predicts counts; the map shows quiet, normal or busy relative to the cell's own history. Per-cell quantiles from the training weeks do it, and the forecast goes through the same function as the actual count, so the two can be compared:</p>
+<pre><code class="language-python">q = train.groupby("cell").y.quantile([0.4, 0.8]).unstack()
+pred = pd.Series(gbm.predict(test[all_cols]), index=test.index)
+
+
+def level(cell, value):
+    lo, hi = q.loc[cell]
+    return "quiet" if value &lt; lo else "busy" if value &gt; hi else "normal"
+
+
+small, big = base.argmin(), base.argmax()
+peak_small = test[test.cell == small].y.max()
+assert level(small, peak_small) == "busy"               # a small cell's peak still shows as busy ...
+assert peak_small &lt; q.loc[big, 0.4]                     # ... even though a big hub's quiet hours reach higher
+
+busy_on_events = {name: np.mean([level(c, v) == "busy" for c, v in zip(test.cell[ev], p[ev])])
+                  for name, p in [("actual", test.y.to_numpy()), ("profile", prof_pred.to_numpy()), ("boosting", pred.to_numpy())]}
+assert busy_on_events["actual"] &gt; 0.9                   # event hours really are busy for their cell
+assert busy_on_events["profile"] &lt; 0.4 &lt; 0.8 &lt; busy_on_events["boosting"]</code></pre>
+<p>The relative scale is what makes a small cell's peak show as busy. The last check is the product-level version of the event result above: over 90% of event hours are actually busy for their cell, yet the clock-only profile labels fewer than 40% of them busy, while the model with the event flag gets over 80%.</p>
+<h2 id="a-system-that-fits-on-a-laptop">A system that fits on a laptop</h2>
+<p>The scale settles most of the architecture. Taipei city is about 270 km²; with cells of roughly 0.25 km² that is about 1,100 cells, times 12 horizons, about 13,000 numbers per hour. That is far too small to need online inference, so everything is precomputed in batch.</p>
+<pre><code class="language-python">cells = round(270 / 0.25)
+per_hour = cells * 12
+assert 1000 &lt; cells &lt; 1200 and per_hour &lt; 15_000</code></pre>
+<pre><code class="language-plaintext">pollers (every 5-10 min)        hourly job                      nightly job
+  metro, bikes, weather,  --&gt;   aggregate to cell x hour  --&gt;   retrain, backtest against
+  events                        build features                  the baselines, keep the
+        |                       predict next 12 hours            model only if it wins
+        v                               |
+  raw store (Parquet / SQLite)          v
+                                predictions table  --&gt;  small read-only API  --&gt;  web map
+                                (cell, hour, level)     (cached JSON)             (open-source map library,
+                                                                                  OpenStreetMap data)</code></pre>
+<p>Each piece has a cheap fallback. If a feed is down, features are filled from the profile and the map says the data is stale; if the nightly model loses to the profile in backtesting, the profile serves. Map tiles need care: OpenStreetMap's own tile servers are not meant for app traffic, so use a tile provider or self-hosted tiles built from OpenStreetMap data. A web app beats a native one for a first version, because the main use ("should I go now?") is a quick look, often from a shared link.</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>The proxy is the product.</b> If station counts miss where crowds form, no model fixes that. Validate the crowd index against ground truth first: count people at a handful of places by hand for a few hours and check that the index ranks them correctly.</li><li><b>The forecast changes what it forecasts.</b> If many people avoid the place marked busy, it empties and the next quiet place fills up. At small scale this does not matter. At large scale, spread recommendations over several quiet options instead of naming one.</li><li><b>Regime changes.</b> Holidays, typhoons, new stations and road closures break weekly seasonality. Holiday flags help, and a monitor on forecast error per cell catches the rest (see <a href="../simulation-based-evaluation/">simulation-based evaluation</a> for building such checks before launch).</li><li><b>Feed fragility.</b> Open-data endpoints change format or go quiet without notice; validate schemas on ingest and alert on missing hours.</li><li><b>Terms of use.</b> Read every data source's licence and attribution requirement before building on it.</li></ul>
+<h2 id="verdict">Verdict</h2>
+<p>Feasible, with one big if. The data plumbing, the forecasting and the serving all fit comfortably on a laptop, and a profile baseline is already useful for "when should I go?". The open question is whether transit and bike proxies track the crowds people actually feel. That is cheap to check before writing any model code, and it is the first thing to do.</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

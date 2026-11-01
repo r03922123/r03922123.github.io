@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vector databases: nearest-neighbor search at scale · r03922123</title>
+<meta name="description" content="What a vector database does and how it answers top-k similarity queries without scanning every vector. Exact search as a matrix product, then the three ideas behind approximate search (inverted lists, product quantization and navigable graphs), each built in NumPy and measured by recall against brute force, followed by filtering, hybrid search and how to choose.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site">
+  <a class="home" href="/">r03922123</a>
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+</header>
+<main>
+<article class="post-body">
+<p class="crumb"><a href="/posts/">Posts</a> · LLMs and generative AI</p>
+<header class="post-head">
+  <h1>Vector databases: nearest-neighbor search at scale</h1>
+  <div class="meta">November 1, 2026 · 13 min read · vector search · ANN · IVF · product quantization · HNSW · RAG</div>
+</header>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#exact-search-is-one-matrix-product">Exact search is one matrix product</a></li><li><a href="#inverted-lists-search-only-the-nearby-clusters">Inverted lists: search only the nearby clusters</a></li><li><a href="#product-quantization-shrink-the-vectors">Product quantization: shrink the vectors</a></li><li><a href="#navigable-graphs-walk-towards-the-query">Navigable graphs: walk towards the query</a></li><li><a href="#filters-and-hybrid-search">Filters and hybrid search</a></li><li><a href="#what-the-database-adds-and-how-to-choose">What the database adds, and how to choose</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<p>A vector database stores embeddings, one vector per document, image, product or user, and answers one question quickly: given a query vector, which stored vectors are most similar to it? That question sits under semantic search, the retrieval step of <a href="../rag-architecture/">retrieval-augmented generation</a>, and the candidate stage of <a href="../two-tower-retrieval/">two-tower recommenders</a>.</p>
+<p>Answering it exactly means comparing the query with every stored vector. That is fine for thousands of vectors and too slow or too expensive for hundreds of millions, so vector databases use <b>approximate nearest-neighbor (ANN)</b> search: return most of the true top-k while looking at a small fraction of the data. This post builds the three main ANN ideas in NumPy on the same synthetic data, measures each one against brute force, and then covers what a database adds on top of an index.</p>
+<h2 id="exact-search-is-one-matrix-product">Exact search is one matrix product</h2>
+<p>Many embedding models are trained with cosine similarity, so the usual first step is to scale every vector to unit length. Then cosine similarity is a plain dot product, and Euclidean distance gives the same ranking, because for unit vectors</p>
+\[ \lVert a - b \rVert^2 = \lVert a \rVert^2 + \lVert b \rVert^2 - 2\, a^\top b = 2 - 2\, a^\top b . \]
+<p>With \(n\) stored vectors of dimension \(d\) as rows of a matrix \(X\), exact search for a batch of queries \(Q\) is the product \(QX^\top\) followed by a top-k per row. The cost is \(O(nd)\) per query, and the whole of \(X\) has to be read for every batch.</p>
+<p>The data below is synthetic but not uniform: points are scattered around 100 random centers, roughly like embeddings of documents on 100 topics. That matters, because ANN methods exploit structure, and uniformly random high-dimensional vectors are close to the worst case for all of them.</p>
+<pre><code class="language-python">import heapq
+import numpy as np
+
+rng = np.random.default_rng(0)
+n, d, k = 10_000, 64, 10
+
+
+def unit(x):
+    return x / np.linalg.norm(x, axis=1, keepdims=True)
+
+
+centers = rng.standard_normal((100, d))
+
+
+def sample(m, spread=1.5):
+    which = rng.integers(len(centers), size=m)
+    return unit(centers[which] + spread * rng.standard_normal((m, d))).astype(np.float32)
+
+
+X = sample(n)          # the stored vectors
+Q = sample(200)        # queries from the same distribution, not copies of stored vectors
+
+
+def exact_search(Q, X, k):
+    S = Q @ X.T                                            # every query against every vector
+    top = np.argpartition(-S, k, axis=1)[:, :k]            # unordered top k, O(n) per row
+    order = np.argsort(-np.take_along_axis(S, top, axis=1), axis=1)
+    return np.take_along_axis(top, order, axis=1)
+
+
+truth = exact_search(Q, X, k)
+assert (truth[:5] == np.argsort(-(Q[:5] @ X.T), axis=1)[:, :k]).all()   # matches a full sort
+
+
+def recall_at_k(found, truth):
+    return float(np.mean([len(set(f) &amp; set(t)) / len(t) for f, t in zip(found, truth)]))
+
+
+# Cosine (dot product of unit vectors) and Euclidean distance rank identically.
+dist2 = ((Q[:, None, :] - X[None, :500, :]) ** 2).sum(-1)
+assert np.allclose(dist2, 2 - 2 * Q @ X[:500].T, atol=1e-5)
+assert (np.argsort(dist2[0])[:k] == np.argsort(-(Q[0] @ X[:500].T))[:k]).all()
+
+# Memory for exact search over 10 million 768-dimensional float32 vectors:
+assert 10_000_000 * 768 * 4 / 1e9 == 30.72                 # GB, read in full for every query batch</code></pre>
+<p>Every approximate method below is scored by <b>recall@k</b>: the fraction of the exact top-k that it returns. Note what that measures. It is fidelity to brute force, not relevance. If the embedding model puts the wrong documents nearest the query, a perfect index returns them faithfully.</p>
+<p>If the model was trained with raw, unnormalized dot products, the task is maximum inner product search, which ranks differently from Euclidean distance or cosine; pick the index metric to match how the model was trained.</p>
+<h2 id="inverted-lists-search-only-the-nearby-clusters">Inverted lists: search only the nearby clusters</h2>
+<p>The first idea is to partition. Run k-means on the stored vectors to get <code>nlist</code> centroids, and file each vector in the list of its nearest centroid. This is an <b>inverted file index (IVF)</b>: the centroids divide the space into Voronoi cells, and each cell keeps a list of its members. At query time, rank the centroids by distance to the query, open the <code>nprobe</code> closest lists, and score only their members exactly.</p>
+<pre><code class="language-python">def kmeans(Z, c, iters=10, seed=0):
+    r = np.random.default_rng(seed)
+    C = Z[r.choice(len(Z), c, replace=False)].astype(np.float64)
+    for _ in range(iters):
+        a = (-2 * Z @ C.T + (C ** 2).sum(1)).argmin(1)    # nearest centroid; |z|^2 is constant per row
+        counts = np.bincount(a, minlength=c)
+        sums = np.zeros_like(C)
+        np.add.at(sums, a, Z)
+        keep = counts &gt; 0
+        C[keep] = sums[keep] / counts[keep, None]
+    a = (-2 * Z @ C.T + (C ** 2).sum(1)).argmin(1)
+    return C.astype(np.float32), a
+
+
+nlist = 100
+centroids, cell = kmeans(X, nlist)
+lists = [np.flatnonzero(cell == j) for j in range(nlist)]
+
+
+centroid_sq = (centroids ** 2).sum(1)
+
+
+def ivf_search(q, nprobe, k=10):
+    probe = np.argsort(centroid_sq - 2 * centroids @ q)[:nprobe]   # nearest centroids, same rule as assignment
+    cand = np.concatenate([lists[j] for j in probe])
+    return cand[np.argsort(-(X[cand] @ q))[:k]], len(cand)
+
+
+ivf = {}
+for nprobe in [1, 4, 8, 32]:
+    res = [ivf_search(q, nprobe) for q in Q]
+    ivf[nprobe] = (recall_at_k([r[0] for r in res], truth), np.mean([r[1] for r in res]) / n)
+
+recalls = [r for r, _ in ivf.values()]
+assert recalls == sorted(recalls)                  # more lists opened, never lower recall
+assert ivf[1][0] &lt; 0.85 and ivf[32][0] &gt; 0.95
+assert ivf[8][1] &lt; 0.1                             # nprobe 8 scores under 10% of the vectors
+assert ivf_search(Q[0], nlist)[0].tolist() == truth[0].tolist()   # all lists = exact search</code></pre>
+<p>On this data the trade-off looks like this (fraction scanned is the share of stored vectors scored exactly, not counting the 100 centroid comparisons):</p>
+<table><thead><tr><th>nprobe</th><th>recall@10</th><th>fraction scanned</th></tr></thead><tbody><tr><td>1</td><td>about 0.76</td><td>1%</td></tr><tr><td>4</td><td>about 0.90</td><td>4%</td></tr><tr><td>8</td><td>about 0.94</td><td>9%</td></tr><tr><td>32</td><td>about 0.99</td><td>34%</td></tr></tbody></table>
+<p>Recall can only rise with <code>nprobe</code>, since a larger probe set is a superset and members are scored exactly. Misses happen when a true neighbor sits just across a cell boundary, which in high dimensions is common. The knobs interact: more lists (<code>nlist</code>) make each list shorter, so a fixed <code>nprobe</code> is faster but covers less of the space. A common starting point is <code>nlist</code> of a few times \(\sqrt{n}\), with <code>nprobe</code> tuned at query time, which needs no rebuild.</p>
+<h2 id="product-quantization-shrink-the-vectors">Product quantization: shrink the vectors</h2>
+<p>IVF reduces how many vectors are scored, but each one is still stored in full. Thirty gigabytes of float32 per copy is expensive to hold in RAM, and the scan is limited by memory bandwidth. <b>Product quantization</b> (PQ), introduced by Hervé Jégou, Matthijs Douze and Cordelia Schmid (2011), compresses each vector to a few bytes.</p>
+<p>Split each \(d\)-dimensional vector into \(m\) sub-vectors of \(d/m\) dimensions. For each sub-space, run k-means with 256 centroids, so that a sub-vector is replaced by the one-byte index of its nearest centroid. A vector becomes \(m\) bytes. With \(d = 64\) and \(m = 8\), that is 8 bytes instead of 256.</p>
+<p>The search side is what makes PQ fast. The query is not compressed (this is called asymmetric distance computation). For each sub-space, compute the dot product of the query's sub-vector with all 256 centroids once, giving an \(m \times 256\) table. The approximate score of any stored vector is then \(m\) table lookups and a sum:</p>
+\[ q^\top \hat{x} = \sum_{j=1}^{m} q_j^\top \, c_j[\text{code}_j(x)] . \]
+<pre><code class="language-python">m, ks = 8, 256
+ds = d // m
+books = []
+codes = np.empty((n, m), dtype=np.uint8)
+for j in range(m):
+    book, code = kmeans(X[:, j * ds:(j + 1) * ds], ks, iters=8, seed=j)
+    books.append(book)
+    codes[:, j] = code
+
+
+def pq_scores(q):
+    tables = np.stack([books[j] @ q[j * ds:(j + 1) * ds] for j in range(m)])   # m x 256, built once per query
+    return tables[np.arange(m), codes].sum(axis=1)                             # m lookups per stored vector
+
+
+# The lookup score is exactly the dot product with the decoded vector.
+decoded = np.hstack([books[j][codes[:, j]] for j in range(m)])
+assert np.allclose(pq_scores(Q[0]), decoded @ Q[0], atol=1e-4)
+assert X.nbytes // codes.nbytes == 32                                          # 256 bytes -&gt; 8 bytes
+
+pq_only, reranked = [], []
+for q in Q:
+    s = pq_scores(q)
+    shortlist = np.argpartition(-s, 100)[:100]                                 # best 100 by compressed score
+    pq_only.append(shortlist[np.argsort(-s[shortlist])[:k]])
+    reranked.append(shortlist[np.argsort(-(X[shortlist] @ q))[:k]])          # rescore with full vectors
+
+pq_recall, rerank_recall = recall_at_k(pq_only, truth), recall_at_k(reranked, truth)
+assert pq_recall &lt; 0.6 &lt; 0.85 &lt; rerank_recall</code></pre>
+<p>At 32 times compression the compressed ranking alone gets only about 40% of the true top 10, because quantization error is large compared with the small gaps between near neighbors. But about nine in ten of the true neighbors are somewhere in the compressed top 100, so rescoring that shortlist with the full vectors recovers about 90%. That is the standard pattern: a compressed scan to get a shortlist, then an exact rerank, with the full vectors on disk or in cheaper storage.</p>
+<p>In practice IVF and PQ are combined. A common refinement encodes each vector's offset from its IVF centroid rather than the vector itself, which spends the code bits where they help. ScaNN, from Ruiqi Guo and colleagues at Google (2020), changes the quantization objective instead: it penalizes the error parallel to the data point more than the error orthogonal to it, because the parallel component is what changes large inner products.</p>
+<h2 id="navigable-graphs-walk-towards-the-query">Navigable graphs: walk towards the query</h2>
+<p>The third idea needs no partition at all. Link each vector to its nearest neighbors, then answer a query by walking the graph: start somewhere, move to whichever neighbor is closer to the query, and stop when no neighbor improves. A plain greedy walk stalls in local optima, so the search keeps a beam of the best <code>ef</code> nodes found so far and keeps expanding until the closest unexpanded candidate is worse than the worst node in the beam.</p>
+<p><b>HNSW</b> (Hierarchical Navigable Small World graphs, Yury Malkov and Dmitry Yashunin, 2016) is the graph index that most vector databases offer, and often their default. It inserts vectors one at a time, chooses each node's links with a heuristic that keeps some long-range edges, and stacks sparser layers on top so that the search starts with long jumps and finishes with short ones. The sketch below keeps the core and simplifies the rest: the bottom layer is an exact 12-nearest-neighbor graph with reverse edges added, and a random 1% of nodes stands in for the upper layers by picking the starting point.</p>
+<pre><code class="language-python">M = 12
+nbrs = np.empty((n, M), dtype=np.int64)
+for start in range(0, n, 1000):                       # exact kNN graph, built in chunks
+    S = X[start:start + 1000] @ X.T
+    S[np.arange(len(S)), np.arange(start, start + len(S))] = -np.inf
+    nbrs[start:start + 1000] = np.argpartition(-S, M, axis=1)[:, :M]
+adj = [set(row) for row in nbrs]
+for i in range(n):
+    for j in nbrs[i]:
+        adj[j].add(i)                                  # make edges two-way
+adj = [np.fromiter(a, dtype=np.int64) for a in adj]
+hubs = rng.choice(n, 100, replace=False)               # stand-in for HNSW's upper layers
+
+
+def graph_search(q, ef, k=10):
+    entry = hubs[np.argmax(X[hubs] @ q)]
+    s = float(X[entry] @ q)
+    visited, n_scored = {entry}, len(hubs) + 1
+    frontier = [(-s, entry)]                           # max-heap of candidates to expand
+    beam = [(s, entry)]                                # min-heap of the best ef found so far
+    while frontier:
+        neg, node = heapq.heappop(frontier)
+        if len(beam) &gt;= ef and -neg &lt; beam[0][0]:
+            break                                      # nothing left that can improve the beam
+        new = [v for v in adj[node] if v not in visited]
+        visited.update(new)
+        n_scored += len(new)
+        for v, sv in zip(new, X[new] @ q if new else []):
+            if len(beam) &lt; ef or sv &gt; beam[0][0]:
+                heapq.heappush(frontier, (-sv, v))
+                heapq.heappush(beam, (sv, v))
+                if len(beam) &gt; ef:
+                    heapq.heappop(beam)
+    return [v for _, v in sorted(beam, reverse=True)[:k]], n_scored
+
+
+graph = {}
+for ef in [10, 40, 160]:
+    res = [graph_search(q, ef) for q in Q]
+    graph[ef] = (recall_at_k([r[0] for r in res], truth), np.mean([r[1] for r in res]) / n)
+
+assert graph[10][0] &lt; graph[40][0] &lt; graph[160][0]
+assert graph[40][0] &gt; 0.85 and graph[40][1] &lt; 0.06     # ~90% recall scoring ~4% of the vectors
+assert graph[160][0] &gt; 0.95</code></pre>
+<p>At <code>ef = 40</code> the walk returns about 90% of the true top 10 after scoring about 4% of the vectors, and <code>ef = 160</code> reaches about 98% at 13%. At ten thousand vectors that is roughly what IVF achieves for the same work (the graph's count includes its 100 entry points, IVF's leaves out its 100 centroids). The difference shows at scale: the number of steps a well-built navigable graph needs grows slowly with \(n\), which is why HNSW-style graphs sit near the top of public recall-versus-throughput benchmarks of in-memory indexes. The price is memory, since the full vectors and every edge live in RAM, and slow, memory-hungry builds. DiskANN (Subramanya and colleagues, 2019) is a graph index designed to keep most of that on SSD.</p>
+<h2 id="filters-and-hybrid-search">Filters and hybrid search</h2>
+<p>Real queries come with conditions: only documents this user may see, only products in stock. There are two naive ways to apply them, and both fail somewhere.</p>
+<ul><li><b>Post-filtering</b> runs the ANN search, takes the top candidates, and drops those that fail the filter. If the filter is selective, few or none survive.</li><li><b>Pre-filtering</b> restricts the search to items that pass. With an exact scan that is correct, and when only a small set passes it is also cheap. Inside an index it is harder: a graph walk that may only step on passing nodes can find its path cut off.</li></ul>
+<pre><code class="language-python">allowed = rng.random(n) &lt; 0.02                         # a filter that 2% of items pass
+
+post, pre = [], []
+for q in Q:
+    cand, _ = ivf_search(q, nprobe=8, k=50)            # ANN top 50, then filter
+    post.append(cand[allowed[cand]][:k])
+    ids = np.flatnonzero(allowed)                      # filter first, then exact search on the rest
+    pre.append(ids[np.argsort(-(X[ids] @ q))[:k]])
+
+assert np.mean([len(p) for p in post]) &lt; 2             # usually one or no results instead of 10
+assert all(len(p) == k and allowed[p].all() for p in pre)</code></pre>
+<p>Several vector databases therefore plan filtered queries: they estimate how selective the filter is, scan the passing items exactly when few pass, and otherwise search the index with the filter applied during traversal and a wider beam.</p>
+<p>The second common addition is <b>hybrid search</b>. Embeddings are good at paraphrase and weak at exact tokens such as part numbers, error codes, names and rare terms, which keyword search with BM25 handles well. Hybrid search runs both and merges the two ranked lists. Their scores are on different scales, so the simplest robust merge uses only ranks. Reciprocal rank fusion (Gordon Cormack, Charles Clarke and Stefan Büttcher, 2009) scores each document by</p>
+\[ \text{RRF}(d) = \sum_{\text{lists } L} \frac{1}{60 + \text{rank}_L(d)} , \]
+<p>where the constant 60 is the value from their paper and damps the advantage of the very top ranks.</p>
+<pre><code class="language-python">def rrf(*rankings, c=60):
+    score = {}
+    for ranking in rankings:
+        for rank, doc in enumerate(ranking, start=1):
+            score[doc] = score.get(doc, 0.0) + 1 / (c + rank)
+    return sorted(score, key=score.get, reverse=True)
+
+
+# Query: "error E1043 at startup". Dense search finds startup problems in general;
+# keyword search finds the one document that contains the code.
+dense = ["boot-slow", "startup-crash", "config-reset", "driver-timeout", "e1043-fix"]
+keyword = ["e1043-fix", "error-codes-index", "startup-crash"]
+fused = rrf(dense, keyword)
+assert fused[:2] == ["startup-crash", "e1043-fix"]     # in both lists, so both rise to the top
+assert fused.index("e1043-fix") &lt; dense.index("e1043-fix")</code></pre>
+<p>The fused top results usually go to a cross-encoder reranker, which reads the query and each candidate together and is too slow to run over the whole collection.</p>
+<h2 id="what-the-database-adds-and-how-to-choose">What the database adds, and how to choose</h2>
+<p>An index answers top-k queries over a fixed set of vectors. A vector database wraps one or more indexes with the parts a production system needs: storage of the vectors and metadata, inserts, updates and deletes (often as tombstones that are cleaned up when segments are rebuilt), filtered queries, sharding and replication, and backups. Those operations are where the index types differ in practice. IVF centroids are trained once and go stale as the data distribution shifts, and HNSW handles inserts well but deletes poorly.</p>
+<p>The choices fall into three groups.</p>
+<table><thead><tr><th>Option</th><th>Examples</th><th>Fits when</th></tr></thead><tbody><tr><td>A library inside your service</td><td>FAISS, ScaNN, hnswlib</td><td>you control the infrastructure, the index fits on the machine, and updates come in batches</td></tr><tr><td>A vector extension to a database you already run</td><td>pgvector for PostgreSQL, vector fields in Elasticsearch or OpenSearch</td><td>millions of vectors, you need joins or transactions with other data, and you want one system to operate</td></tr><tr><td>A dedicated vector database</td><td>Milvus, Qdrant, Weaviate, Chroma, or managed services such as Pinecone</td><td>large or fast-changing collections, heavy filtering, many tenants, or you want the operations handled</td></tr></tbody></table>
+<p>FAISS (Jeff Johnson, Matthijs Douze and Hervé Jégou, at Facebook AI Research, now Meta AI) is a library, not one algorithm: it offers exact, IVF, PQ, HNSW and combined indexes on CPU and GPU, and is a good place to prototype before choosing a service.</p>
+<p>A rough guide to the index itself:</p>
+<ol><li>Under about a million vectors, try exact search first. A batched matrix product on a GPU, or even a CPU, is often fast enough, and recall is 1.</li><li>If the vectors fit in RAM and latency matters most, use HNSW and tune <code>ef</code> at query time.</li><li>If memory is the constraint, use IVF with PQ and rerank a shortlist with full vectors.</li><li>If the collection is much larger than RAM, use a disk-based graph index or shard across machines.</li></ol>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Not measuring recall.</b> Keep a sample of real queries, compute their exact top-k offline, and track the index's recall as the data grows. Tuning <code>nprobe</code> or <code>ef</code> without this is guessing.</li><li><b>Blaming the index for bad results.</b> When retrieval quality is poor, first check exact search with the same embeddings. If that is also poor, the problem is the embedding model, the chunking, or the query, and no index setting will fix it.</li><li><b>Mixing embedding models.</b> Vectors from different models, or different versions of one model, live in different spaces. Changing the model means re-embedding and re-indexing everything.</li><li><b>Inconsistent normalization.</b> Normalize stored vectors and queries the same way and match the index metric to how the model was trained.</li><li><b>Benchmarking on someone else's data.</b> Recall and speed depend on the structure of the vectors; uniform random data makes every index look bad, and public benchmark numbers do not transfer. Measure on your own embeddings.</li></ul>
+<p>For the retrieval pipeline around the index, see <a href="../rag-architecture/">RAG architecture</a>; for how the embeddings are trained, <a href="../contrastive-loss/">contrastive losses</a> and <a href="../two-tower-retrieval/">two-tower retrieval</a>. Eugene Yan's essays on <a href="https://eugeneyan.com/writing/llm-patterns/">patterns for LLM systems</a> and <a href="https://eugeneyan.com/writing/real-time-recommendations/">real-time recommendations</a> are good further reading on putting these indexes into production.</p>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>
