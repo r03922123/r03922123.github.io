@@ -152,6 +152,11 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
            font: 600 clamp(.64rem, 1.2vw, .8rem)/1.3 var(--font-display); letter-spacing: .22em; text-transform: uppercase; color: #f1e2bb;
            text-shadow: 0 1px 0 #000, 0 0 10px #000; }
 .rm-hint::before, .rm-hint::after { content: "\25C6"; color: #d9a441; margin: 0 .8em; font-size: .8em; }
+.rm-hint-t { display: none; }
+@media (hover: none) {   /* touch: no hover labels, and a tap opens the door at once, so name the doors up front */
+  .rm-hint-p { display: none; } .rm-hint-t { display: inline; letter-spacing: .12em; }
+  .rm-hint::before, .rm-hint::after { content: none; }
+}
 
 /* The doors. Hidden until the first frame has placed them; the list below the room works all along. */
 .rm-doors { position: absolute; inset: 0; z-index: 1; pointer-events: none; visibility: hidden; }
