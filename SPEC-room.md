@@ -12,9 +12,8 @@ wood and fabric, warm firelight against cool moonlight. The camera breathes slow
 | Bookshelf | `posts/` | books glow, label "POSTS · 59" |
 | Open spellbook on a lectern | `leetcode/` | pages flutter, label "LEETCODE · 31" |
 | Three portraits above the mantel: KK, TT, HTC | `about.html#kkcompany`, `#tiktok`, `#htc` | that frame lights up, label "ABOUT · KKCOMPANY" etc. |
-| Gramophone | `posts/#musicgen` | horn glows, label "MUSICGEN" |
 
-Ambience: a crackling fireplace (flickering light and a few rising embers), candles, two armchairs and a rug,
+Ambience (no links): a gramophone on a side table, a crackling fireplace (flickering light and a few rising embers), candles, two armchairs and a rug,
 a tall window with moon and stars, a tapestry. Portraits show emblems (a note, a play triangle, goggles), not faces.
 A game-style title card ("Jie-Hong Lin — machine learning engineer. Choose something in the room.") sits over the
 top of the view and never blocks it. A plain text list of the same doors sits below.

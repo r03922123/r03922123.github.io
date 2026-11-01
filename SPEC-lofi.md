@@ -7,14 +7,14 @@ An escape hatch from the scene: a plain, fast, text-only home with the same cont
 in the corner switches between the scene and the plain home; the choice is remembered on that device.
 Visitors whose OS asks for reduced motion start in lo-fi, and can still switch to the (motionless) scene.
 
-The plain home shows: the greeting, the four sections as a list (Posts, LeetCode, About, MusicGen), and
+The plain home shows: the greeting, the three sections as a list (Posts, LeetCode, About), and
 the latest three posts.
 
 ### Amendment for `room` (version 2)
 - Visitors whose browser has no WebGL start in lo-fi, and the toggle is hidden for them (the room cannot render).
   `room.js` decides this after it loads; until then the title card and text door list are already readable.
 - In lo-fi mode `room.js` never loads three.js, so the plain home stays light.
-- The plain home lists the same doors as the room: Posts, LeetCode, About, MusicGen, plus the latest three posts.
+- The plain home lists the same doors as the room: Posts, LeetCode, About, plus the latest three posts.
 
 ## Tech Stack
 A `data-mode="scene|lofi"` attribute on `<html>`, set by an inline script in `<head>` before first paint
