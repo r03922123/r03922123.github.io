@@ -10,7 +10,7 @@ With a clock running, most failed attempts are not a lack of knowledge. They are
 The method here has six steps: understand, size, brute force, optimize, code, test. Each is shown on one problem, worked end to end. For the patterns themselves (sliding windows, heaps, graph searches and so on), the [LeetCode patterns](/leetcode/) series has a short post on each.
 
 ## A time budget
-Decide the split before starting, so a stuck step is noticed rather than felt. For a 45-minute block:
+Decide the split before starting, so a stuck step is noticed rather than felt. For a timed block, for example a 45-minute contest problem or practice session:
 
 | Step | Time | Output |
 |---|---|---|
@@ -245,7 +245,7 @@ If the better idea has not come by the end of the design budget, write the brute
 ## Pitfalls
 - **Coding before the problem is pinned down.** A clean solution to the wrong question is worth nothing. Settle the ambiguities in step 1.
 - **Choosing a pattern by its look.** Check its preconditions against the constraints, as the window example showed.
-- **Silent assumptions.** Write the plan as comments before the code, and the invariant next to the loop. A written trail shows where reasoning went wrong, and lets anyone reading along follow and help.
+- **Silent assumptions.** Write the plan as comments before the code, and the invariant next to the loop. A written trail shows where reasoning went wrong, and makes the solution easier to review later.
 - **Testing only the example.** The given example is usually the case the naive idea already handles. The edge-case list and the stress test are where bugs show up.
 - **No time left to test.** Keep the reserve. If coding runs long, cut features, not testing.
 
