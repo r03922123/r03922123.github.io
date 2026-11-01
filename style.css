@@ -175,6 +175,7 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .rm-tip small { display: block; font-size: .72rem; color: #cdb98f; }
 .rm-door:focus-visible::before, .rm-door:focus-visible .rm-tip { opacity: 1; }
 @media (hover: hover) { .rm-door:hover::before, .rm-door:hover .rm-tip { opacity: 1; } }
+@media (forced-colors: active) { .rm-door:focus-visible { outline: 2px solid CanvasText; } }   /* gradients vanish there */
 
 /* The loading screen, shown until the first frame. */
 .rm-load { position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 12px;
