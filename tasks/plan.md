@@ -135,11 +135,11 @@ one-line reason grounded in real industry practice plus this project's evidence.
       over others' work (MusicGen and the like), and copied third-party text.
       Why: identify and control personal data before release (NIST Privacy Framework); here, each per-post
       reviewer only saw its own post.
-- [ ] **J4 Home performance audit** (running): role: `agent-skills:web-performance-auditor`, on `index.html`, `room.js` and
+- [x] **J4 Home performance audit** (done: 9 findings, 1 high): role: `agent-skills:web-performance-auditor`, on `index.html`, `room.js` and
       `style.css`: first paint before three.js, the 30 fps cap, pausing when hidden or off-screen, and phone cost.
       Why: set performance budgets and measure against them (web.dev, Core Web Vitals); here, `SPEC-room.md`'s
       30 fps cap has never been measured.
-- [ ] **J5 Fix findings**: role: main session. Apply confirmed findings from J2-J4, then rerun J1.
+- [x] **J5 Fix findings** (done on `v2`: 21 fixed, 2 rejected, 1 partly fixed with the rest open, and 1 regression found and fixed while verifying): role: main session. Apply confirmed findings from J2-J4, then rerun J1.
 - [ ] **J6 Owner preview, then stop**: role: owner. Serve locally, give the owner a short summary, and push only
       with the owner's explicit OK.
       Why: a human approves before a release reaches users (Google SRE book, "Release Engineering"); here, the

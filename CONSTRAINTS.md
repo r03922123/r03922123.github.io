@@ -37,8 +37,8 @@ Each row names the command that gives the verdict. All must pass on the branch t
 | Home draw calls per frame | 157 measured before instancing the bands; about 113 estimated after | must not grow | J4 audit; re-measure |
 | Room frame rate | 30 fps active, 15 idle or touch | fixed by design (SPEC-room) | J4 audit + `room.js` |
 
-None of these has an external check yet (Lighthouse is not installed and there is no CI). The CI sketch in
-`tasks/plan.md` is where they would move.
+None of these has an external check yet (Lighthouse is not installed and there is no CI). A GitHub Actions
+workflow that builds the posts and runs the gates is the natural place for them; it is not set up.
 
 ## Exceptions
 
