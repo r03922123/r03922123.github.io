@@ -531,13 +531,16 @@ function build(THREE, context) {
         const sx = (v.x + 1) / 2 * cssW, sy = (1 - v.y) / 2 * cssH;
         x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
       }
-      const mw = Math.max(44, x1 - x0), mh = Math.max(44, y1 - y0);   // touch targets of at least 44 px
-      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      d.link.style.transform = `translate(${Math.round(cx - mw / 2)}px,${Math.round(cy - mh / 2)}px)`;
-      d.link.style.width = Math.round(mw) + "px"; d.link.style.height = Math.round(mh) + "px";
+      const mw = Math.round(Math.max(44, x1 - x0)), mh = Math.round(Math.max(44, y1 - y0));   // touch targets >= 44 px
+      const left = Math.round((x0 + x1 - mw) / 2), top = Math.round((y0 + y1 - mh) / 2);
       const tall = mh > cssH * .45;                                       // tall objects: the label sits inside
+      const key = `${left},${top},${mw},${mh}`;
+      if (key === d.placed) continue;                                     // the camera drifts slowly: most frames, no change
+      d.placed = key;
+      d.link.style.transform = `translate(${left}px,${top}px)`;
+      d.link.style.width = mw + "px"; d.link.style.height = mh + "px";
       d.link.classList.toggle("rm-mid", tall);
-      d.link.classList.toggle("rm-below", !tall && cy - mh / 2 < cssH * .3);
+      d.link.classList.toggle("rm-below", !tall && top < cssH * .3);
     }
   }
 
