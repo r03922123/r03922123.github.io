@@ -181,7 +181,8 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .rm-load { position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 12px;
            background: #07060b; transition: opacity .7s, visibility .7s; }
 .rm-ready .rm-load { opacity: 0; visibility: hidden; }
-.rm-ready .rm-bar i { animation: none; }   /* a hidden element's animation keeps running */
+.rm-ready .rm-bar i { animation: none; }
+@media (prefers-reduced-motion: reduce) { .rm-load { transition: none; } }   /* a hidden element's animation keeps running */
 .rm-load b { font: 700 .9rem/1 var(--font-display); letter-spacing: .3em; text-transform: uppercase; color: #e2b04f; }
 .rm-bar { position: relative; overflow: hidden; width: 180px; height: 8px; border: 1px solid #b8862f; padding: 1px; }
 .rm-bar i { position: absolute; top: 1px; bottom: 1px; left: 1px; width: 38%; will-change: transform; background: linear-gradient(90deg, #a8742a, #ffe08a); }
