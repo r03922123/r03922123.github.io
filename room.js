@@ -8,9 +8,13 @@ const root = document.documentElement;
 const stage = document.getElementById("rm-stage");
 let room = null, starting = false;
 
-function hasWebGL() {
-  try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }
-  catch (e) { return false; }
+const GL_OPTIONS = { antialias: false, alpha: false, stencil: false, powerPreference: "low-power" };
+function hasWebGL() {                        // three.js r169 needs WebGL2; release the probe's context at once
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    return !!gl;
+  } catch (e) { return false; }
 }
 function setMode(mode) {                     // the attribute and the toggle's pressed state, kept in step
   root.setAttribute("data-mode", mode);
@@ -28,11 +32,14 @@ async function sync() {
   if (room) { room.resume(); return; }
   if (starting) return;
   starting = true;
-  if (!hasWebGL()) { giveUp(); return; }
-  try { room = build(await import(THREE_URL)); } catch (e) { giveUp(); }
+  let gl = null;                             // made on the room's own canvas and handed to three.js: one context
+  try { gl = stage.querySelector(".rm-canvas").getContext("webgl2", GL_OPTIONS); } catch (e) {}
+  if (!gl) { giveUp(); return; }
+  try { room = build(await import(THREE_URL), gl); } catch (e) { giveUp(); }
 }
 new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ["data-mode"] });
-sync();
+// Creating a WebGL context can take seconds while a cold GPU wakes up, so let the title card and door list paint first.
+requestAnimationFrame(() => setTimeout(sync));
 // A visitor who starts in lo-fi never reaches the check above, so probe once when the page is idle: without WebGL
 // the toggle would only lead to a room that cannot render.
 if (stage && root.getAttribute("data-mode") === "lofi")
@@ -47,11 +54,11 @@ function rng(seed) {                         // mulberry32: the same room on eve
   };
 }
 
-function build(THREE) {
+function build(THREE, context) {
   const rand = rng(20011116);
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
   const canvas = stage.querySelector(".rm-canvas");
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "low-power" });
+  const renderer = new THREE.WebGLRenderer({ canvas, context, ...GL_OPTIONS });
   renderer.setPixelRatio(1);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07060b);
