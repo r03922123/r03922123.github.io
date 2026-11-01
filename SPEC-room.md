@@ -9,8 +9,8 @@ wood and fabric, warm firelight against cool moonlight. The camera breathes slow
 
 | Object | Opens | On hover / focus |
 |---|---|---|
-| Bookshelf | `posts/` | books glow, label "POSTS · 59" |
-| Open spellbook on a lectern | `leetcode/` | pages flutter, label "LEETCODE · 31" |
+| Bookshelf | `posts/` | books glow, label "POSTS" (the bookshelf) |
+| Open spellbook on a lectern | `leetcode/` | a page turns, label "LEETCODE" (the spellbook · 31 pattern notes) |
 | Three portraits above the mantel: KK, TT, HTC | `about.html#kkcompany`, `#tiktok`, `#htc` | that frame lights up, label "ABOUT · KKCOMPANY" etc. |
 
 Ambience (no links): a gramophone on a side table, a crackling fireplace (flickering light and a few rising embers), candles, two armchairs and a rug,
@@ -26,7 +26,7 @@ nothing taken from felixrieseberg.com.
   request on the home page), loaded by `room.js` as an ES module.
 - The room is built in code from boxes, cylinders and a few extruded shapes; textures are drawn at load time on small
   canvases (stone, planks, cloth) with nearest-neighbour filtering. No model or image files.
-- Era look: render to a low-resolution target (about 400 px tall) and scale it up with `image-rendering: pixelated`;
+- Era look: render the canvas itself at about 270 px tall and scale it up by a whole number with `image-rendering: pixelated`;
   a vertex-snapping tweak on the materials for the slight PS1-style wobble; fog for depth.
 
 ## Commands
@@ -55,7 +55,7 @@ by projecting its centre every frame; they are focusable, labeled, and show the 
 `room.js` is plain ES-module JavaScript, no build step; every class name for the room is prefixed `rm-`.
 
 ## Testing Strategy
-- Browser at 375, 768 and 1440 px: the four doors are visible, hover and Tab show their labels, Enter opens the
+- Browser at 375, 768 and 1440 px: the five door links (bookshelf, spellbook, three portraits) are visible, hover and Tab show their labels, Enter opens the
   right page, no horizontal scroll, no console errors.
 - Performance: render loop capped near 30 fps (the era's frame rate), paused when the tab is hidden or the canvas is
   off-screen; first paint of the page (title card, text list) does not wait for three.js.
@@ -69,6 +69,6 @@ by projecting its centre every frame; they are focusable, labeled, and show the 
 - Never: Harry Potter or other franchise marks; copying another site's art or code; autoplay of anything.
 
 ## Success Criteria
-- [ ] Room renders with the era look on desktop and phone; four doors work by mouse, touch and keyboard
+- [ ] Room renders with the era look on desktop and phone; five door links work by mouse, touch and keyboard
 - [ ] 30 fps cap, pause when hidden, still frame under reduced motion, lo-fi when WebGL is missing
 - [ ] No third-party requests; home HTML + CSS under 150 KB
