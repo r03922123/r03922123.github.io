@@ -316,4 +316,4 @@ For the basic building blocks see [why attention divides by the square root of d
 12. Hu et al., [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685), ICLR 2022.
 13. Liu et al., [Lost in the Middle: How Language Models Use Long Contexts](https://arxiv.org/abs/2307.03172), TACL 2024.
 
-I studied these topics in Stanford's CME295 course, Transformers and Large Language Models; the explanations and experiments here are my own.
+These topics follow Stanford's CME295 course, Transformers and Large Language Models; the explanations and experiments here are my own.
