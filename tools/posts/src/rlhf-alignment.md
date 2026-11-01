@@ -256,4 +256,4 @@ Measuring a tuned model well is its own subject; see [evaluating ML systems](/po
 - Shao, Z. et al. (2024). DeepSeekMath: pushing the limits of mathematical reasoning in open language models. arXiv:2402.03300.
 - Xu, S. et al. (2024). Is DPO superior to PPO for LLM alignment? A comprehensive study. ICML.
 
-This post is a rewrite of study notes built from the papers above; the toy world and all code are original.
+This post draws on the papers above; the toy world and all code are original.

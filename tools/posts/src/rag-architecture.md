@@ -353,7 +353,7 @@ They solve different problems and are often combined. RAG suits knowledge that c
 - **Mismatched embeddings.** Queries and chunks must be embedded by the same model version, and changing the model means re-embedding the whole collection.
 - **Evaluating on questions the model already knows.** A general-knowledge test set rewards the model's memory, not the retrieval. Use questions that only the documents can answer.
 
-Eugene Yan's [Patterns for Building LLM-based Systems & Products](https://eugeneyan.com/writing/llm-patterns/) was a starting point for these notes; the example corpus, code and measurements here are my own.
+Eugene Yan's [Patterns for Building LLM-based Systems & Products](https://eugeneyan.com/writing/llm-patterns/) was a starting point for this post; the example corpus, code and measurements here are my own.
 
 ## References
 1. Lewis et al., [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401), NeurIPS 2020.
