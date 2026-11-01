@@ -464,6 +464,7 @@ function build(THREE, context) {
     return { p, pos: g.attributes.position, col: g.attributes.color, life: Array.from({ length: n }, () => rand()) };
   }
   const embers = points(26, 2, 0xffffff), sparks = points(40, 2, 0xffffff);
+  let sparkBox = null;
 
   // ---- Doors: each <a> in .rm-doors is moved over the screen box of its object.
   const links = [...stage.querySelectorAll(".rm-door")];
@@ -587,6 +588,13 @@ function build(THREE, context) {
       spellL.intensity = 2 * active.glow;
     }
     const sb = active ? active.box : null;
+    if (sb !== sparkBox) {                   // a new object: every sparkle starts around it, not where the last one was
+      sparkBox = sb;
+      if (sb) for (let i = 0; i < sparks.life.length; i++) {
+        sparks.pos.setXYZ(i, sb.min.x + rand() * (sb.max.x - sb.min.x), sb.min.y + rand() * (sb.max.y - sb.min.y), sb.max.z + .05);
+        sparks.life[i] = rand();
+      }
+    }
     for (let i = 0; i < sparks.life.length; i++) {
       let l = sparks.life[i] + (still ? 0 : dt * (.5 + (i % 4) * .15));
       if (l >= 1 || !sb) {
