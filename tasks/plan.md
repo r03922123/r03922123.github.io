@@ -86,7 +86,7 @@ scripts/check.py + denylist.local.txt   (gate for everything below)
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Private vault content leaks into a page | High | Check script gate on every commit; manual review at Checkpoint A |
+| Private vault content leaks into a page | High | Check script gates every merge and push (not local commits, see CONSTRAINTS.md); manual review at Checkpoint A |
 | About page overclaims vs. a `Never claim:` line | High | Claim-by-claim table in Task 2, reviewed by you |
 | Text-to-music facts about 2026 models are wrong after translation | Med | Keep the note's `[paper]`/`[illustrative]` marks; cite each paper; flag anything unverifiable |
 | LoRA tutorial code no longer runs once rewritten | Med | Extract code to scratchpad and run it (CPU, tiny model) before publishing |
