@@ -465,6 +465,7 @@ function build(THREE, context) {
   }
   const embers = points(26, 2, 0xffffff), sparks = points(40, 2, 0xffffff);
   let sparkBox = null;
+  const emberSeed = Array.from({ length: embers.life.length }, (_, i) => (i * .37) % 1);
 
   // ---- Doors: each <a> in .rm-doors is moved over the screen box of its object.
   const links = [...stage.querySelectorAll(".rm-door")];
@@ -478,6 +479,9 @@ function build(THREE, context) {
     const c = b.getCenter(new THREE.Vector3());
     return { ...d, link, box: b, corners, center: c, glow: 0, hotColor: new THREE.Color(d.hot) };
   }).filter(Boolean);
+  const bookDoor = doors.find((d) => d.focus === top);
+  let last = 0, running = false, raf = 0, onScreen = true, wanted = true;   // animation state, used from here on
+
   // The pointer wins while it is over a door; otherwise the keyboard-focused door stays lit with its label.
   let active = null, hovered = null, focused = null;
   function choose() { active = hovered || focused; if (!running) still(); }
@@ -518,7 +522,7 @@ function build(THREE, context) {
   stage.addEventListener("pointerleave", () => { aim.tx = aim.ty = 0; });
   stage.addEventListener("scroll", () => { stage.scrollTop = stage.scrollLeft = 0; });   // older browsers without overflow: clip
 
-  const v = new THREE.Vector3(), tmp = new THREE.Vector3();
+  const v = new THREE.Vector3(), tmp = new THREE.Vector3(), spellOffset = new THREE.Vector3(0, .2, .9);
   function placeDoors() {
     for (const d of doors) {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -538,10 +542,9 @@ function build(THREE, context) {
   }
 
   // ---- Animation.
-  let last = 0, running = false, raf = 0, onScreen = true, wanted = true;
-  function update(t, dt, still) {
-    const k = still ? 1 : 1 - Math.exp(-dt * 7);
-    if (!still) {
+  function update(t, dt, frozen) {
+    const k = frozen ? 1 : 1 - Math.exp(-dt * 7);
+    if (!frozen) {
       aim.x += (aim.tx - aim.x) * (1 - Math.exp(-dt * 2)); aim.y += (aim.ty - aim.y) * (1 - Math.exp(-dt * 2));
       camera.position.set(base.x + Math.sin(t * .11) * .16 + aim.x * .3, base.y + Math.sin(t * .17) * .05 - aim.y * .12, base.z);
       tmp.set(look.x + aim.x * .25, look.y - aim.y * .1, look.z);
@@ -550,30 +553,30 @@ function build(THREE, context) {
     }
     camera.lookAt(tmp);
 
-    const flick = still ? 1 : .86 + .08 * Math.sin(t * 11.3) + .06 * Math.sin(t * 23.7 + 1) + .04 * rand();
+    const flick = frozen ? 1 : .86 + .08 * Math.sin(t * 11.3) + .06 * Math.sin(t * 23.7 + 1) + .04 * rand();
     fireL.intensity = 16 * flick;
     halo.material.opacity = .32 * flick; floorGlow.material.opacity = .2 * flick;
-    const frame = still ? 0 : Math.floor(t * 9);
+    const frame = frozen ? 0 : Math.floor(t * 9);
     flames.forEach((f) => {
       const u = f.userData;
-      f.scale.set(1 + (still ? 0 : .06 * Math.sin(t * 7 + u.phase)), 1 + (still ? 0 : .14 * Math.sin(t * 9.3 + u.phase) + .06 * Math.sin(t * 17 + u.phase)), 1);
+      f.scale.set(1 + (frozen ? 0 : .06 * Math.sin(t * 7 + u.phase)), 1 + (frozen ? 0 : .14 * Math.sin(t * 9.3 + u.phase) + .06 * Math.sin(t * 17 + u.phase)), 1);
       f.material.map = fireTs[(frame + u.k) % 3];
     });
     candleFlames.forEach((c) => {
-      const s = still ? 1 : 1 + .12 * Math.sin(t * 13 + c.phase) + .05 * Math.sin(t * 29 + c.phase);
+      const s = frozen ? 1 : 1 + .12 * Math.sin(t * 13 + c.phase) + .05 * Math.sin(t * 29 + c.phase);
       c.f.scale.set(1, s, 1); c.hl.material.opacity = .26 * s;
     });
-    sconceL.intensity = 3 * (still ? 1 : .9 + .1 * Math.sin(t * 13 + 2));
+    sconceL.intensity = 3 * (frozen ? 1 : .9 + .1 * Math.sin(t * 13 + 2));
 
     // Embers.
     for (let i = 0; i < embers.life.length; i++) {
       let l = embers.life[i];
-      if (!still) l += dt * (.35 + (i % 5) * .06);
-      if (l >= 1) { l -= 1; embers.p.userData[i] = rand(); }
+      if (!frozen) l += dt * (.35 + (i % 5) * .06);
+      if (l >= 1) { l -= 1; emberSeed[i] = rand(); }
       embers.life[i] = l;
-      const s = embers.p.userData[i] ?? ((i * .37) % 1);
+      const s = emberSeed[i];
       embers.pos.setXYZ(i, (s - .5) * .8 + Math.sin(l * 6 + i) * .06, .25 + l * 1.15, -3.38 + (i % 3) * .03);
-      const a = still ? 0 : Math.sin(l * Math.PI) * (.6 + .4 * Math.sin(t * 20 + i));
+      const a = frozen ? 0 : Math.sin(l * Math.PI) * (.6 + .4 * Math.sin(t * 20 + i));
       embers.col.setXYZ(i, a, a * .5, a * .15);
     }
     embers.pos.needsUpdate = embers.col.needsUpdate = true;
@@ -585,7 +588,7 @@ function build(THREE, context) {
     }
     spellL.intensity = 0;
     if (active) {
-      spellL.position.copy(active.center).add(tmp.set(0, .2, .9));
+      spellL.position.copy(active.center).add(spellOffset);
       spellL.intensity = 2 * active.glow;
     }
     const sb = active ? active.box : null;
@@ -598,22 +601,21 @@ function build(THREE, context) {
     }
     sparks.p.visible = !!sb;                 // nothing chosen: no upload, no draw
     if (sb) for (let i = 0; i < sparks.life.length; i++) {
-      let l = sparks.life[i] + (still ? 0 : dt * (.5 + (i % 4) * .15));
+      let l = sparks.life[i] + (frozen ? 0 : dt * (.5 + (i % 4) * .15));
       if (l >= 1 || !sb) {
         l = l % 1;
         if (sb) sparks.pos.setXYZ(i, sb.min.x + rand() * (sb.max.x - sb.min.x), sb.min.y + rand() * (sb.max.y - sb.min.y), sb.max.z + .05);
       }
       sparks.life[i] = l;
-      if (sb && !still) sparks.pos.setY(i, sparks.pos.getY(i) + dt * .25);
-      const a = sb && !still ? Math.sin(l * Math.PI) * (i % 3 ? 1 : .5 + .5 * Math.sin(t * 25 + i)) * (active ? active.glow : 0) : 0;
+      if (sb && !frozen) sparks.pos.setY(i, sparks.pos.getY(i) + dt * .25);
+      const a = sb && !frozen ? Math.sin(l * Math.PI) * (i % 3 ? 1 : .5 + .5 * Math.sin(t * 25 + i)) * (active ? active.glow : 0) : 0;
       sparks.col.setXYZ(i, a, a * .86, a * .55);
     }
     if (sb) sparks.pos.needsUpdate = sparks.col.needsUpdate = true;
 
     // The record turns; the spellbook's page turns while it is chosen.
-    disc.rotation.y -= still ? 0 : dt * 1.1;
-    const book = doors.find((d) => d.focus === top);
-    if (!still && active === book) flip.rotation.z = Math.PI * Math.min(1, ((t * .9) % 1) * 1.25);
+    disc.rotation.y -= frozen ? 0 : dt * 1.1;
+    if (!frozen && active === bookDoor) flip.rotation.z = Math.PI * Math.min(1, ((t * .9) % 1) * 1.25);
     else flip.rotation.z += (0 - flip.rotation.z) * k;
   }
   function render(t, dt, s) {
