@@ -510,6 +510,7 @@ function build(THREE, context) {
     camera.aspect = aspect;
     camera.fov = 2 * Math.atan(vHalf / dist) * 180 / Math.PI;
     camera.updateProjectionMatrix();
+    doors.forEach((d) => { d.tipW = 0; d.placed = ""; });
     if (!running) still();
   }
 
@@ -541,6 +542,10 @@ function build(THREE, context) {
       d.link.style.width = mw + "px"; d.link.style.height = mh + "px";
       d.link.classList.toggle("rm-mid", tall);
       d.link.classList.toggle("rm-below", !tall && top < cssH * .3);
+      d.tipW ||= d.link.querySelector(".rm-tip").offsetWidth;            // measured once, again after a resize or font load
+      const half = d.tipW / 2 + 6, centre = left + mw / 2;                 // keep the label inside the stage's clip
+      const dx = Math.min(Math.max(centre, half), Math.max(half, cssW - half)) - centre;
+      d.link.style.setProperty("--tip-dx", Math.round(dx) + "px");
     }
   }
 
@@ -645,6 +650,7 @@ function build(THREE, context) {
   reduce.addEventListener?.("change", loop);
   new IntersectionObserver((es) => { onScreen = es[es.length - 1].isIntersecting; loop(); }).observe(stage);
   new ResizeObserver(resize).observe(stage);
+  document.fonts?.ready.then(() => { doors.forEach((d) => { d.tipW = 0; d.placed = ""; }); if (!running) still(); });
   resize();
   loop();
   return { pause() { wanted = false; loop(); }, resume() { wanted = true; resize(); loop(); } };

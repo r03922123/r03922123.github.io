@@ -166,7 +166,7 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
                                linear-gradient(var(--c), var(--c)) 0 100% / 14px 2px, linear-gradient(var(--c), var(--c)) 0 100% / 2px 14px,
                                linear-gradient(var(--c), var(--c)) 100% 100% / 14px 2px, linear-gradient(var(--c), var(--c)) 100% 100% / 2px 14px;
                    background-repeat: no-repeat; filter: drop-shadow(0 0 2px #000); }
-.rm-tip { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); opacity: 0; white-space: nowrap;
+.rm-tip { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(calc(-50% + var(--tip-dx, 0px))); opacity: 0; white-space: nowrap;
           padding: 5px 14px 6px; text-align: center; background: rgba(20, 12, 7, .92); border: 1px solid #b8862f;
           box-shadow: 0 0 0 3px rgba(20, 12, 7, .6); }
 .rm-below .rm-tip { bottom: auto; top: calc(100% + 10px); }
