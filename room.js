@@ -385,7 +385,13 @@ function build(THREE, context) {
   });
   shelf.add(bookMesh);
   const bandMat = lam({ color: 0xc79a42 });
-  books.forEach((b) => { if (rand() < .45 && !b.lean) box(b.w + .004, .012, .01, bandMat, b.x, b.y + b.h * .3, .02 + b.d / 2, shelf); });
+  const banded = books.filter((b) => rand() < .45 && !b.lean);         // gold bands on some spines: one draw call
+  const bandMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), bandMat, banded.length);
+  banded.forEach((b, i) => {
+    m4.compose(new THREE.Vector3(b.x, b.y + b.h * .3, .02 + b.d / 2), q.identity(), new THREE.Vector3(b.w + .004, .012, .01));
+    bandMesh.setMatrixAt(i, m4);
+  });
+  shelf.add(bandMesh);
   doorObjects.bookshelf = { group: shelf, mats: [bookMat, bandMat], hot: 0xffc070, k: .07 };
 
   // Lectern with an open spellbook (LeetCode).
