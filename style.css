@@ -199,11 +199,11 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .rm-list li { padding: 9px 0; border-bottom: 1px solid var(--line); }
 .rm-list a { font-family: var(--font-display); font-weight: 700; letter-spacing: .04em; }
 .rm-list span { display: block; color: var(--muted); font-size: .9em; }
-.no-webgl .mode-toggle { display: none; }   /* the room cannot render here: lo-fi only */
 
 /* Lo-fi: the plain home and its toggle (SPEC-lofi) */
 .mode-toggle { display: none; }
 [data-mode] .mode-toggle { display: inline-block; }   /* no JS, no toggle */
+html.no-webgl .mode-toggle { display: none; }   /* the room cannot render here: lo-fi only. Outranks the line above. */
 @media (max-width: 600px) { body.home header.site .mode-toggle { margin-left: auto; } body.home header.site nav { flex-basis: 100%; margin-left: 0; } }
 .mode-toggle { font: 700 .75rem/1 var(--font-display); letter-spacing: .1em; color: var(--muted);
                background: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; cursor: pointer; }

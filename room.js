@@ -12,12 +12,18 @@ function hasWebGL() {
   try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }
   catch (e) { return false; }
 }
+function setMode(mode) {                     // the attribute and the toggle's pressed state, kept in step
+  root.setAttribute("data-mode", mode);
+  document.querySelector(".mode-toggle")?.setAttribute("aria-pressed", String(mode === "lofi"));
+}
 function giveUp() {                          // no WebGL: the plain home, and no toggle (SPEC-lofi amendment)
   root.classList.add("no-webgl");
-  root.setAttribute("data-mode", "lofi");
+  try { localStorage.setItem("home-mode", "lofi"); } catch (e) {}   // so the next visit does not flash the loader
+  setMode("lofi");
 }
 async function sync() {
   if (!stage) return;
+  if (root.classList.contains("no-webgl")) { if (root.getAttribute("data-mode") !== "lofi") setMode("lofi"); return; }
   if (root.getAttribute("data-mode") !== "scene") { if (room) room.pause(); return; }
   if (room) { room.resume(); return; }
   if (starting) return;
@@ -27,6 +33,10 @@ async function sync() {
 }
 new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ["data-mode"] });
 sync();
+// A visitor who starts in lo-fi never reaches the check above, so probe once when the page is idle: without WebGL
+// the toggle would only lead to a room that cannot render.
+if (stage && root.getAttribute("data-mode") === "lofi")
+  (window.requestIdleCallback || setTimeout)(() => { if (!room && !starting && !hasWebGL()) giveUp(); });
 
 function rng(seed) {                         // mulberry32: the same room on every visit
   return function () {
