@@ -522,18 +522,11 @@ function build(THREE, context) {
     if (!running) still();
   }
 
-  const aim = { x: 0, y: 0, tx: 0, ty: 0 };
-  stage.addEventListener("pointermove", (ev) => {
-    if (ev.pointerType === "touch") return;
-    const r = stage.getBoundingClientRect();
-    aim.tx = (ev.clientX - r.left) / r.width * 2 - 1; aim.ty = (ev.clientY - r.top) / r.height * 2 - 1;
-  });
-  stage.addEventListener("pointerleave", () => { aim.tx = aim.ty = 0; });
   stage.addEventListener("pointermove", () => { lastInput = performance.now(); }, { passive: true });
   stage.addEventListener("focusin", () => { lastInput = performance.now(); });
   stage.addEventListener("scroll", () => { stage.scrollTop = stage.scrollLeft = 0; });   // older browsers without overflow: clip
 
-  const v = new THREE.Vector3(), tmp = new THREE.Vector3(), spellOffset = new THREE.Vector3(0, .2, .9);
+  const v = new THREE.Vector3(), spellOffset = new THREE.Vector3(0, .2, .9);
   function placeDoors() {
     for (const d of doors) {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -546,7 +539,7 @@ function build(THREE, context) {
       const left = Math.round((x0 + x1 - mw) / 2), top = Math.round((y0 + y1 - mh) / 2);
       const tall = mh > cssH * .45;                                       // tall objects: the label sits inside
       const key = `${left},${top},${mw},${mh}`;
-      if (key === d.placed) continue;                                     // the camera drifts slowly: most frames, no change
+      if (key === d.placed) continue;                                     // the camera is still: only a resize moves a door
       d.placed = key;
       d.link.style.transform = `translate(${left}px,${top}px)`;
       d.link.style.width = mw + "px"; d.link.style.height = mh + "px";
@@ -562,14 +555,11 @@ function build(THREE, context) {
   // ---- Animation.
   function update(t, dt, frozen) {
     const k = frozen ? 1 : 1 - Math.exp(-dt * 7);
-    if (!frozen) {
-      aim.x += (aim.tx - aim.x) * (1 - Math.exp(-dt * 2)); aim.y += (aim.ty - aim.y) * (1 - Math.exp(-dt * 2));
-      camera.position.set(base.x + Math.sin(t * .11) * .16 + aim.x * .3, base.y + Math.sin(t * .17) * .05 - aim.y * .12, base.z);
-      tmp.set(look.x + aim.x * .25, look.y - aim.y * .1, look.z);
-    } else {
-      camera.position.copy(base); tmp.copy(look);
-    }
-    camera.lookAt(tmp);
+    // The camera never moves: no mouse-follow, no sway. Moving the viewpoint without the visitor asking made people
+    // dizzy, and with snapped vertices any camera motion makes the whole room shimmer. Life comes from the fire,
+    // candles, embers, sparkles and the turning page instead.
+    camera.position.copy(base);
+    camera.lookAt(look);
 
     const flick = frozen ? 1 : .86 + .08 * Math.sin(t * 11.3) + .06 * Math.sin(t * 23.7 + 1) + .04 * rand();
     fireL.intensity = 16 * flick;

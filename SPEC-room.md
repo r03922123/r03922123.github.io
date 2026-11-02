@@ -5,7 +5,9 @@ Module of `CAPABILITY-MAP.md`. Depends on `theme`. Supersedes `scene`. Status: *
 ## Objective
 The home page is a small castle common room at night, drawn live in low-poly 3D with the look of a 2000s
 console game: a low internal resolution scaled up with hard pixels, slightly wobbling vertices, flat-shaded stone,
-wood and fabric, warm firelight against cool moonlight. The camera breathes slowly; nothing needs to be learned.
+wood and fabric, warm firelight against cool moonlight. The camera stands still (moving it made visitors dizzy, and
+snapped vertices turn any camera motion into a full-screen shimmer); the fire, candles and embers carry the life.
+Nothing needs to be learned.
 
 | Object | Opens | On hover / focus |
 |---|---|---|
