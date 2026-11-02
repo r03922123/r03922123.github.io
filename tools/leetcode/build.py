@@ -6,6 +6,7 @@ Source format: front matter (title, summary, group, order) between '---' lines, 
 ## / ### headings, paragraphs, '- ' and '1. ' lists, ```python fences, `code`, **bold**, [text](url), \\( math \\).
 """
 import html
+import os
 import re
 import tempfile
 import subprocess
@@ -166,7 +167,12 @@ def run_code(slug, body):
         return "no python"
     script = Path(tempfile.gettempdir()) / f"leetcode-{slug}.py"   # all blocks of a post, run as one script
     script.write_text("\n\n".join(blocks))
-    r = subprocess.run([sys.executable, "-I", str(script)], capture_output=True, text=True, timeout=120)
+    # One thread per numeric library: these scripts are small, and on a busy machine NumPy, PyTorch and
+    # scikit-learn thread pools fight for cores (bias-variance-tradeoff: 13 s and 49 s of CPU with the default
+    # pools, 7.6 s and 4.5 s of CPU single-threaded; under load the pools pushed it past the timeout).
+    env = {**os.environ, **{k: "1" for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                                             "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS")}}
+    r = subprocess.run([sys.executable, "-I", str(script)], capture_output=True, text=True, timeout=120, env=env)
     if r.returncode:
         sys.exit(f"{slug}: code failed\n{r.stderr[-2000:]}")
     return f"{len(blocks)} python blocks pass"
