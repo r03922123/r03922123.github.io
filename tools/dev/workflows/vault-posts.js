@@ -72,7 +72,7 @@ const POSTS = [
 
 const ALL_SLUGS = POSTS.map(p => p.slug).join(', ')
 const RULES = `
-You are writing one post for a public personal site (an educational ML blog in the style of Lil'Log). Owner: Jie-Hong Lin, ML engineer.
+You are writing one post for a public personal site (an educational ML blog in the style of Lil'Log). Owner: Jie-Hong Lin, applied scientist.
 Source format: ${P}/src/<slug>.md, front matter between '---' lines with exactly these keys: title, summary, group, order, tags (tags joined with ' · '). Body: ## and ### headings, paragraphs, '- ' and '1. ' lists, pipe tables, \`\`\`python fences (executed), \`\`\`plaintext / \`\`\`sql / \`\`\`bash fences (shown, not executed), inline \`code\`, **bold**, [text](url), inline math \\( ... \\), display math on its own lines starting with \\[ and ending with \\]. NEVER use $ for math. No images, no Obsidian syntax (no [[wikilinks]], no > [!callouts], no ==highlights==).
 Match the voice, depth and structure of these published posts first (read them): ${SITE}/tools/leetcode/src/heap.md and ${SITE}/posts/position-bias/index.html (a long-form post). Skim ${SITE}/tools/leetcode/build.py to see the renderer.
 Rules:

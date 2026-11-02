@@ -17,7 +17,7 @@ Nothing needs to be learned.
 
 Ambience (no links): a gramophone on a side table, a crackling fireplace (flickering light and a few rising embers), candles, two armchairs and a rug,
 a tall window with moon and stars, a tapestry. Portraits show emblems (a note, a play triangle, goggles), not faces.
-A game-style title card ("Jie-Hong Lin — machine learning engineer. Choose something in the room.") sits over the
+A game-style title card ("Jie-Hong Lin — applied scientist. Choose something in the room.") sits over the
 top of the view and never blocks it. A plain text list of the same doors sits below.
 
 Everything is original: no Harry Potter names, crests or characters, no recreation of a specific game's room, and
