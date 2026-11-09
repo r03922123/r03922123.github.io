@@ -119,8 +119,8 @@ because every page stays readable; the PR's screenshots are where to object.
 - [ ] The colour scan still fails when a stray hex is added after the token blocks (shown once, then reverted)
 - [ ] Home: computed `body` styles match `main`, no new font requested, and lo-fi screenshots match
 - [ ] A post renders all three faces in light and dark
-- [ ] `git diff --name-only main` lists no generated page, and `git diff main -- style.css | grep -E '^[-+].*\.rm-'`
-  prints nothing
+- [ ] `git diff --name-only main` lists no generated page, and every `.rm-` rule is unchanged: the result of
+  `re.findall(r"[^{}]*\.rm-[^{}]*\{[^{}]*\}", css)` is equal on `git show main:style.css` and on the working tree
 
 ## Open Questions
 
