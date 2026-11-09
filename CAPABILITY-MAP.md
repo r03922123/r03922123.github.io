@@ -1,7 +1,27 @@
 # Capability Map: interactive redesign
 
-Version 3, 2026-11-10. Content is specified in `SPEC.md`; this map covers the redesign and the vault posts.
+Version 4 (proposed), 2026-11-10. Content is specified in `SPEC.md`; this map covers the redesign and the vault posts.
 The map, not file names, is the index of what exists.
+
+## Version 4: reading pages after an Anthropic research article (proposed 2026-11-10, not yet approved)
+
+Changes one thing in version 3: the visual reference for `blog-theme`, `reading-shell` and `posts-index` moves from
+claude.dev to `anthropic.com/research/components-of-agent-memory` (article page) and `anthropic.com/research` (lists).
+Module ids, dependencies, build order and the common room are unchanged.
+
+| Module id | Taken from the reference | Adapted for this site |
+|---|---|---|
+| `blog-theme` | Serif body, sans headings, warm off-white page, near-black text, links that are underlined and keep the text colour | Open-licensed self-hosted fonts and our own palette; dark mode, which the reference page does not show |
+| `reading-shell` | Centred title; a side column for published date, topic and tags; one 720 px text column; figures wider than the text | No hero image; the contents rail joins the side column; code, tables and maths, which the reference article has none of, use the wider column |
+| `posts-index` | Topic cards with post counts, an article count, a filter bar, rows of topic and title and summary | Text rows only, no gallery or carousel; ordered by `group` and `order`, since 55 posts share one date |
+
+Measured on the reference at a 1920 px viewport: title 36 px bold sans, body 17 px on a 26 px line in a 720 px column,
+figures 1158 px wide, hero 865 px wide.
+
+Assumptions to confirm on approval:
+- Article text stays as it is; only the appearance changes.
+- No cover images: the repo has none. Covers would be a separate module later.
+- The version 3 rule still holds: structure only, no Anthropic fonts, logo, footer content or identical palette.
 
 ## Version 3: reading pages after claude.dev (approved 2026-11-10)
 
