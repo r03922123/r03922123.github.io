@@ -29,7 +29,7 @@ Prototype on the real posts, 2026-11-10, over 90 entries (the 2 MusicGen entries
 | Titles and summaries hold code spans and `\( \)` maths | Strip that markup when building the index, so results show plain text |
 | `posts-index` makes the URL fragment the topic filter | Search uses `?q=`. While a query is present, results replace the sections and the filter is ignored |
 | `posts-index` has no JavaScript, and lists it under "ask first" | Approving this spec is that approval, for these two pages only |
-| The repo has no JS tests; Node's built-in runner needs no package | `node --test`. CI adds a pinned setup-node step, so its version cannot drift |
+| The repo has no JS tests; Node's built-in runner needs no package | `node --test`. CI adds `actions/setup-node`, pinned by SHA, with Node 26, so its version cannot drift |
 | The page's title and summary text comes from files in this repo, but a query comes from the URL | Render with `textContent` only, so a crafted `?q=` cannot inject markup |
 | `check.py` scans every served text file for private terms | The index is covered already |
 
@@ -51,8 +51,8 @@ Preview:      python3 -m http.server 8000
 ## Project Structure
 
 ```
-search-core.js               → rank(entries, query): pure, so Node can test it
-search.js                    → box, lazy fetch, results, ?q= handling
+search-core.mjs              → rank(entries, query): pure, so Node can test it
+search.mjs                   → box, lazy fetch, results, ?q= handling
 search-index.json            → generated; committed like the other generated files
 tools/search/build.py        → builds the index
 tools/posts/build.py, tools/leetcode/build.py → add the module to the list pages
@@ -82,8 +82,18 @@ export function rank(entries, query) {
 
 - Test first, in `test_search.mjs`: an exact match outranks a prefix match; a title outranks a summary; all words are
   required; matching ignores case; an empty or punctuation-only query returns nothing; ties sort the same way every run.
-- Golden queries on the real index, expected in the top 3: `dropout`, `cuped`, `position bias`, `knapsack`, `union find`,
-  `peeking`, `cold start`, `two tower`, `vector database`, `bayes`, `poisson`, `flashattention`, `sql window`.
+- Golden queries on the real index, each with the post that must appear in the top 3:
+
+| Query | Post | Query | Post |
+|---|---|---|---|
+| `dropout` | `dropout` | `two tower` | `two-tower-retrieval` |
+| `cuped` | `ab-testing` | `vector database` | `vector-databases` |
+| `position bias` | `position-bias` | `bayes` | `conditional-probability-bayes` |
+| `knapsack` | `knapsack` | `poisson` | `poisson-distribution` |
+| `union find` | `union-find` | `flashattention` | `flashattention` |
+| `peeking` | `ab-testing` | `sql window` | `sql-cheatsheet` |
+| `cold start` | `cold-start` | | |
+
 - Test first, in `test_check.py`: a listed post missing from the index fails.
 - Browser check on the local preview, on both pages, at 375 and 1440 px, in light and dark:
   - The index is requested only after the box gets focus or the URL has `?q=`.
@@ -107,7 +117,7 @@ Out of scope: typo tolerance, stemming, highlighting matches, and Chinese-langua
 - [ ] All 13 golden queries pass on the generated index
 - [ ] `search-index.json` is under 100 KB, and two rebuilds leave `git status` clean
 - [ ] Every browser check above passes, with output in the PR
-- [ ] `check.py` still passes its home-weight budget, because the home page loads none of this
+- [ ] The home page's network log shows no search file
 
 ## Open Questions
 

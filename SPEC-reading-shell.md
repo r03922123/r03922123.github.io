@@ -12,10 +12,10 @@ Users: readers of 15-minute technical posts, on phones and on wide screens. The 
 | Requirement | Done means |
 |---|---|
 | Shared top bar | Reading pages have a sticky bar: links at left, name centred, GitHub at right. Home's header looks as it does today |
-| Title block | Topic link and `h1`, centred above the text column |
+| Title block | Topic link and `h1`, centred above the text column. Long-form posts have no topic group, so theirs reads "Long-form" and links to `/posts/` |
 | One text column | Body text is at most 720 px wide at every screen size |
 | Side column | From 1200 px: published, reading time, topic, tags and contents, sticky at the right. Below: details under the title, contents as today's card |
-| Code gets room | From 1200 px, `pre` hangs left of the text column, up to 1040 px wide |
+| Code and wide tables get room | From 1200 px, `pre` and tables of 5 or more columns hang left of the text column, up to 1040 px wide. Maths stays in the text column and scrolls |
 | Links land correctly | A contents link or a room door puts its heading below the sticky bar |
 | Doors cannot break silently | `check.py` fails on a local `#fragment` with no matching id |
 
@@ -27,7 +27,7 @@ Users: readers of 15-minute technical posts, on phones and on wide screens. The 
 | Right of the text is taken by the side column, and left is empty | `pre` extends left only, so it never runs under the side column |
 | 14 of 106 tables have 5 or more columns | `table:has(th:nth-child(5))` makes those wide with CSS alone. Without `:has`, they scroll as they do today |
 | Two templates produce 88 pages (`tools/leetcode/build.py`, `tools/posts/build.py`); the 4 long-form pages, About and 404 are hand-written | Change two templates, regenerate, and edit the long-form pages by hand in the same PR, or they would meet the new grid with the old markup |
-| `.wrap` caps every page at 760 px, and home uses it 4 times | Scope the wider layout to `body:not(.home)` |
+| `.wrap` caps every page at 760 px, and home uses it 4 times | Scope the wider layout to article pages, `body:has(.post-body)`. Home, the two list pages, About and 404 keep 760 px |
 | `style.css:60` sets `scroll-margin-top: 24px` | A sticky bar would cover the target heading. Raise it to the bar's height plus a gap |
 | `link_ok` in `scripts/check.py:78` drops the fragment. Home links to `about.html#kkcompany`, `#tiktok` and `#htc` | Add the fragment check. Today 708 local fragment links resolve and 0 are broken, so it starts green |
 | Long-form pages place the contents after the intro paragraph | Move it into the side column; the intro stays first in the text |
@@ -36,7 +36,9 @@ Users: readers of 15-minute technical posts, on phones and on wide screens. The 
 ## Tech Stack
 
 `style.css` with CSS grid, the two Python templates, and no new JavaScript or package. The fonts from `blog-theme` get
-preload tags here, for Source Serif 4 upright and Inter only, since italic is used on few pages.
+preload tags here, for Source Serif 4 upright and Inter only, since italic is used on few pages. They go through the templates' `assets`
+parameter, and by hand on the 6 hand-written pages. The nav markup stays as it is, because `tools/posts/build.py:22-24`
+asserts on it; the centred bar is CSS only.
 
 ## Layout
 
@@ -70,7 +72,8 @@ tools/posts/build.py         → post template; regenerates 55 posts
 posts/<slug>/index.html      → the 4 long-form pages, by hand
 about.html, 404.html         → plain headings in place of the frames; ids unchanged
 scripts/check.py             → fragment check
-scripts/test_check.py        → its failing case first
+scripts/test_check.py        → its failing cases first
+tools/dev/same_articles.py   → drops header, aside, nav and .crumb before comparing
 ```
 
 Two PRs, each opening with `Takeover phase: build (owner-approved exception; repo is in understand)`:
@@ -93,11 +96,19 @@ Semantic markup with no layout classes in the content, generated the same way fo
 
 ## Testing Strategy
 
-- Test first: a `test_check.py` case has a link to `page.html#missing`, and must fail before the check exists.
-- Browser check on the local preview, on one topic post, one LeetCode post, one long-form post, About and 404, at
+- Test first: `test_check.py` cases link to `page.html#missing`, `/dir/#missing` and a same-page `#missing`, and each
+  must fail before the check exists. Same-page links need their own case: `link_ok` returns early on them, and they are
+  703 of the 708.
+- Browser check on the local preview, on one topic post, one LeetCode post, one long-form post, one list page, About and
+  404, at
   375, 768, 1200, 1440 and 1920 px, in light and dark:
   - The page never scrolls sideways: `scrollWidth <= innerWidth`.
-  - Text column width is at most 720 px; a `pre` never overlaps the side column and starts at least 16 px from the edge.
+  - On posts, the text column is at most 720 px at every width, and exactly 720 px from 1200 px up.
+  - At 1440 px, an overflowing `pre` and a table of 5 or more columns are wider than 720 px, end at the text column's
+    right edge, stay clear of the side column, and start at least 16 px from the page edge.
+  - From 1200 px, `.post-side` is visible and stays in view while scrolling. Below 1200 px, the details row and
+    contents card show instead.
+  - The list page stays at 760 px.
   - Clicking a contents link, and opening `about.html#tiktok`, leaves the heading below the bar.
 - Home: computed styles and lo-fi screenshots match `main`, as in `blog-theme`.
 - Screenshots of each page at 375 and 1440 px in the PR.
@@ -118,7 +129,8 @@ Out of scope: list pages (`posts-index`), real per-post dates, search.
 - [ ] Every browser check above passes at all five widths, with output in the PR
 - [ ] Home: computed styles and lo-fi screenshots match `main`
 - [ ] The rebuild leaves no uncommitted generated page
-- [ ] A diff of the extracted post text against `main` shows no change
+- [ ] `python3 tools/dev/same_articles.py main` reports no change. It needs the edit above first, because today it
+  compares the whole `<article>` and the new side column would flag every post
 
 ## Open Questions
 

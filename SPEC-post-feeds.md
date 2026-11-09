@@ -15,7 +15,7 @@ Users: feed readers, crawlers, LLM tools, and people who want a post as Markdown
 | `sitemap.xml` | 96 absolute URLs: home, About, 2 lists, 90 posts, 2 MusicGen. No 404 page |
 | `robots.txt` | Allows everything and names the sitemap |
 | `llms.txt` | The site's name, a one-line summary, and every post linked by section |
-| Markdown beside each post | `posts/<slug>/index.md` and `leetcode/<slug>/index.md` for the 86 posts with a source, without front matter |
+| Markdown beside each post | `posts/<slug>/index.md` and `leetcode/<slug>/index.md` for the 86 posts with a source, with `# <title>` in place of the front matter |
 | Page head | Canonical link on 94 pages; feed link; on posts, JSON-LD, and a Markdown alternate on the 86 |
 | Same output every run | Two rebuilds in a row change nothing |
 
@@ -36,8 +36,9 @@ Users: feed readers, crawlers, LLM tools, and people who want a post as Markdown
 
 ## Tech Stack
 
-Stdlib Python. `tools/feeds/build.py` loads the post lists from `tools/posts/build.py` and `tools/leetcode/build.py`, as
-those files already load each other, and writes every feed file. It runs after both builds.
+Stdlib Python. `tools/feeds/build.py` loads the post lists from `tools/posts/build.py` and `tools/leetcode/build.py` with
+`importlib`, each separately, because the loader at `tools/posts/build.py:14-17` points `lc.HERE` at the posts folder. It
+writes every feed file. It runs after both builds.
 
 ## Commands
 
@@ -78,7 +79,8 @@ def rss_date(text):
 
 - Test first, one failing case each in `test_check.py`: a listed post missing from the sitemap; malformed XML; an item
   with no `pubDate`; an email in the feed; a canonical link that does not match the page's URL; JSON-LD that does not
-  parse; a post source with no `index.md`; a `.md` that keeps its front matter.
+  parse; a post source with no `index.md`; a `.md` that keeps its front matter; a page with no canonical link; a page with no
+  feed link; a post with no JSON-LD; a source-backed post with no Markdown alternate.
 - The check requires the outputs whenever `tools/feeds/build.py` exists, so deleting a feed fails rather than passing.
 - Stability: run the build twice and show `git status` is clean after the second.
 - After merge, on the live site: each file returns 200 with a sensible content type, and the W3C Feed Validator and
@@ -98,8 +100,10 @@ Out of scope: real per-post dates, Open Graph images, search, and security heade
 - [ ] Each new check failed in its test before the rule existed, and passes now
 - [ ] `rss.xml` has 92 items and `sitemap.xml` 96 URLs, both parsed by `xml.etree`
 - [ ] 86 `index.md` files exist, none with front matter
+- [ ] 94 pages have one canonical link and a feed link; 90 posts have JSON-LD; the 86 have a Markdown alternate
 - [ ] Two consecutive rebuilds leave `git status` clean
-- [ ] The live checks pass after merge
+
+Post-merge follow-up, not a merge gate: the live checks above.
 
 ## Open Questions
 
