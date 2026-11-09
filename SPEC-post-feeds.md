@@ -1,6 +1,6 @@
 # Spec: post-feeds
 
-Module of `CAPABILITY-MAP.md` (version 4). Depends on `site-baseline`. Status: **draft**, 2026-11-10.
+Module of `CAPABILITY-MAP.md` (version 4). Depends on `site-baseline`. Status: **approved** 2026-11-10.
 
 ## Objective
 
