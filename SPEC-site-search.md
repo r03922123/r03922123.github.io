@@ -1,6 +1,6 @@
 # Spec: site-search
 
-Module of `CAPABILITY-MAP.md` (version 4). Depends on `posts-index`. Status: **draft**, 2026-11-10.
+Module of `CAPABILITY-MAP.md` (version 4). Depends on `posts-index`. Status: **approved** 2026-11-10.
 
 ## Objective
 
