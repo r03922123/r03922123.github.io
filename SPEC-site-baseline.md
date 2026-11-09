@@ -1,7 +1,7 @@
 # Spec: site-baseline
 
 Module of `CAPABILITY-MAP.md` (version 3). Depends on nothing. Status: **approved** 2026-11-10; **amended** the same
-day after pre-merge review, and the amendment waits for owner approval.
+day after two pre-merge review rounds, and the amendment is approved.
 
 ## Objective
 
