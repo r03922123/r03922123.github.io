@@ -64,7 +64,7 @@ Module specs are written one at a time, in build order.
 | `site-baseline` | Project CLAUDE.md, learning log, ADRs, CI that runs the CONSTRAINTS.md gates, protected `main` | — | `SPEC-site-baseline.md` |
 | `post-feeds` | Generated at build time: `rss.xml`, `sitemap.xml`, `robots.txt`, `llms.txt`, a `.md` beside each post that has a Markdown source (86 of 90), canonical links, JSON-LD | `site-baseline` | not yet written |
 | `blog-theme` | New tokens and type for reading pages; the parchment tokens move under `body.home` so the common room is unchanged | `site-baseline` | `SPEC-blog-theme.md` |
-| `reading-shell` | Shared nav, title block, contents rail, tables and code, across posts, About and 404 | `blog-theme` | not yet written |
+| `reading-shell` | Shared nav, title block, contents rail, tables and code, across posts, About and 404 | `blog-theme` | `SPEC-reading-shell.md` |
 | `posts-index` | Posts and LeetCode lists as rows, with category filters | `blog-theme` | not yet written |
 | `site-search` | Index generated at build time, searched in the browser | `posts-index` | not yet written |
 
