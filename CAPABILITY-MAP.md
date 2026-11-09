@@ -5,9 +5,16 @@ The map, not file names, is the index of what exists.
 
 ## Version 4: reading pages after an Anthropic research article (proposed 2026-11-10, not yet approved)
 
-Changes one thing in version 3: the visual reference for `blog-theme`, `reading-shell` and `posts-index` moves from
+Changes two things in version 3. The visual reference for `blog-theme`, `reading-shell` and `posts-index` moves from
 claude.dev to `anthropic.com/research/components-of-agent-memory` (article page) and `anthropic.com/research` (lists).
-Module ids, dependencies, build order and the common room are unchanged.
+A new module, `post-voice`, takes the writing craft of Anthropic's research and engineering posts. Existing module ids
+and the common room are unchanged.
+
+| New module id | Responsibility | Depends on | Spec |
+|---|---|---|---|
+| `post-voice` | Reframe the 59 topic and long-form posts: opening, main claim, limits, captions, ending. Code, numbers and asserts stay as they are | `site-baseline` | not yet written |
+
+Build order: `site-baseline` → `post-feeds`, `blog-theme`, `post-voice` → `reading-shell`, `posts-index` → `site-search`.
 
 | Module id | Taken from the reference | Adapted for this site |
 |---|---|---|
@@ -18,8 +25,32 @@ Module ids, dependencies, build order and the common room are unchanged.
 Measured on the reference at a 1920 px viewport: title 36 px bold sans, body 17 px on a 26 px line in a 720 px column,
 figures 1158 px wide, hero 865 px wide.
 
+Writing sample, 2026-11-10: 9 posts (the article above, 4 from the Interpretability team, 4 from Engineering) against
+this site's 55 topic posts, with one script for both. Nine posts is a small sample, so these are leads, not laws.
+
+| Per 1000 words unless noted | Reference (9) | Topic posts (55) | Reading |
+|---|---|---|---|
+| Mean sentence length, words | 19.6 | 19.6 | Same; leave alone |
+| Words per paragraph | 59.9 | 55.2 | Close; leave alone |
+| First person (we/our/I) | 24.6 | 0.6 | Largest gap: the reference says who did what |
+| Headings | 4.6 | 6.7 | Reference sections run longer |
+| Code blocks | 0.2 | 5.7 | Keep ours: code is what these posts are for |
+| Figures | 2.6 | 0 | Tables and asserts play this role here |
+
+| Move | Reference | Topic posts today | `post-voice` |
+|---|---|---|---|
+| Opening | A concrete situation, stake or question (7 of 8 read closely) | 27 of 55 open by defining the term | Open on the problem; define the term next |
+| Limits | Stated in all 4 Engineering posts and in the Interpretability result posts | About 14 of 55 near the end (rough keyword count) | Every post says what it does not show |
+| Ending | Open questions, implications or a takeaway | 26 of 55 end on Pitfalls | Keep Pitfalls; close with what remains open |
+| Terms defined at first use | All 8 | Already done | Keep |
+
+Not taken: the team "we" (one author here, so "I" for what was run), hiring calls, a longer word count, em dashes
+(the posts use none today), and any sentence from the reference.
+
 Assumptions to confirm on approval:
-- Article text stays as it is; only the appearance changes.
+- `post-voice` is a framing pass, not a full rewrite: the code blocks of each post stay byte-identical, checked by hash.
+- The 31 LeetCode notes are out of scope. At a median of 305 words they are a different form, and the sample has no match.
+- Pilot of 3 posts first, then batches by group, because 59 posts cannot fit the 300-line limit per change.
 - No cover images: the repo has none. Covers would be a separate module later.
 - The version 3 rule still holds: structure only, no Anthropic fonts, logo, footer content or identical palette.
 
