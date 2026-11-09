@@ -29,6 +29,13 @@ Decisions recorded 2026-11-10:
 - Supersedes for reading pages: `reskin`, and the version 2 decision "parchment theme everywhere". `theme` stays
   for the common room only. The external MusicGen posts stay untouched.
 
+Notes for later module specs:
+- `blog-theme`: `scripts/test_check.py` reads the theme tokens from `:root`, so moving them under `body.home` changes
+  a gate test. Say so in that spec, because `CONSTRAINTS.md` forbids quietly weakening a gate.
+- `reading-shell`: `scripts/check.py` strips fragments before checking links, so a rewrite of About could break the
+  common room's portrait doors (`about.html#kkcompany` and its siblings) with no failing check. That spec needs its
+  own check that those ids still exist.
+
 ## Version 2 modules
 
 | Module id | Responsibility | Depends on | Spec |
@@ -37,7 +44,7 @@ Decisions recorded 2026-11-10:
 | `theme` | Parchment (light) and candlelit (dark) tokens, serif display headings, game-menu chrome | — | `SPEC-theme.md` |
 | `room` | Home page: a real-time low-poly 3D castle common room in a 2000s console-game style; objects are the navigation | `theme` | `SPEC-room.md` |
 | `lofi` | Plain text home and a remembered toggle; automatic for reduced motion and when WebGL is unavailable | `room` | `SPEC-lofi.md` |
-| `reskin` | Every reading page (long-form, topic and LeetCode posts, About, 404) in the parchment theme | `theme` | `SPEC-reskin.md` |
+| ~~`reskin`~~ | Superseded by `blog-theme` and `reading-shell` in version 3: every reading page in the parchment theme | `theme` | `SPEC-reskin.md` |
 | ~~`scene`~~ | Superseded by `room`: the Tokyo-night SVG desk (version 1). Kept in git history | — | `SPEC-scene.md` |
 
 Build order: `posts-vault` (content, in parallel) and `theme` → `reskin`, `room` → `lofi`.
