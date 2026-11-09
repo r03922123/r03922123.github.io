@@ -1,6 +1,6 @@
 # Spec: site-baseline
 
-Module of `CAPABILITY-MAP.md` (version 3). Depends on nothing. Status: **draft** 2026-11-10, waiting for owner review.
+Module of `CAPABILITY-MAP.md` (version 3). Depends on nothing. Status: **approved** 2026-11-10.
 
 ## Objective
 
