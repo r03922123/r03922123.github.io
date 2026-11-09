@@ -1,9 +1,9 @@
 # Capability Map: interactive redesign
 
-Version 4 (proposed), 2026-11-10. Content is specified in `SPEC.md`; this map covers the redesign and the vault posts.
+Version 4, 2026-11-10. Content is specified in `SPEC.md`; this map covers the redesign and the vault posts.
 The map, not file names, is the index of what exists.
 
-## Version 4: reading pages after an Anthropic research article (proposed 2026-11-10, not yet approved)
+## Version 4: reading pages after an Anthropic research article (approved 2026-11-10)
 
 Changes two things in version 3. The visual reference for `blog-theme`, `reading-shell` and `posts-index` moves from
 claude.dev to `anthropic.com/research/components-of-agent-memory` (article page) and `anthropic.com/research` (lists).
@@ -47,7 +47,7 @@ this site's 55 topic posts, with one script for both. Nine posts is a small samp
 Not taken: the team "we" (one author here, so "I" for what was run), hiring calls, a longer word count, em dashes
 (the posts use none today), and any sentence from the reference.
 
-Assumptions to confirm on approval:
+Assumptions approved with this version:
 - `post-voice` is a framing pass, not a full rewrite: the code blocks of each post stay byte-identical, checked by hash.
 - The 31 LeetCode notes are out of scope. At a median of 305 words they are a different form, and the sample has no match.
 - Pilot of 3 posts first, then batches by group, because 59 posts cannot fit the 300-line limit per change.
