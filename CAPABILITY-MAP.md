@@ -1,7 +1,35 @@
 # Capability Map: interactive redesign
 
-Version 2, 2026-11-01. Content is specified in `SPEC.md`; this map covers the redesign and the vault posts.
+Version 3, 2026-11-10. Content is specified in `SPEC.md`; this map covers the redesign and the vault posts.
 The map, not file names, is the index of what exists.
+
+## Version 3: reading pages after claude.dev (approved 2026-11-10)
+
+Everything except the common room (all of `index.html`, lo-fi included) takes its structure from claude.dev.
+Module specs are written one at a time, in build order.
+
+| Module id | Responsibility | Depends on | Spec |
+|---|---|---|---|
+| `site-baseline` | Project CLAUDE.md, learning log, ADRs, CI that runs the CONSTRAINTS.md gates, protected `main` | — | `SPEC-site-baseline.md` |
+| `post-feeds` | Generated at build time: `rss.xml`, `sitemap.xml`, `robots.txt`, `llms.txt`, a `.md` beside each post that has a Markdown source (86 of 90), canonical links, JSON-LD | `site-baseline` | not yet written |
+| `blog-theme` | New tokens and type for reading pages; the parchment tokens move under `body.home` so the common room is unchanged | `site-baseline` | not yet written |
+| `reading-shell` | Shared nav, title block, contents rail, tables and code, across posts, About and 404 | `blog-theme` | not yet written |
+| `posts-index` | Posts and LeetCode lists as rows, with category filters | `blog-theme` | not yet written |
+| `site-search` | Index generated at build time, searched in the browser | `posts-index` | not yet written |
+
+Build order: `site-baseline` → `post-feeds`, `blog-theme` → `reading-shell`, `posts-index` → `site-search`.
+
+Decisions recorded 2026-11-10:
+- Hosting stays on GitHub Pages with the Python build. Only claude.dev's public outputs are adopted, not its framework.
+  Pages cannot set custom response headers, so its security headers are out of reach here.
+- Baseline first; the understand and tidy phases do not block this redesign (owner-approved exception).
+- Structure only. No Anthropic fonts, mascot, footer content or identical palette: this is a personal site and must
+  not read as an Anthropic property.
+- Not taken: Mods, Docs and Terminal pages, the "Try Claude Code" button, interactive figures.
+- Supersedes for reading pages: `reskin`, and the version 2 decision "parchment theme everywhere". `theme` stays
+  for the common room only. The external MusicGen posts stay untouched.
+
+## Version 2 modules
 
 | Module id | Responsibility | Depends on | Spec |
 |---|---|---|---|
