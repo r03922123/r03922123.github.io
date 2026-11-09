@@ -44,7 +44,7 @@ template and on those 6 pages. Keep the two link strings that `tools/posts/build
 
 ```
 1200 px and wider                                      Under 1200 px
-                 [ links    name    GitHub ]           [ name ] [ links ]
+                 [ links    name    GitHub ]           [ links  name  GitHub ], wrapping on phones
                       Topic · Title                    Topic · Title
  [ pre, up to 1040 px     ][ text 720 ][ side 240 ]    details row
                                                        contents card
