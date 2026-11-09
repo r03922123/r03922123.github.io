@@ -120,7 +120,8 @@ because every page stays readable; the PR's screenshots are where to object.
 - [ ] Home: computed `body` styles match `main`, no new font requested, and lo-fi screenshots match
 - [ ] A post renders all three faces in light and dark
 - [ ] `git diff --name-only main` lists no generated page, and every `.rm-` rule is unchanged: the result of
-  `re.findall(r"[^{}]*\.rm-[^{}]*\{[^{}]*\}", css)` is equal on `git show main:style.css` and on the working tree
+  `re.findall(r"[^{}]*\.rm-[^{}]*\{[^{}]*\}", css)` is equal on `git show main:style.css` and on the working tree. `@media`
+  and `@keyframes` wrappers around those rules are outside that comparison, so read them in the diff
 
 ## Open Questions
 
