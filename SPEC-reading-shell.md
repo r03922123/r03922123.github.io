@@ -1,6 +1,6 @@
 # Spec: reading-shell
 
-Module of `CAPABILITY-MAP.md` (version 4). Depends on `blog-theme`. Status: **draft**, 2026-11-10.
+Module of `CAPABILITY-MAP.md` (version 4). Depends on `blog-theme`. Status: **approved** 2026-11-10.
 
 ## Objective
 
