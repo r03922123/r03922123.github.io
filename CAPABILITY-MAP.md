@@ -3,7 +3,7 @@
 Version 4, 2026-11-10. Content is specified in `SPEC.md`; this map covers the redesign and the vault posts.
 The map, not file names, is the index of what exists.
 
-Status, 2026-11-10: all six module specs for versions 3 and 4 are approved, and none is implemented. Next: build
+Status, 2026-11-10: all seven module specs for versions 3 and 4 are approved, and none is implemented. Next: build
 `site-baseline`, in a fresh session, from the latest `main`.
 
 ## Version 4: reading pages after an Anthropic research article (approved 2026-11-10)
