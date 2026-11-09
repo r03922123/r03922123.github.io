@@ -12,7 +12,7 @@ and the common room are unchanged.
 
 | New module id | Responsibility | Depends on | Spec |
 |---|---|---|---|
-| `post-voice` | Reframe the 59 topic and long-form posts: opening, main claim, limits, captions, ending. Code, numbers and asserts stay as they are | `site-baseline` | not yet written |
+| `post-voice` | Reframe the 59 topic and long-form posts: opening, main claim, limits, captions, ending. Code, numbers and asserts stay as they are | `site-baseline` | `SPEC-post-voice.md` |
 
 Build order: `site-baseline` → `post-feeds`, `blog-theme`, `post-voice` → `reading-shell`, `posts-index` → `site-search`.
 
