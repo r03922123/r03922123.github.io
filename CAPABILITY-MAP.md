@@ -66,7 +66,7 @@ Module specs are written one at a time, in build order.
 | `blog-theme` | New tokens and type for reading pages; the parchment tokens move under `body.home` so the common room is unchanged | `site-baseline` | `SPEC-blog-theme.md` |
 | `reading-shell` | Shared nav, title block, contents rail, tables and code, across posts, About and 404 | `blog-theme` | `SPEC-reading-shell.md` |
 | `posts-index` | Posts and LeetCode lists as rows, with category filters | `blog-theme` | `SPEC-posts-index.md` |
-| `site-search` | Index generated at build time, searched in the browser | `posts-index` | not yet written |
+| `site-search` | Index generated at build time, searched in the browser | `posts-index` | `SPEC-site-search.md` |
 
 Build order: `site-baseline` → `post-feeds`, `blog-theme` → `reading-shell`, `posts-index` → `site-search`.
 
