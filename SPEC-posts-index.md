@@ -15,7 +15,7 @@ Users: a visitor deciding what to read, and anyone sharing a link to one topic.
 | Article count | The page states its total: 61 on Posts, 31 on LeetCode |
 | Filter | Choosing a card shows only that topic; "All topics" shows everything |
 | Shareable and reversible | `/posts/#probability` opens filtered; the browser's back button undoes a filter |
-| Rows | Every post is a row: title and summary, plus date and length where the build has them |
+| Rows | Every post is a row: title and summary, plus the date-and-length line where the listing already has one (long-form and MusicGen) |
 | Nothing is lost | Without `:has` support, every section stays visible and cards jump to their section |
 
 ## What the code forces
@@ -25,7 +25,7 @@ Users: a visitor deciding what to read, and anyone sharing a link to one topic.
 | `check.py` compares `.lofi-latest` with the first three `/posts/<slug>/` links on the index | Long-form rows stay first. Cards link to `#fragments`, so they do not count as post links |
 | `check.py` requires a `#musicgen` section that links both MusicGen posts | It stays, as a filterable section |
 | The 4 long-form posts sit outside any section, as cards | Wrap them in `<section class="group" id="long-form">` so they can be filtered |
-| LeetCode sections are a bare `<h2 id>` followed by a list | Change to the same `<section class="group">`. Heading ids do not change |
+| LeetCode sections are a bare `<h2 id>` followed by a list | Change to the same `<section class="group">`. The ids keep their values and move to the section |
 | `class="post"` is used only on `posts/index.html` | Its CSS is removed with the cards |
 | Nothing links into a list section today | Making `#musicgen` show one section breaks no existing link |
 | Summaries already exist for all topic and long-form posts | No new copy is needed; cards have no descriptions, unlike the reference's |
@@ -98,7 +98,7 @@ Generated markup, the same on both pages.
 - Never: add a gallery, carousel or cover image (the map rules them out for now), a date sort on one shared date, or
   post text changes.
 
-Out of scope: the search box (`site-search`), real per-post dates, the top bar and page width (`reading-shell`).
+Out of scope: the search box (`site-search`), real per-post dates, the top bar (`reading-shell`). These pages keep the 760 px column.
 
 ## Success Criteria
 

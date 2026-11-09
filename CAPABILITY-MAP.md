@@ -22,7 +22,7 @@ Build order: `site-baseline` → `post-feeds`, `blog-theme`, `post-voice` → `r
 | Module id | Taken from the reference | Adapted for this site |
 |---|---|---|
 | `blog-theme` | Serif body, sans headings, warm off-white page, near-black text, links that are underlined and keep the text colour | Open-licensed self-hosted fonts and our own palette; dark mode, which the reference page does not show |
-| `reading-shell` | Centred title; a side column for published date, topic and tags; one 720 px text column; figures wider than the text | No hero image; the contents rail joins the side column; code, tables and maths, which the reference article has none of, use the wider column |
+| `reading-shell` | Centred title; a side column for published date, topic and tags; one 720 px text column; figures wider than the text | No hero image; the contents rail joins the side column; code and tables of 5 or more columns, which the reference article has none of, use the wider column; maths stays in the text column |
 | `posts-index` | Topic cards with post counts, an article count, a filter bar, rows of topic and title and summary | Text rows only, no gallery or carousel; ordered by `group` and `order`, since 55 posts share one date |
 
 Measured on the reference at a 1920 px viewport: title 36 px bold sans, body 17 px on a 26 px line in a 720 px column,
@@ -48,11 +48,11 @@ this site's 55 topic posts, with one script for both. Nine posts is a small samp
 | Terms defined at first use | All 8 | Already done | Keep |
 
 Not taken: the team "we" (one author here, so "I" for what was run), hiring calls, a longer word count, em dashes
-(the posts use none today), and any sentence from the reference.
+(the posts' prose uses none today), and any sentence from the reference.
 
 Assumptions approved with this version:
 - `post-voice` is a framing pass, not a full rewrite: the code blocks of each post stay byte-identical, checked by hash.
-- The 31 LeetCode notes are out of scope. At a median of 305 words they are a different form, and the sample has no match.
+- The 31 LeetCode notes are out of scope. At a median of about 305 words of paragraph text they are a different form, and the sample has no match.
 - Pilot of 3 posts first, then batches by group, because 59 posts cannot fit the 300-line limit per change.
 - No cover images: the repo has none. Covers would be a separate module later.
 - The version 3 rule still holds: structure only, no Anthropic fonts, logo, footer content or identical palette.

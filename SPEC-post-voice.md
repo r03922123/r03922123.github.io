@@ -24,7 +24,7 @@ Taken from the 9-post sample in `CAPABILITY-MAP.md`. Heading style is not a rule
 | Move | Rule | Where |
 |---|---|---|
 | Open on the problem | First sentences give a situation, a stake or a result. The definition comes next | Paragraph 1 |
-| State the finding early | Say what the post shows, in first person. 43 of the 55 topic posts already have a "This post…" paragraph to convert | Paragraphs 1–3 |
+| State the finding early | Say what the post shows, in first person. About 43 of the 55 topic posts already say "this post" in their first three paragraphs (a regex count); those lines convert | Paragraphs 1–3 |
 | Say what it does not show | Name the conditions the evidence rests on, using facts already in the post | Before the last section ends |
 | Make evidence speak | A results table or key assert is followed by one sentence on what it shows, if it lacks one | Anywhere |
 | End on what is open | One closing paragraph after Pitfalls: what remains unknown or where to go next | Before credits or References |
@@ -41,13 +41,15 @@ the same as the sample), code, tables, citations.
 
 Markdown sources in `tools/posts/src/` and the four hand-written pages in `posts/<slug>/index.html`, stdlib Python only.
 `scripts/voice_check.py` compares each post with `scripts/voice-baseline.json`, generated once from `main` before the
-first edit.
+first edit. On the 4 long-form pages, prose means the text inside `<article>`, leaving out `header`, `nav`, `aside`,
+`pre` and `table`, so `reading-shell`'s markup cannot disturb the comparison.
 
 ## Commands
 
 ```
 All gates:      sh scripts/gates.sh
 Voice check:    python3 scripts/voice_check.py
+Final check:    python3 scripts/voice_check.py --final
 Voice tests:    (cd scripts && python3 -m unittest test_voice_check)
 Build one post: python3 -I tools/posts/build.py . <slug>
 ```
@@ -56,7 +58,7 @@ Build one post: python3 -I tools/posts/build.py . <slug>
 
 ```
 scripts/voice_check.py        → compares posts with the baseline; a gate until this module ends
-scripts/voice-baseline.json   → per post: hashes of code blocks and tables, numbers, prose word count
+scripts/voice-baseline.json   → per post: hashes of code blocks, tables and prose; numbers; prose word count
 scripts/test_voice_check.py   → one failing case per rule
 scripts/gates.sh              → gains the voice gate; the last PR removes it and the baseline
 tools/posts/src/<slug>.md     → the 55 edited sources; generated pages rebuilt
@@ -100,14 +102,12 @@ Limit:  These numbers come from one sine-wave task averaged over 4 seeds, so the
 ## Testing Strategy
 
 - Test first: `test_voice_check.py` has one case each for a changed code block, a changed table, a new number in
-  prose, a dropped number, 11% growth, and an unchanged post that passes. A number already in that post's code or
-  tables may appear in prose, which is what the "4 seeds" line above needs.
+  prose, a dropped number, 11% growth, and an unchanged post, which passes normally and fails under `--final`. A number
+  already in that post's code or tables may appear in prose, which is what the "4 seeds" line above needs.
 - Every post still builds and its asserts pass (`gates.sh`), on Linux in CI.
 - Fresh review per PR: a reviewer that never saw the edits' reasoning checks every new sentence against that post's
   code and tables, and checks each "I" against the first-person rule. Machines verify the evidence is intact; only a
   reader can verify the framing is true.
-- Before and after metrics in each PR, using the sample's script. They are reported, not targets, because aiming at a
-  first-person rate would produce filler.
 
 ## Boundaries
 
@@ -122,7 +122,8 @@ Out of scope: new figures, cover images, real per-post dates, LeetCode notes, th
 
 - [ ] Each rule's test failed before the check existed, and all pass now
 - [ ] The owner approved the pilot
-- [ ] `python3 scripts/voice_check.py` passes for all 59 posts on the last PR before the gate is removed
+- [ ] In PR 8, before the commit that removes the gate, `python3 scripts/voice_check.py --final` passes: all 59 posts
+  meet the rules, and each post's prose hash differs from the baseline
 - [ ] `sh scripts/gates.sh` exits 0 on every PR
 - [ ] Every PR has a fresh review of its new sentences, with no open finding
 - [ ] `grep -c` for the post-wording gate still shows only the one allowed hit

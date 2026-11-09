@@ -101,6 +101,7 @@ gate() { name=$1; shift; echo "== $name"; "$@" || { echo "FAILED: $name"; exit 1
 check_tests() { (cd scripts && python3 -m unittest test_check); }
 gate "privacy"     python3 scripts/check.py --denylist-only
 gate "post build"  python3 -I tools/posts/build.py .
+gate "leetcode build" python3 -I tools/leetcode/build.py .
 gate "check tests" check_tests
 ```
 
@@ -119,6 +120,7 @@ gate "check tests" check_tests
 | `site` | A broken link | Local, because `CONSTRAINTS.md` forbids pushing a failing tip |
 | `site` | `index.html` padded past 150 KB | Local |
 | `post build` | A failing assert in one post's Python block | Local |
+| `leetcode build` | A failing assert in one LeetCode post's Python block | Local |
 | `check tests` | A failing assertion in `test_check.py` | Local |
 | `post wording` | A second matching line inside the one allowed file | Local |
 | `rebuild clean` | A committed hand edit to a generated page; the build restores it, so the tree differs from HEAD | Local |

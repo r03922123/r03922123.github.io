@@ -25,7 +25,7 @@ Users: readers of the 90 reading pages, and visitors to the room, who should not
 | No JS reads a colour token (`room.js`, `post.js`, `index.html`) | Moving tokens under `body.home` cannot break the room's code |
 | `index.html:29` is the only page with `class="home"`, and it also holds lo-fi mode | One selector covers the room and lo-fi; no HTML changes |
 | Most rules use `var(--font-display)` and `var(--font-body)` | Swapping those two tokens restyles reading pages without touching their rules |
-| Browsers download a `@font-face` file only when text uses it | The home page pays nothing for the new fonts; italic is fetched only by pages with `<em>` (16 uses in 93 files) |
+| Browsers download a `@font-face` file only when text uses it | The home page pays nothing for the new fonts; italic is fetched only by pages with `<em>` or `<i>`: 16 `<em>` in 3 files, and `<i>` on all 4 long-form pages |
 | Five characters fall outside the Latin subset: `→ λ ≤ α ≈`, on at most 3 pages each | They use the next font in the stack. Accepted; a wider subset would cost every page |
 
 ## Tech Stack
@@ -119,7 +119,8 @@ because every page stays readable; the PR's screenshots are where to object.
 - [ ] The colour scan still fails when a stray hex is added after the token blocks (shown once, then reverted)
 - [ ] Home: computed `body` styles match `main`, no new font requested, and lo-fi screenshots match
 - [ ] A post renders all three faces in light and dark
-- [ ] `git diff --stat main` shows no generated page and no `.rm-*` rule changed
+- [ ] `git diff --name-only main` lists no generated page, and `git diff main -- style.css | grep -E '^[-+].*\.rm-'`
+  prints nothing
 
 ## Open Questions
 
