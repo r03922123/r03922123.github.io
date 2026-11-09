@@ -37,8 +37,8 @@ Users: readers of 15-minute technical posts, on phones and on wide screens. The 
 
 `style.css` with CSS grid, the two Python templates, and no new JavaScript or package. The fonts from `blog-theme` get
 preload tags here, for Source Serif 4 upright and Inter only, since italic is used on few pages. They go through the templates' `assets`
-parameter, and by hand on the 6 hand-written pages. The nav markup stays as it is, because `tools/posts/build.py:22-24`
-asserts on it; the centred bar is CSS only.
+parameter, and by hand on the 6 hand-written pages. The bar's elements are reordered to match the screen (links, name, GitHub) in the
+template and on those 6 pages. Keep the two link strings that `tools/posts/build.py:22-24` replaces, since it asserts on them.
 
 ## Layout
 
@@ -99,7 +99,7 @@ Semantic markup with no layout classes in the content, generated the same way fo
 - Test first: `test_check.py` cases link to `page.html#missing`, `/dir/#missing` and a same-page `#missing`, and each
   must fail before the check exists. Same-page links need their own case: `link_ok` returns early on them, and they are
   703 of the 708.
-- Browser check on the local preview, on one topic post, one LeetCode post, one long-form post, one list page, About and
+- Browser check on the local preview, on one topic post, one LeetCode post, one long-form post (`posts/position-bias/`, which has a wide table and a long code line), one list page, About and
   404, at
   375, 768, 1200, 1440 and 1920 px, in light and dark:
   - The page never scrolls sideways: `scrollWidth <= innerWidth`.

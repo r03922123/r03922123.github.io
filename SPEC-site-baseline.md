@@ -112,7 +112,7 @@ gate "check tests" check_tests
   empty, a comments-only and an indented-comments denylist. Paste the failing output into the PR. These tests are the
   proof of scrubbing, because the Actions runner masks each literal line of a secret, so a clean CI log proves nothing.
 - One planted fault per step, each shown red through `gates.sh` with the step's name in the output, then reverted.
-  `CONSTRAINTS.md`'s "Privacy and site" gate is two steps here, and Site and Home weight share the `site` step:
+  `CONSTRAINTS.md`'s "Builds" gate is two steps here, its "Privacy and site" gate is two steps, and Site and Home weight share the `site` step:
 
 | Step | Planted fault | Where |
 |---|---|---|
