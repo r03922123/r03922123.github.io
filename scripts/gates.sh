@@ -1,5 +1,5 @@
 #!/bin/sh
-# The six CONSTRAINTS.md gates for merge and push, as seven named steps; this is the only place they are spelled out.
+# The six CONSTRAINTS.md gates for merge and push, as eight named steps; this is the only place they are spelled out.
 # The same script runs locally before every push and in CI (.github/workflows/gates.yml), so the two cannot drift.
 # One named step per gate, so a red log says which rule broke. Privacy runs first and stops the run,
 # so no later step can echo a private term out of a file. The quick steps run before the slow builds.
@@ -33,5 +33,6 @@ gate "check tests"    check_tests
 gate "post wording"   post_wording
 gate "post build"     python3 -I tools/posts/build.py .
 gate "leetcode build" python3 -I tools/leetcode/build.py .
+gate "feeds build"    python3 -I tools/feeds/build.py .         # reads both post lists, so it runs after them
 gate "rebuild clean"  rebuild_clean
 echo "all gates passed"
