@@ -25,7 +25,7 @@ branch tip before it is merged or pushed.
 
 | Gate | Rule | `gates.sh` step |
 |---|---|---|
-| Builds | Every post and LeetCode page builds, and every python block passes its asserts | `post build`, `leetcode build` |
+| Builds | Every post and LeetCode page builds, and every python block passes its asserts; the feed files build | `post build`, `leetcode build`, `feeds build` |
 | Privacy and site | No private terms (local denylist) in contents or file names, no phone numbers, no broken links, page heads complete, pinned CDNs, listings complete | `privacy`, then `site` (needs `scripts/denylist.local.txt`; in CI, the `SITE_DENYLIST` secret) |
 | Home weight | `index.html` + `style.css` ≤ 150 KB (three.js lazy and counted apart) | `site` |
 | Check tests | The checker itself still works | `check tests` |
