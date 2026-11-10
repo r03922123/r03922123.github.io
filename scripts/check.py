@@ -6,6 +6,7 @@ text file and is itself kept out of git (scripts/denylist.local.txt). Usage: pyt
 private terms unless --show-terms is given (local debugging only).
 """
 import argparse
+import json
 import os
 import re
 import sys
@@ -177,6 +178,69 @@ def links(root, rel, base):
     return [(kind, site_path(base, value) if kind == "a" else value, latest) for kind, value, latest in items]
 
 
+class HeadTags(HTMLParser):
+    """A page's <link> attributes and the text of each JSON-LD script."""
+
+    def __init__(self, text):
+        super().__init__()
+        self.links, self.ld, self.in_ld = [], [], False
+        self.feed(text)
+        self.close()
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "link":
+            self.links.append(attrs)
+        self.in_ld = tag == "script" and attrs.get("type") == "application/ld+json"
+        if self.in_ld:
+            self.ld.append("")
+
+    def handle_endtag(self, tag):
+        self.in_ld = False
+
+    def handle_data(self, data):
+        if self.in_ld:
+            self.ld[-1] += data
+
+    def hrefs(self, rel, kind=None):
+        return [a.get("href") for a in self.links if rel in (a.get("rel") or "").split() and kind in (None, a.get("type"))]
+
+
+def head_findings(root):
+    """SPEC-post-feeds page head: each page names its own absolute URL and the feed; each post carries JSON-LD, and
+    each post with a Markdown source links that copy."""
+    pages = [(page, path, None) for page, path in zip(("index.html", "about.html", "posts/index.html", "leetcode/index.html"), FIXED_PAGES)]
+    pages += [(p.relative_to(root).as_posix(), f"/{section}/{p.parent.name}/", section)
+              for section in ("posts", "leetcode") for p in sorted(root.glob(f"{section}/*/index.html"))]
+    findings = []
+    for rel, path, section in pages:
+        if not (root / rel).is_file():
+            continue
+        tags = HeadTags((root / rel).read_text(errors="replace"))
+        canonical = tags.hrefs("canonical")
+        if not canonical:
+            findings.append(f"{rel}: no canonical link")
+        elif canonical != [SITE + path]:                 # exactly one, and this page's own URL
+            findings.append(f"{rel}: canonical link {', '.join(map(str, canonical))} is not {SITE + path}")
+        if SITE + "/rss.xml" not in tags.hrefs("alternate", "application/rss+xml"):
+            findings.append(f"{rel}: no feed link")
+        for text in tags.ld:
+            try:
+                json.loads(text)
+            except json.JSONDecodeError as error:      # line and column only, never page text
+                findings.append(f"{rel}: JSON-LD does not parse (line {error.lineno}, column {error.colno})")
+            if EMAIL.search(text):
+                findings.append(f"{rel}: email address in JSON-LD")
+        if section is None:
+            continue
+        if not tags.ld:
+            findings.append(f"{rel}: no JSON-LD")
+        sourced = (root / "tools" / section / "src" / f"{Path(rel).parent.name}.md").is_file()
+        if sourced and SITE + path + "index.md" not in tags.hrefs("alternate", "text/markdown"):
+            findings.append(f"{rel}: no Markdown alternate")
+    return findings
+
+
 def feed_findings(root, listed):
     """SPEC-post-feeds. Active once tools/feeds/build.py exists, so a deleted or broken feed fails instead of passing."""
     if not (root / "tools/feeds/build.py").is_file():
@@ -211,7 +275,7 @@ def feed_findings(root, listed):
             # The page drops a link to an unwritten post (build.py's link()); the Markdown copy keeps it live.
             findings += [f"{section}/{src.stem}/index.md: broken link {url}" for url in MD_LINK.findall(MD_CODE.sub("", text))
                          if not link_ok(root, md, url)]
-    return findings
+    return findings + head_findings(root)
 
 
 def check(root, denylist, terms_only=False):
