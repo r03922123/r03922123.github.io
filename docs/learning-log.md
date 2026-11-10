@@ -2,6 +2,24 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: blog-theme
+
+1. **Swap the values, keep the names.** Every rule asks for `var(--bg)` or `var(--font-body)`, so the reading pages
+   change by redefining about a dozen tokens at `:root`, and the room keeps its look by redefining them again on
+   `body.home`. It is like a config file per experiment: the code stays the same and only the settings differ.
+   Trade-off: the two surfaces share token names, so a new token must be set in both places. Risk: a token set only
+   at `:root` leaks the reading value into the room, which is why a test pins all 22 of the room's colours.
+2. **A gate must follow the thing it guards.** The contrast test used to read only the `:root` blocks, so moving the
+   room's colours under `body.home` would have taken them out of the test without a single failure. It now reads all
+   four palettes and fails if any block is missing, like a lab checklist that lists every sample by name instead of
+   "the samples in fridge A". Trade-off: the test finds blocks by their exact opening lines, so reformatting them
+   means editing the test. Risk: a fifth palette added later would be missed until someone adds it to `PALETTES`.
+3. **Pay for a font only where it shows.** The three font files live in the repo, and a browser downloads a face only
+   when some text on the page uses it. The home names neither new font, so it requests nothing new, and the italic
+   loads only on pages with italic text. It is like a library ordering a book only when a reader asks for it.
+   Trade-off: until `reading-shell` adds preload tags, a reading page may draw in the fallback font for a moment
+   (`font-display: swap`). Risk: five characters outside the Latin subset fall back to the next font in the stack.
+
 ## 2026-11-11 · build: post-feeds head tags
 
 1. **One function writes the tags.** `head_tags()` in `tools/leetcode/build.py` makes the canonical link, feed link,
