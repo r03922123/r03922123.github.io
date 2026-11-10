@@ -136,7 +136,7 @@ light and dark mode, math and code render, and a side-by-side read of the About 
 - **Ask first:** adding any dependency beyond KaTeX/highlight.js; publishing any note not in the
   table above; any wording about a role that goes beyond the résumé bullet; pushing to `main`.
 - **Never:** write to the Obsidian vault; push the vault or copy its git history; publish the phone
-  number, the timeline/family narrative, mental-health content, target-company lists, or interview
+  number, the timeline/family narrative, target-company lists, or interview
   coaching; invent a metric or resolve a "not measured" item into a number.
 
 ## Success Criteria
