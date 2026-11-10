@@ -191,11 +191,11 @@ def check(root, denylist):
     return findings
 
 
-def main():
-    if not DENYLIST.exists():
-        sys.exit(f"missing {DENYLIST}: create it with one private term per line (see README)")
-    terms = [t.strip() for t in DENYLIST.read_text().splitlines() if t.strip() and not t.startswith("#")]
-    findings = check(Path(__file__).resolve().parent.parent, terms)
+def main(argv=None, root=None, denylist=DENYLIST):
+    if not denylist.exists():
+        sys.exit(f"missing {denylist}: create it with one private term per line (see README)")
+    terms = [t.strip() for t in denylist.read_text().splitlines() if t.strip() and not t.startswith("#")]
+    findings = check(root or Path(__file__).resolve().parent.parent, terms)
     print("\n".join(findings) or "ok")
     sys.exit(1 if findings else 0)
 

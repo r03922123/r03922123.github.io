@@ -1,11 +1,13 @@
 # Tests for check.py: a clean site passes; each planted fault is reported.
 import ast
+import io
 import re
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from check import check
+from check import check, main
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -266,6 +268,67 @@ class ThemeTest(unittest.TestCase):
         body = body.split("/* Scene", 1)[0]                                       # scene art may use literal colours
         stray = re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", body)
         self.assertEqual(stray, [], "colours outside the token blocks")
+
+
+LEAK = re.compile(r"acme(?:[\W_]|%20)*corp", re.I)        # the term below in any case, spacing or path form
+
+
+class MainTest(unittest.TestCase):
+    """main() is what CI runs and Actions logs are public: no output line may show a term, the run must still fail,
+    and an unset or empty secret must fail closed. The runner masks secret lines, so a clean CI log proves nothing."""
+
+    site = CheckTest.site
+
+    def run_main(self, files, terms="acme corp\n", *args):
+        denylist = Path(tempfile.mkdtemp()) / "denylist.local.txt"     # outside the site, as in the repo
+        denylist.write_text(terms)
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(out), self.assertRaises(SystemExit) as exit_:
+            main(list(args), root=self.site(files), denylist=denylist)
+        code = exit_.exception.code
+        if isinstance(code, str):                                      # sys.exit("message") prints to stderr
+            out.write(code)
+        return code not in (0, None), out.getvalue()
+
+    def assert_fails_without_leak(self, files):
+        failed, out = self.run_main(files)
+        self.assertTrue(failed, out)
+        self.assertNotRegex(out, LEAK)
+        return out
+
+    def test_term_in_a_case_variant_is_found_and_hidden(self):
+        out = self.assert_fails_without_leak({"index.html": PAGE.format(body=""), "notes.md": "Worked at ACME Corp."})
+        self.assertIn("notes.md:1: private term", out)
+
+    def test_term_in_a_broken_link_is_hidden(self):
+        out = self.assert_fails_without_leak({"index.html": PAGE.format(body='<a href="acme-corp.html">x</a>')})
+        self.assertIn("broken link", out)
+
+    def test_term_in_a_hyphenated_path_is_found_and_hidden(self):
+        out = self.assert_fails_without_leak({"index.html": PAGE.format(body=""), "posts/index.html": PAGE.format(
+            body=MUSICGEN), "posts/acme-corp/index.html": PAGE.format(body="")})
+        self.assertIn("private term in file name", out)
+
+    def test_term_in_a_binary_file_name_is_found(self):
+        for name in ("img/acme_corp.png", "files/Acme%20Corp.pdf"):
+            out = check(self.site({name: b"\x89PNG\0"}), ["acme corp"])
+            self.assertEqual(out, [f"{name}: private term in file name 'acme corp'"])
+
+    def test_show_terms_prints_the_term_for_local_debugging(self):
+        failed, out = self.run_main({"notes.md": "acme corp"}, "acme corp\n", "--show-terms")
+        self.assertTrue(failed)
+        self.assertIn("acme corp", out)
+
+    def test_denylist_only_skips_the_site_checks(self):
+        failed, out = self.run_main({"index.html": "<a href='missing.html'>x</a>"}, "acme corp\n", "--denylist-only")
+        self.assertFalse(failed, out)
+
+    def test_no_terms_fails_closed(self):
+        clean = {"index.html": PAGE.format(body=""), "posts/index.html": PAGE.format(body=MUSICGEN)}
+        for terms in ("", "\n\n", "# a\n# b\n", "  # note\n\t# other\n"):
+            failed, out = self.run_main(clean, terms)
+            self.assertTrue(failed, f"{terms!r} loaded as a denylist")
+            self.assertIn("no terms", out)
 
 
 if __name__ == "__main__":
