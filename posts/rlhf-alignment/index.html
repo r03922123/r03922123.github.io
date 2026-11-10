@@ -7,6 +7,8 @@
 <meta name="description" content="How a language model is tuned towards answers people prefer: a reward model fit to pairwise comparisons, the KL-regularized objective and its closed-form optimum, PPO as the way classic RLHF optimizes it, DPO as the way to skip the reward model, and a toy world where over-optimizing a good-looking reward model makes answers worse. Every claim is checked with asserts.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/rlhf-alignment/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/rlhf-alignment/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · LLMs and generative AI</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#llms-and-generative-ai">LLMs and generative AI</a></p>
   <h1>RLHF and alignment: reward models, PPO and DPO</h1>
-  <div class="meta">November 1, 2026 · 15 min read · LLM · alignment · RLHF · reward model · PPO · DPO</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#three-stages">Three stages</a></li><li><a href="#stage-2-a-reward-model-from-comparisons">Stage 2: a reward model from comparisons</a></li><li><a href="#stage-3-the-objective-and-its-optimum">Stage 3: the objective and its optimum</a></li><li><a href="#how-ppo-optimizes-it">How PPO optimizes it</a></li><li><a href="#dpo-skip-the-reward-model">DPO: skip the reward model</a></li><li><a href="#feedback-from-ai-constitutional-ai-and-rlaif">Feedback from AI: Constitutional AI and RLAIF</a></li><li><a href="#which-method-and-what-goes-wrong">Which method, and what goes wrong</a></li><li><a href="#references">References</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>15 min</dd><dt>Topic</dt><dd>LLMs and generative AI</dd><dt>Tags</dt><dd>LLM · alignment · RLHF · reward model · PPO · DPO</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#three-stages">Three stages</a></li><li><a href="#stage-2-a-reward-model-from-comparisons">Stage 2: a reward model from comparisons</a></li><li><a href="#stage-3-the-objective-and-its-optimum">Stage 3: the objective and its optimum</a></li><li><a href="#how-ppo-optimizes-it">How PPO optimizes it</a></li><li><a href="#dpo-skip-the-reward-model">DPO: skip the reward model</a></li><li><a href="#feedback-from-ai-constitutional-ai-and-rlaif">Feedback from AI: Constitutional AI and RLAIF</a></li><li><a href="#which-method-and-what-goes-wrong">Which method, and what goes wrong</a></li><li><a href="#references">References</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>A model fine-tuned on demonstrations can only be as good as the demonstrations, and writing excellent answers is slow and expensive. Judging answers is much easier: shown two responses to the same prompt, most people can say which one is better even if they could not have written either. Reinforcement learning from human feedback (RLHF) turns those judgements into a training signal. Its modern form was introduced for Atari games and simulated robot control by Christiano et al. (2017), applied to language models for style and summarization (Ziegler et al., 2019; Stiennon et al., 2020), and became the standard recipe for assistants with InstructGPT (Ouyang et al., 2022), where labelers preferred the outputs of a 1.3B tuned model to those of the 175B GPT-3, a model more than a hundred times larger.</p>
 <p>This post builds the pieces in order: the reward model, the objective it is optimized under, PPO, and DPO, which removes the reward model altogether. A small simulated world runs through all of it, with one deliberate flaw in the reward model, because the most important lesson of RLHF is what happens when you optimize a reward that is only approximately right.</p>
 <h2 id="three-stages">Three stages</h2>
@@ -199,6 +205,7 @@ assert abs(pi_dpo @ r_true - pi_ppo @ r_true) &lt; 0.05     # same policy, same 
 <h2 id="references">References</h2>
 <ul><li>Christiano, P. et al. (2017). Deep reinforcement learning from human preferences. NeurIPS.</li><li>Ziegler, D. et al. (2019). Fine-tuning language models from human preferences. arXiv:1909.08593.</li><li>Stiennon, N. et al. (2020). Learning to summarize from human feedback. NeurIPS.</li><li>Ouyang, L. et al. (2022). Training language models to follow instructions with human feedback. NeurIPS.</li><li>Bradley, R. A. and Terry, M. E. (1952). Rank analysis of incomplete block designs: I. The method of paired comparisons. Biometrika.</li><li>Schulman, J. et al. (2017). Proximal policy optimization algorithms. arXiv:1707.06347.</li><li>Gao, L., Schulman, J. and Hilton, J. (2023). Scaling laws for reward model overoptimization. ICML.</li><li>Rafailov, R. et al. (2023). Direct preference optimization: your language model is secretly a reward model. NeurIPS.</li><li>Bai, Y. et al. (2022). Constitutional AI: harmlessness from AI feedback. arXiv:2212.08073.</li><li>Shao, Z. et al. (2024). DeepSeekMath: pushing the limits of mathematical reasoning in open language models. arXiv:2402.03300.</li><li>Xu, S. et al. (2024). Is DPO superior to PPO for LLM alignment? A comprehensive study. ICML.</li></ul>
 <p>This post draws on the papers above; the toy world and all code are original.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

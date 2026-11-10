@@ -7,6 +7,8 @@
 <meta name="description" content="Why the textbook formulas for softmax and cross-entropy return nan and inf on ordinary logits, and the two fixes every framework uses: shift by the max, and compute log-probabilities with log-sum-exp. With the gradient, the binary case and the bugs that quietly undo both.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/stable-softmax-cross-entropy/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/stable-softmax-cross-entropy/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · Machine learning fundamentals</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#machine-learning-fundamentals">Machine learning fundamentals</a></p>
   <h1>Numerically stable softmax and cross-entropy</h1>
-  <div class="meta">November 1, 2026 · 9 min read · softmax · cross-entropy · log-sum-exp · numerics</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#where-floating-point-runs-out">Where floating point runs out</a></li><li><a href="#softmax-ignores-a-constant-shift">Softmax ignores a constant shift</a></li><li><a href="#never-take-the-log-of-a-probability">Never take the log of a probability</a></li><li><a href="#the-gradient-is-softmax-minus-one-hot">The gradient is softmax minus one-hot</a></li><li><a href="#the-binary-case-softplus">The binary case: softplus</a></li><li><a href="#pitfalls">Pitfalls</a></li><li><a href="#which-function-to-call">Which function to call</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>9 min</dd><dt>Topic</dt><dd>Machine learning fundamentals</dd><dt>Tags</dt><dd>softmax · cross-entropy · log-sum-exp · numerics</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#where-floating-point-runs-out">Where floating point runs out</a></li><li><a href="#softmax-ignores-a-constant-shift">Softmax ignores a constant shift</a></li><li><a href="#never-take-the-log-of-a-probability">Never take the log of a probability</a></li><li><a href="#the-gradient-is-softmax-minus-one-hot">The gradient is softmax minus one-hot</a></li><li><a href="#the-binary-case-softplus">The binary case: softplus</a></li><li><a href="#pitfalls">Pitfalls</a></li><li><a href="#which-function-to-call">Which function to call</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>Softmax and cross-entropy are one line of math each, and the one-line code for each breaks on inputs a real network can produce. In float32, a logit of 100 overflows, and a gap of 120 between two logits makes a probability exactly zero, and the log of that zero is infinite. This post derives the two fixes every deep learning framework uses: subtract the maximum before exponentiating, and compute log-probabilities directly with log-sum-exp instead of taking the log of a probability. Each fix is checked against a brute force, and the post ends with the common bugs that quietly undo them.</p>
 <p>Throughout, \(z \in \mathbb{R}^K\) is a vector of logits (the raw scores a network outputs for \(K\) classes) and \(y\) is the index of the correct class.</p>
 <h2 id="where-floating-point-runs-out">Where floating point runs out</h2>
@@ -238,6 +244,7 @@ assert math.isclose(kl, soft_cross_entropy(logits, teacher) - teacher_entropy, r
 <table><thead><tr><th>You have</th><th>Compute</th><th>In PyTorch</th></tr></thead><tbody><tr><td>Logits and class indices</td><td>\(\operatorname{LSE}(z) - z_y\)</td><td><code>F.cross_entropy(logits, y)</code></td></tr><tr><td>Logits and soft targets</td><td>\(-\sum_i p_i \log \operatorname{softmax}(z)_i\)</td><td><code>F.cross_entropy(logits, probs)</code></td></tr><tr><td>One logit and a 0/1 label</td><td>\(\operatorname{softplus}(z) - y z\)</td><td><code>F.binary_cross_entropy_with_logits</code></td></tr><tr><td>Log-probabilities for scoring or sampling</td><td>\(z - \operatorname{LSE}(z)\)</td><td><code>F.log_softmax(logits, dim=-1)</code></td></tr><tr><td>Probabilities to show or threshold</td><td>the max-shifted softmax</td><td><code>torch.softmax(logits, dim=-1)</code></td></tr></tbody></table>
 <p>The rule behind the table: keep everything as logits or log-probabilities for as long as possible, and turn them into probabilities only at the end, when a person needs to read them or a threshold needs to be applied.</p>
 <p>The outline of this post, the max shift followed by the log-softmax rearrangement, follows Jay Mody's post <a href="https://jaykmody.com/blog/stable-softmax/">Numerically Stable Softmax and Cross Entropy</a>.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

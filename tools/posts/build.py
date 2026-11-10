@@ -53,19 +53,10 @@ def build(site, slug):
     status = lc.run_code(slug, body)
     content, toc = lc.render(body)
     minutes = max(1, round(len(re.sub(r"<[^>]+>", " ", content).split()) / 230))
-    toc_html = "".join(f'<li><a href="#{h}">{lc.inline(t)}</a></li>' for h, t in toc)
     page = HEAD.format(title=html.escape(meta["title"]), summary=html.escape(meta["summary"]),
-                       assets=lc.head_tags(f"/posts/{slug}/", (meta["title"], meta["summary"], DATE), markdown=True)
-                       + lc.POST_ASSETS, current="true") + f"""<article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · {html.escape(meta["group"])}</p>
-<header class="post-head">
-  <h1>{lc.inline(meta["title"])}</h1>
-  <div class="meta">{DATE} · {minutes} min read · {html.escape(meta["tags"])}</div>
-</header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>{toc_html}</ol></nav>
-{content}
-</article>
-""" + lc.FOOT
+                       assets=lc.FONTS + lc.head_tags(f"/posts/{slug}/", (meta["title"], meta["summary"], DATE), markdown=True)
+                       + lc.POST_ASSETS, current="true") + lc.article(meta, DATE, minutes, toc, content,
+                                                                      f"/posts/#{lc.slugify(meta['group'])}") + lc.FOOT
     out = Path(site) / "posts" / slug / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page)
@@ -92,7 +83,7 @@ def index(site):
                           f'<ul class="series">\n{lis}\n</ul>\n</section>')
     leetcode_count = len(list((Path(site) / "leetcode").glob("*/index.html")))
     page = HEAD.format(title="Posts", summary="Technical posts on machine learning, statistics, LLMs, recommender systems and ML systems, each with the code and numbers behind it.",
-                       assets=lc.head_tags("/posts/"), current="page") + f"""<section class="intro">
+                       assets=lc.FONTS + lc.head_tags("/posts/"), current="page") + f"""<section class="intro">
   <h1>Posts</h1>
   <p>Technical notes on machine learning, each with the code and numbers behind it: {len(LONGFORM)} long-form posts
   first, then {len(posts)} shorter posts by topic.</p>

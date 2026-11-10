@@ -7,6 +7,8 @@
 <meta name="description" content="0/1 and unbounded knapsack written three ways (memoized recursion, a full table, one rolling row), why the inner loop runs backwards for one and forwards for the other, how to read the chosen items back out, and four LeetCode problems that are knapsack in disguise.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/leetcode/knapsack/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/leetcode/knapsack/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Dynamic programming, bits and games</p>
 <header class="post-head">
+  <p class="crumb"><a href="/leetcode/#dynamic-programming-bits-and-games">Dynamic programming, bits and games</a></p>
   <h1>Knapsack: choosing items under a budget</h1>
-  <div class="meta">October 31, 2026 · 10 min read · dynamic programming · knapsack · subset sum</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#0-1-knapsack-the-recurrence">0/1 knapsack: the recurrence</a></li><li><a href="#unbounded-knapsack-the-same-loop-forwards">Unbounded knapsack: the same loop, forwards</a></li><li><a href="#416-partition-equal-subset-sum">416. Partition Equal Subset Sum</a></li><li><a href="#322-coin-change">322. Coin Change</a></li><li><a href="#518-coin-change-ii-and-why-loop-order-counts">518. Coin Change II, and why loop order counts</a></li><li><a href="#494-target-sum">494. Target Sum</a></li><li><a href="#recognizing-a-knapsack">Recognizing a knapsack</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>10 min</dd><dt>Topic</dt><dd>Dynamic programming, bits and games</dd><dt>Tags</dt><dd>dynamic programming · knapsack · subset sum</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#0-1-knapsack-the-recurrence">0/1 knapsack: the recurrence</a></li><li><a href="#unbounded-knapsack-the-same-loop-forwards">Unbounded knapsack: the same loop, forwards</a></li><li><a href="#416-partition-equal-subset-sum">416. Partition Equal Subset Sum</a></li><li><a href="#322-coin-change">322. Coin Change</a></li><li><a href="#518-coin-change-ii-and-why-loop-order-counts">518. Coin Change II, and why loop order counts</a></li><li><a href="#494-target-sum">494. Target Sum</a></li><li><a href="#recognizing-a-knapsack">Recognizing a knapsack</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>You have a bag that holds weight \(W\) and a pile of items, each with a weight and a value. Which items should go in to make the total value as large as possible without going over? Trying every subset costs \(2^n\). Knapsack DP avoids that by noticing that once you have decided about the first few items, all that matters about those decisions is <b>how much room they left</b>. So the state is "which item am I looking at, and how much room is left", and there are only \(n \cdot (W + 1)\) of those.</p>
 <p>Two versions come up again and again. In <b>0/1 knapsack</b> each item is taken at most once. In <b>unbounded knapsack</b> each item can be taken any number of times (coins, tile sizes, ingredients). The recurrences differ by one index, and in the space-optimized code that index turns into the direction of a loop.</p>
 <h2 id="0-1-knapsack-the-recurrence">0/1 knapsack: the recurrence</h2>
@@ -278,6 +284,7 @@ for _ in range(300):
 <h2 id="practice">Practice</h2>
 <ul><li><a href="https://leetcode.com/problems/maximum-profit-from-trading-stocks/">2291. Maximum Profit From Trading Stocks</a> (plain 0/1 knapsack)</li><li><a href="https://leetcode.com/problems/minimum-white-tiles-after-covering-with-carpets/">2209. Minimum White Tiles After Covering With Carpets</a> (a budget of carpets as the second index)</li><li><a href="https://leetcode.com/problems/minimum-total-distance-traveled/">2463. Minimum Total Distance Traveled</a> (each factory is a bounded item group)</li><li><a href="https://leetcode.com/problems/maximum-alternating-subsequence-sum/">1911. Maximum Alternating Subsequence Sum</a> (take-or-skip DP with a parity state)</li><li><a href="https://leetcode.com/problems/ones-and-zeroes/">474. Ones and Zeroes</a> (two capacities)</li><li><a href="https://leetcode.com/problems/last-stone-weight-ii/">1049. Last Stone Weight II</a> (subset sum in disguise)</li><li><a href="https://leetcode.com/problems/perfect-squares/">279. Perfect Squares</a> (Coin Change with squares)</li><li><a href="https://leetcode.com/problems/profitable-schemes/">879. Profitable Schemes</a></li><li><a href="https://leetcode.com/problems/number-of-dice-rolls-with-target-sum/">1155. Number of Dice Rolls With Target Sum</a> (group knapsack)</li></ul>
 <p>The suffix-subproblem formulation and the backtracking step follow MIT 6.006 Introduction to Algorithms (Fall 2011), Lecture 21 (Dynamic Programming III, which covers knapsack). The LeetCode Discuss study guide "Thief with a knapsack: a series of crimes" and William Fiset's Algorithms repository on GitHub cover the same ground. Dynamic programming itself is from R. Bellman, "Dynamic Programming", Princeton University Press (1957).</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
