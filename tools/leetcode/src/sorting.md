@@ -45,7 +45,7 @@ The early exit when `nums[mid] <= nums[mid + 1]` makes already-sorted input line
 ## Quicksort
 Pick a pivot, partition so smaller items come first, recurse on both sides. It sorts in place and is usually fastest in practice, but its \(O(n \log n)\) is only **expected**: a bad pivot every time gives \(O(n^2)\). A random pivot makes that vanishingly unlikely for any input order.
 
-There is a second trap. With a two-way partition like Lomuto's, items **equal** to the pivot all land on one side, so an array of identical values still degrades to \(O(n^2)\), whatever the pivot. The fix is to partition three ways.
+There is a second trap. With Lomuto's partition, items **equal** to the pivot all land on one side, so an array of identical values still degrades to \(O(n^2)\), whatever the pivot. Hoare's scheme, which stops on equal items, splits them evenly; the fix used here is to partition three ways.
 
 ## The Dutch national flag partition
 Dijkstra's problem: arrange red, white and blue items in order with one pass and no extra space ([75. Sort Colors](https://leetcode.com/problems/sort-colors/)). With a pivot value, it is "less than, equal to, greater than". Keep four regions and shrink the unknown one by one each step:
