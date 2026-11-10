@@ -289,6 +289,23 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertIn("posts/a/", out[0])
 
+    def topics_findings(self, cards, rows):
+        """SPEC-posts-index: a list page with topic cards (id, the count it says) and sections (id, rows)."""
+        nav = "".join(f'<a href="#{sid}"><b>{sid}</b><span>{said}</span></a>' for sid, said in cards)
+        groups = "".join(f'<section class="group" id="{sid}"><h2>{sid}</h2><a class="all" href="#topics">All topics</a>'
+                         f'<ul class="series">{"<li>row</li>" * n}</ul></section>' for sid, n in rows)
+        body = f'<nav class="topics" id="topics">{nav}</nav><div class="groups">{groups}</div>'
+        return self.findings({"leetcode/index.html": PAGE.format(body=body)})
+
+    def test_every_section_needs_a_topic_card(self):
+        self.assertEqual(self.topics_findings([("a", "2 posts"), ("b", "1 post")], [("a", 2), ("b", 1)]), [])
+        self.assertEqual(self.topics_findings([("a", "2 posts")], [("a", 2), ("b", 1)]),
+                         ["leetcode/index.html: section #b has no topic card"])
+
+    def test_card_count_must_match_its_rows(self):
+        self.assertEqual(self.topics_findings([("a", "3 posts")], [("a", 2)]),
+                         ["leetcode/index.html: card #a says 3 posts, its section has 2 rows"])
+
     def feed_site(self, drop_url=None, item=ITEM, edit=None, **files):
         """A small site with every feed file and head tag in order: a topic post and a LeetCode post, each with a
         source and its index.md, and a hand-written post c with no source. A keyword replaces one file, None deletes
