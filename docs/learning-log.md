@@ -2,6 +2,25 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: reading-shell
+
+First of the spec's two PRs: the fragment-link check alone, before the layout moves any heading.
+
+1. **Guard the doors before moving the walls.** The new layout rewrites every article's header and About's frames,
+   so an id could vanish and its links (a contents entry, a room portrait) would quietly land at the top of the
+   page. The check comes first, while all 708 local fragment links resolve, so any break in the shell PR shows up
+   as a red line. It is like taking a baseline measurement before changing the experiment. Trade-off: a separate PR
+   to review. Risk: the check reads ids from the HTML file, so an id that only JavaScript adds would be reported.
+2. **Each red test must fail for its own reason.** A link to another page, to a folder page and to the same page
+   take three different paths through the code, and same-page links (703 of the 708) skipped the old link check
+   entirely. One test per path, each seen failing first, is like a control for each condition instead of one shared
+   control. Trade-off: three tests where one would look tidier. Risk: a fourth link shape, such as `?q#x`, has no
+   test of its own.
+3. **Reuse the resolver, do not copy it.** `link_ok` already knew how a link becomes a file (case-exact, never
+   above the root), so that part moved into `target()` and both checks share it, like one calibrated instrument used
+   for two measurements. Trade-off: touching a working function. Risk: a change to `target()` now moves both checks
+   at once, which is why the 78 older link and page tests still run beside the new ones.
+
 ## 2026-11-11 · build: blog-theme
 
 1. **Swap the values, keep the names.** Every rule asks for `var(--bg)` or `var(--font-body)`, so the reading pages
