@@ -366,7 +366,7 @@ class MainTest(unittest.TestCase):
         # A gap such as "< >" matches as one tag or as three characters; unless each gap has only one reading, each
         # one doubles the work, so a crafted broken link could hang the site step until the job times out.
         scrub = scrubber(["acme corp"])
-        for gap in ("< >", "<%20>", "<&nbsp;>", "<&#160;>", "<-&nbsp;->"):   # seconds to minutes with two readings
+        for gap in ("< >", "<%20>", "<&nbsp;>", "<&#160;>", "<-&nbsp;->", "<_>"):   # seconds to minutes with two readings
             start = time.monotonic()
             scrub("broken link acme" + gap * 24 + "x.html")
             self.assertLess(time.monotonic() - start, 1.0, gap)
@@ -374,7 +374,8 @@ class MainTest(unittest.TestCase):
     def test_any_tag_shaped_gap_is_hidden(self):
         # A punctuated term has only the loose rule, so every <...> the old rule read as a gap must still be one.
         scrub = scrubber(["acme-corp"])
-        for gap in ("<1>", "<!--x-->", "< b>", "</ b>", "<_x>", "<!DOCTYPE html>", "<?xml v?>", "<b>", "< >"):
+        for gap in ("<1>", "<!--x-->", "< b>", "</ b>", "<_x>", "<!DOCTYPE html>", "<?xml v?>", "<b>", "< >",
+                    "<%1>", "<&1>", "<%20b>", "<&NBSP;b>"):
             self.assertNotIn("acme", scrub(f"x acme{gap}corp.png"), gap)
 
     def test_term_at_the_end_of_a_longer_word_is_left_alone(self):

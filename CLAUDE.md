@@ -45,7 +45,7 @@ Preview:     python3 -m http.server 8000
   `scrubber` in `check.py` before adding either.
 - `README.md` still describes version 1 (the desk scene); `docs/ARCHITECTURE.md` will replace its layout section.
 
-## Current state (2026-11-10)
+## Current state (2026-11-11)
 
 - `site-baseline` is merged (PR #3): gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the
   learning log. `main` is protected: a PR with a green `gates` check, for admins too.
