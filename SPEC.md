@@ -69,7 +69,7 @@ run before publishing.
 ```
 Preview:  python3 -m http.server 8000        # then open http://localhost:8000
 Check:    python3 scripts/check.py            # exits 0 when clean, non-zero with findings
-Deploy:   git push origin main                # GitHub Pages serves main
+Deploy:   merge a PR into main                # main is protected; GitHub Pages serves main
 ```
 
 ## Project Structure
