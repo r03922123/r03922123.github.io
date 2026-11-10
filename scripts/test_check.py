@@ -359,29 +359,80 @@ def contrast(a, b):
     return (hi + 0.05) / (lo + 0.05)
 
 
+# The four token blocks (SPEC-blog-theme): reading pages at :root, the common room under body.home, each in light and
+# dark. A block inside @media ends at the media rule's own closing brace.
+PALETTES = {
+    "reading paper": r"^:root \{",
+    "reading night": r"^@media \(prefers-color-scheme: dark\) \{\s*:root \{",
+    "room paper": r"^body\.home \{",
+    "room night": r"^@media \(prefers-color-scheme: dark\) \{\s*body\.home \{",
+}
+
+# Today's parchment and candlelit values, copied from main's style.css before the move. The room's art and lo-fi page
+# were drawn for these, so they are pinned literally: any edit to them must also edit this test.
+ROOM = {
+    "room paper": {"bg": "#f3e9d2", "fg": "#2b2118", "muted": "#6b5a45", "line": "#dccfb0", "card": "#f8f1df",
+                   "accent": "#8a2a1a", "link": "#7a2414", "signal": "#8a6d1f", "gold": "#b8860b",
+                   "code-builtin": "#8a4b08", "code-keyword": "#a3172f"},
+    "room night": {"bg": "#1a1410", "fg": "#efe3c8", "muted": "#b9a88a", "line": "#3a2e24", "card": "#231b15",
+                   "accent": "#e0a85a", "link": "#e8bf7a", "signal": "#f0c869", "gold": "#d9a441",
+                   "code-builtin": "#ffa657", "code-keyword": "#ff7b72"},
+}
+ROOM_FONTS = {   # the home requests no new font: it keeps the system body stack and Cinzel
+    "font-body": '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Helvetica, Arial, sans-serif',
+    "font-display": '"Cinzel", "Iowan Old Style", "Palatino Linotype", Georgia, serif',
+}
+
+
+def palette_spans(css):
+    """{name: (start, end)} of each token block, end just past its closing brace (and its @media brace)."""
+    spans = {}
+    for name, pattern in PALETTES.items():
+        found = list(re.finditer(pattern, css, re.M))
+        assert len(found) == 1, f"{name}: expected one token block, found {len(found)}"
+        close = css.index("}", found[0].end())
+        if found[0].group().startswith("@media"):
+            close = css.index("}", close + 1)
+        spans[name] = (found[0].start(), close + 1)
+    return spans
+
+
 class ThemeTest(unittest.TestCase):
-    """SPEC-theme: text tokens meet WCAG AA on every background, in both variants; colours live in tokens."""
+    """SPEC-theme and SPEC-blog-theme: text tokens meet WCAG AA on every background, in all four palettes; the room
+    keeps today's values; colours live in tokens."""
 
     def variants(self):
         css = STYLE.read_text()
-        light = css[css.index(":root {"):css.index("}", css.index(":root {"))]
-        dark_start = css.index("@media (prefers-color-scheme: dark)")
-        dark = css[dark_start:css.index("}", css.index(":root {", dark_start))]
-        return {"paper": tokens(light), "night": tokens(dark)}
+        return {name: tokens(css[a:b]) for name, (a, b) in palette_spans(css).items()}
 
     def test_text_tokens_meet_aa(self):
-        for name, t in self.variants().items():
+        variants = self.variants()
+        self.assertEqual(sorted(variants), sorted(PALETTES))
+        for name, t in variants.items():
             for text in ("fg", "muted", "link", "accent", "code-builtin", "code-keyword"):
                 for surface in ("bg", "card"):
                     ratio = contrast(t[text], t[surface])
                     self.assertGreaterEqual(ratio, 4.5, f"{name}: --{text} on --{surface} is {ratio:.2f}:1")
 
+    def test_room_keeps_todays_colours(self):
+        variants = self.variants()
+        for name, pinned in ROOM.items():
+            self.assertEqual(variants[name], pinned, f"{name} differs from the parchment values on main")
+
+    def test_room_requests_no_new_font(self):
+        css = STYLE.read_text()
+        a, b = palette_spans(css)["room paper"]
+        fonts = dict(re.findall(r"--(font-body|font-display):\s*([^;]+);", css[a:b]))
+        self.assertEqual(fonts, ROOM_FONTS)
+
     def test_no_hard_coded_colours_outside_tokens_and_scene(self):
         css = STYLE.read_text()
-        dark_start = css.index("@media (prefers-color-scheme: dark)")
-        body = css[css.index("}", css.index(":root {", dark_start)) + 1:]        # after both token blocks
-        body = body.split("/* Scene", 1)[0]                                       # scene art may use literal colours
-        stray = re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", body)
+        spans = sorted(palette_spans(css).values())
+        rest, last = "", 0
+        for a, b in spans:                                                       # every line outside the four blocks
+            rest, last = rest + css[last:a], b
+        rest += css[last:].split("/* Scene", 1)[0]                                # scene art may use literal colours
+        stray = re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", rest)
         self.assertEqual(stray, [], "colours outside the token blocks")
 
 
