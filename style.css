@@ -1,4 +1,4 @@
-/* r03922123: one stylesheet. Sections: tokens, base, header/footer, reading pages, About, LeetCode, room, lo-fi.
+/* r03922123: one stylesheet. Sections: tokens, base, header/footer, reading pages, About, list rows, room, lo-fi.
    Colours live only in the four token blocks (reading pages at :root, the room under body.home, each light and dark)
    and in the scene art. */
 @font-face { font-family: "Cinzel"; src: url("/fonts/cinzel/cinzel-latin.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
@@ -74,11 +74,19 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .intro h1, .post-head h1, .post-body h2, .about h2, .group > h2, .lofi h1, .lost h1, .toc h2 { font-family: var(--font-display); }
 .lofi h1 { letter-spacing: .03em; }   /* Cinzel's tracking, kept on the home only; the sans headings need none */
 .intro p { color: var(--muted); margin: 0; }
-.post { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; margin: 16px 0; color: var(--fg); }
-.post:hover { text-decoration: none; border-color: var(--link); }
-.post h2, .post h3 { font-size: 1.3rem; margin: 0 0 .4em; line-height: 1.3; }
-.post p { margin: 0 0 .7em; color: var(--muted); }
-.post .meta { font-size: .85em; color: var(--muted); }
+/* Topic cards and the filter (SPEC-posts-index), with no JavaScript: the URL's #fragment is the chosen topic, so a
+   link to one shares it and the back button undoes it. The page head marks the chosen card; its selectors come from
+   the section list. Without :has every section stays and a card jumps to its own. */
+.topics { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.topics a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; color: var(--fg); }
+.topics a:hover { text-decoration: none; border-color: var(--link); }
+.topics b { display: block; font: 600 .95rem/1.3 var(--font-display); }
+.topics span { display: block; color: var(--muted); font-size: .85em; margin-top: 2px; }
+.count { color: var(--muted); font-size: .9em; margin: 16px 0 0; }
+/* "All topics" links to #topics, which is not a section, so every section shows again. */
+.groups:has(.group:target) .group:not(:target) { display: none; }
+.group > .all { display: inline-block; font: 600 .8rem/1.4 var(--font-display); letter-spacing: .04em; color: var(--muted); text-decoration: underline; }
+.group:not(:target) > .all { display: none; }   /* only a chosen topic needs the way back */
 .group { margin: 48px 0 0; }
 .group > h2 { font-size: 1.3rem; margin: 0 0 .2em; }
 .group > p { color: var(--muted); margin: 0; }
@@ -172,11 +180,12 @@ body:has(.post-body) .wrap { max-width: 752px; }
 .role li, .plain li { margin: .5em 0; }
 .plain { list-style: disc; }
 
-/* LeetCode series: a compact list on the series page. */
+/* List rows: the posts index and the LeetCode series. */
 .series { list-style: none; padding: 0; margin: 0; }
 .series li { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .series li a { font-weight: 600; }
 .series li span { display: block; color: var(--muted); font-size: .9em; margin-top: 2px; }
+.series li .meta { font-size: .8em; }   /* the date-and-length line of long-form and MusicGen rows */
 
 /* 404 */
 .lost { text-align: center; padding-top: 72px; }
