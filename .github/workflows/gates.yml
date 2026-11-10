@@ -28,9 +28,10 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements-ci.txt
-      # Every package pinned by hash (requirements-ci.txt), since the post code runs while the denylist is on disk.
+      # Every package pinned by hash, and wheels only (a source build would fetch unhashed build tools), since the
+      # post code runs while the denylist is on disk.
       - name: Install the post code's packages
-        run: python -m pip install --require-hashes -r requirements-ci.txt
+        run: python -m pip install --require-hashes --only-binary :all: -r requirements-ci.txt
       # The secret reaches this one step only, through step-level env: the post build forwards its whole
       # environment to every post script. It is stored base64-encoded because the runner masks each line of a
       # secret as a substring of every log line, so a short term inside a longer word would show as "pl***ing"
