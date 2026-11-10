@@ -47,10 +47,13 @@ LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&mid
 PHONE_SEP = r"(?:[-. ()_/\u00a0\u2011]|&#8209;|&#x2011;|&nbsp;)*"   # _ and /: names are scanned with them as gaps
 WORD_SEP = r"(?:\s|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)+"     # what a browser shows as a space between two words
 NAME_SEP = re.compile(r"[-_/.]")                  # how a file name separates words; Pages serves names as URLs
-# Scrubbing over-redacts: any gap, or none. A <...> counts as a tag only if a letter or digit comes before any inner
-# "<": an all-punctuation "< >" read as one tag or as three characters would give each gap two readings and double
-# the time per gap, and the punctuation branch can never read a letter, so each gap has exactly one reading.
-LOOSE_SEP = r"(?:[\W_]|%20|&nbsp;|&#0*160;|&#x0*a0;|<(?=[^<>]*[^\W_])[^>]*>)*"
+# Scrubbing over-redacts: any gap, or none. Each gap must have exactly one reading, or each one doubles the time and
+# a crafted line can hang the run. So a <...> counts as a tag only if it holds a letter or digit that no other branch
+# can read: "< >", "<%20>" or "<&nbsp;>" are read piece by piece instead. This hides exactly what <[^>]+> hid.
+GAP_CODES = r"%20|&nbsp;|&#0*160;|&#x0*a0;"
+NOT_A_WORD = rf"(?:{GAP_CODES}|%(?!20)|&(?!nbsp;|#0*160;|#x0*a0;)|[^\w<>%&]|_)"   # pieces with no readable letter
+TAG_GAP = rf"<(?={NOT_A_WORD}*[^\W_])[^>]*>"
+LOOSE_SEP = rf"(?:[\W_]|{GAP_CODES}|{TAG_GAP})*"
 
 
 def term_rx(term):

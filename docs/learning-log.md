@@ -6,11 +6,13 @@ The three most important whys of each change, newest first. Each heading reads `
 
 1. **Give a pattern one way to match.** The scrubber read `< >` as one tag or as three characters, so each such gap
    doubled the work, like a maze where every fork leads to the same room. A `<...>` now counts as a tag only if
-   it holds a letter or digit, which the punctuation branch can never read, so each gap has one reading.
-   Trade-off: a harder pattern to read. Risk: two quicker fixes each hid less. A possessive repeat missed `%20`,
-   and "a tag starts with a letter" missed `<1>`, which let a punctuated term print in clear text. The tests and a
-   fresh reviewer caught them. A speed fix needs correctness tests for every shape the old rule matched.
-2. **Measure the slow case in a test.** The new test times a crafted line: 8.4 s before, under 0.01 s after.
+   it holds a letter or digit that no other branch can read, so `< >`, `<%20>` and `<&nbsp;>` are read piece by
+   piece, and each gap has one reading. Trade-off: a harder pattern, split into named parts. Risk: three quicker
+   fixes each fell short. A possessive repeat missed `%20`, "a tag starts with a letter" missed `<1>` (a punctuated
+   term printed in clear text), and "a tag holds a letter" left `<&nbsp;>` slow. Tests and two fresh reviews
+   caught them. The final rule accepts the same gaps as the old one on 111,150 test strings.
+2. **Measure the slow case in a test.** The new test times crafted lines: seconds to minutes before (90 s for 24
+   `<%20>` gaps on one machine), milliseconds after.
    Trade-off: a timing test can flake on a slow machine, so it allows 1 s for a case that takes milliseconds.
    Risk: the bound is loose enough that a smaller slowdown would pass.
 3. **Cancel stale PR runs, never `main`'s.** A newer push to a PR makes the older run pointless. Each commit on
