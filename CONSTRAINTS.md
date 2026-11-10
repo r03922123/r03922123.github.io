@@ -1,6 +1,7 @@
 # Constraints
 
-Last reviewed: 2026-11-01 by the owner (r03922123), written up by Claude.
+Last reviewed: 2026-11-01 by the owner (r03922123), written up by Claude. Gates moved into `scripts/gates.sh` and CI
+on 2026-11-10 (`SPEC-site-baseline.md`).
 
 This repo is a **public** GitHub Pages site: whatever reaches `main` on GitHub is live. These rules decide when
 work gets saved, checked, merged and published. Do not weaken this file to make a change pass. Tightening a rule
@@ -18,16 +19,18 @@ can be a quiet change; loosening one must be said in the commit message.
 
 ## Gates for merge and push
 
-Each row names the command that gives the verdict. All must pass on the branch tip before it is merged or pushed.
+`sh scripts/gates.sh` runs them all, locally before every push and in CI as the required `gates` check on every PR
+to `main`. Each row names its step in that script, the only place the commands are spelled out. All must pass on the
+branch tip before it is merged or pushed.
 
-| Gate | Rule | Checked by |
+| Gate | Rule | `gates.sh` step |
 |---|---|---|
-| Builds | Every post and LeetCode page builds, and every python block passes its asserts | `python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py .` |
-| Privacy and site | No private terms (local denylist), no phone numbers, no broken links, page heads complete, pinned CDNs, listings complete | `python3 scripts/check.py` (needs `scripts/denylist.local.txt`) |
-| Home weight | `index.html` + `style.css` ≤ 150 KB (three.js lazy and counted apart) | `python3 scripts/check.py` |
-| Check tests | The checker itself still works | `(cd scripts && python3 -m unittest test_check)` |
-| Post wording | No interview framing, vault or Obsidian mentions, no MusicGen authorship; the one allowed hit is the InterviewQuery credit in `coin-flips-normal-approximation.md` | `grep -n -i -E "interview\|obsidian\|vault\|musicgen" tools/posts/src/*.md` |
-| Rebuild is clean | Generated HTML is committed and matches its sources | `git status --short` empty after the builds |
+| Builds | Every post and LeetCode page builds, and every python block passes its asserts | `post build`, `leetcode build` |
+| Privacy and site | No private terms (local denylist) in contents or file names, no phone numbers, no broken links, page heads complete, pinned CDNs, listings complete | `privacy`, then `site` (needs `scripts/denylist.local.txt`; in CI, the `SITE_DENYLIST` secret) |
+| Home weight | `index.html` + `style.css` ≤ 150 KB (three.js lazy and counted apart) | `site` |
+| Check tests | The checker itself still works | `check tests` |
+| Post wording | No interview framing, vault or Obsidian mentions, no MusicGen authorship; the one allowed hit is the InterviewQuery credit in `coin-flips-normal-approximation.md` | `post wording` |
+| Rebuild is clean | Generated HTML is committed and matches its sources | `rebuild clean` |
 
 ## Measured, not yet enforced
 
@@ -37,8 +40,8 @@ Each row names the command that gives the verdict. All must pass on the branch t
 | Home draw calls per frame | 157 measured before instancing the bands; about 113 estimated after | must not grow | J4 audit; re-measure |
 | Room frame rate | 30 fps active, 15 idle or touch | fixed by design (SPEC-room) | J4 audit + `room.js` |
 
-None of these has an external check yet (Lighthouse is not installed and there is no CI). A GitHub Actions
-workflow that builds the posts and runs the gates is the natural place for them; it is not set up.
+None of these has an external check yet (Lighthouse is not installed). CI runs the gates above but not these
+metrics; `.github/workflows/gates.yml` is the natural place for them later.
 
 ## Exceptions
 
