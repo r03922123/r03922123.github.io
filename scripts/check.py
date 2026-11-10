@@ -12,7 +12,7 @@ import sys
 import traceback
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 
 PAGES = {".html", ".htm"}
 SOURCES = "tools/leetcode/src"                    # Markdown that build.py renders into pages
@@ -46,7 +46,7 @@ LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&mid
                             r"|has\s+(\d+)\s+short\s+posts")
 PHONE_SEP = r"(?:[-. ()\u00a0\u2011]|&#8209;|&#x2011;|&nbsp;)*"
 WORD_SEP = r"(?:\s|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)+"     # what a browser shows as a space between two words
-NAME_SEP = re.compile(r"[-_/]|%20")               # how a file name separates words; Pages serves names as URLs
+NAME_SEP = re.compile(r"[-_/.]")                  # how a file name separates words; Pages serves names as URLs
 LOOSE_SEP = r"(?:[\W_]|%20|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)*"   # scrubbing over-redacts: any gap, or none
 
 
@@ -68,10 +68,15 @@ def scrubber(terms):
         loose = [re.compile(LOOSE_SEP.join(map(re.escape, words)), re.I)] if words else []
         rules += [(rx, f"[term #{n}]") for rx in [term_rx(term), *loose]]
 
-    def scrub(line):
+    def redact(line):
         for rx, label in rules:
             line = rx.sub(label, line)
         return line
+
+    def scrub(line):                                  # a %-encoded term is printed decoded, so it is redacted too
+        decoded = unquote(line)
+        clean = redact(decoded)
+        return clean if clean != decoded else redact(line)
     return scrub
 
 
@@ -161,11 +166,13 @@ def check(root, denylist, terms_only=False):
         if path.is_file() and ".git" not in path.parts:
             rel = path.relative_to(root).as_posix()
             findings += [f"{rel}: private term in file name {term!r}" for term, rx in deny
-                         if rx.search(NAME_SEP.sub(" ", rel))]
+                         if rx.search(NAME_SEP.sub(" ", unquote(rel)))]
     for path, text in text_files(root):
         rel = path.relative_to(root).as_posix()
+        decoded = unquote(text)                       # a link such as /%61cme%20corp/ is the term once served
         for term, rx in deny:                         # whole text, so a term split across lines is still found
-            lines = sorted({text.count("\n", 0, m.start()) + 1 for m in rx.finditer(text)})
+            lines = sorted({body.count("\n", 0, m.start()) + 1
+                            for body in {text, decoded} for m in rx.finditer(body)})
             findings += [f"{rel}:{n}: private term {term!r}" for n in lines]
         if terms_only:
             continue
@@ -228,10 +235,12 @@ def main(argv=None, root=None, denylist=DENYLIST):
     parser.add_argument("--denylist-only", action="store_true", help="only the private-term scan of contents and names")
     parser.add_argument("--show-terms", action="store_true", help="print terms unscrubbed (local debugging only)")
     args = parser.parse_args(argv)
+    if args.show_terms and os.environ.get("CI"):
+        sys.exit("--show-terms is refused in CI: Actions logs on this repo are public")
     if not denylist.exists():
         sys.exit(f"missing {denylist}: create it with one private term per line (see README)")
     # Strip before testing for '#', so an indented comment is not loaded as a term.
-    terms = [t for t in (line.strip() for line in denylist.read_text().splitlines()) if t and not t.startswith("#")]
+    terms = [t for t in (line.strip() for line in denylist.read_text(encoding="utf-8-sig").splitlines()) if t and not t.startswith("#")]
     if not terms:                                     # an unset CI secret writes an empty file: fail closed
         sys.exit(f"no terms in {denylist.name}: the privacy check would pass vacuously")
     scrub = (lambda line: line) if args.show_terms else scrubber(terms)
