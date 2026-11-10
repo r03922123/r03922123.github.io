@@ -1,0 +1,9 @@
+# What the Python blocks in posts import, pinned to the versions they pass on today. CI only.
+# torch comes from PyTorch's CPU index: PyPI's Linux wheel requires the CUDA packages.
+--extra-index-url https://download.pytorch.org/whl/cpu
+numpy==1.26.4
+scipy==1.15.3
+scikit-learn==1.8.0
+torch==2.11.0+cpu
+pandas==2.3.3
+threadpoolctl==3.6.0
