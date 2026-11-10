@@ -120,20 +120,40 @@ def exists_exactly(root, rel):
     return path.is_file()
 
 
-def link_ok(root, page, url):
-    if re.match(r"[a-z]+:|//|#", url):
-        return True
+def local(url):
+    """True for a link this site serves: not another scheme or host, and not a project repo beside this one."""
+    path = url.split("#")[0].split("?")[0]
+    return not re.match(r"[a-z]+:|//", url) and not (path.startswith("/") and path.strip("/").split("/")[0] in EXTERNAL)
+
+
+def target(root, page, url):
+    """The file a local url on page points to, relative to root, or None if there is none."""
     url = url.split("#")[0].split("?")[0]
-    if url.startswith("/"):
-        if url.strip("/").split("/")[0] in EXTERNAL:
-            return True
-        target = url.lstrip("/")
-    else:
-        target = (page.parent.relative_to(root) / url).as_posix()
-    target = Path(os.path.normpath(target))
-    if target.parts[:1] == ("..",):
-        return False                                  # above the site root
-    return exists_exactly(root, target) or exists_exactly(root, target / "index.html")
+    if not url:
+        return page.relative_to(root)                 # same page
+    rel = url.lstrip("/") if url.startswith("/") else (page.parent.relative_to(root) / url).as_posix()
+    rel = Path(os.path.normpath(rel))
+    if rel.parts[:1] == ("..",):
+        return None                                   # above the site root
+    return next((t for t in (rel, rel / "index.html") if exists_exactly(root, t)), None)
+
+
+def link_ok(root, page, url):
+    return url.startswith("#") or not local(url) or target(root, page, url) is not None
+
+
+def fragment_ok(root, page, url, ids):
+    """A local #fragment must name an id on its page; "" and "top" scroll to the top, as browsers do with no id.
+    ids caches each page's ids. A missing page is link_ok's finding, and a non-HTML file has no ids to check."""
+    fragment = unquote(url.partition("#")[2])
+    if "#" not in url or not local(url) or fragment.lower() in ("", "top"):
+        return True
+    rel = target(root, page, url)
+    if rel is None or rel.suffix not in PAGES:
+        return True
+    if rel not in ids:
+        ids[rel] = {value for kind, value, _ in Anchors((root / rel).read_text(errors="replace")).items if kind == "id"}
+    return fragment in ids[rel]
 
 
 class Anchors(HTMLParser):
@@ -281,7 +301,7 @@ def feed_findings(root, listed):
 def check(root, denylist, terms_only=False):
     root = Path(root)
     deny = [(term, term_forms(term)) for term in denylist]
-    findings = []
+    findings, ids = [], {}
     # Names too, binary files included: the builds print paths and Pages serves names, so acme-corp.png leaks.
     for path in sorted(root.rglob("*")):
         if path.is_file() and ".git" not in path.parts:
@@ -304,8 +324,9 @@ def check(root, denylist, terms_only=False):
         if path.suffix not in PAGES:
             continue
         findings += [f"{rel}: missing {name}" for name, rx in HEAD.items() if not rx.search(text)]
-        findings += [f"{rel}: broken link {url}" for url in (a or b for a, b in LINK.findall(text))
-                     if not link_ok(root, path, url)]
+        urls = [a or b for a, b in LINK.findall(text)]
+        findings += [f"{rel}: broken link {url}" for url in urls if not link_ok(root, path, url)]
+        findings += [f"{rel}: broken fragment {url}" for url in urls if not fragment_ok(root, path, url, ids)]
         for svg in SVG.findall(text):                 # scene doors: links drawn in SVG must still be named
             for tag, href in SVG_LINK.findall(svg):
                 if "aria-label=" not in tag:

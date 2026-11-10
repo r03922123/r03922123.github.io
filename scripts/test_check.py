@@ -201,7 +201,8 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(out, ["leetcode/index.html: leetcode/heap/ is not listed"])
 
     def test_svg_links_need_an_aria_label(self):
-        body = '<svg viewBox="0 0 10 10"><a href="#x" aria-label="X"><rect/></a><a href="#y"><rect/></a></svg>'
+        body = '<svg viewBox="0 0 10 10"><a href="#x" aria-label="X"><rect/></a><a href="#y"><rect/></a></svg>' \
+               '<h2 id="x">x</h2><h2 id="y">y</h2>'                               # the doors' targets exist
         out = self.findings({"index.html": PAGE.format(body=body)})
         self.assertEqual(out, ["index.html: link inside SVG without aria-label: #y"])
 
