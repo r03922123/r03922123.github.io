@@ -13,6 +13,7 @@ import traceback
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
+from xml.etree import ElementTree
 
 PAGES = {".html", ".htm"}
 SOURCES = "tools/leetcode/src"                    # Markdown that build.py renders into pages
@@ -41,6 +42,12 @@ PINNED = re.compile(r"[@/]\d+\.\d+\.\d+")
 SVG = re.compile(r"<svg\b.*?</svg>", re.S)
 SVG_LINK = re.compile(r'(<a\b[^>]*\bhref="([^"]*)"[^>]*>)')
 HOME_BUDGET = 150_000
+# SPEC-post-feeds: the files tools/feeds/build.py writes, and the pages the sitemap must hold besides the posts.
+SITE = "https://r03922123.github.io"
+FEEDS = ("rss.xml", "sitemap.xml", "robots.txt", "llms.txt")
+FIXED_PAGES = ("/", "/about.html", "/posts/", "/leetcode/")
+SITEMAP_LOC = "{http://www.sitemaps.org/schemas/sitemap/0.9}loc"
+EMAIL = re.compile(r"[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")   # not a pinned name@1.2.3
 # Hand-written LeetCode post counts on the home page and posts index; build.py only rewrites the series page.
 LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&middot;)\s+(\d+)|\b(\d+)\s+pattern\b"
                             r"|has\s+(\d+)\s+short\s+posts")
@@ -168,6 +175,38 @@ def links(root, rel, base):
     return [(kind, site_path(base, value) if kind == "a" else value, latest) for kind, value, latest in items]
 
 
+def feed_findings(root, listed):
+    """SPEC-post-feeds. Active once tools/feeds/build.py exists, so a deleted or broken feed fails instead of passing."""
+    if not (root / "tools/feeds/build.py").is_file():
+        return []
+    findings = [f"{name}: missing" for name in FEEDS if not (root / name).is_file()]
+    trees = {}
+    for name in ("rss.xml", "sitemap.xml"):
+        if (root / name).is_file():
+            try:
+                trees[name] = ElementTree.parse(root / name).getroot()
+            except ElementTree.ParseError as error:        # the message gives a line and column, never page text
+                findings.append(f"{name}: malformed XML ({error})")
+    if "sitemap.xml" in trees:
+        locs = {(loc.text or "").strip() for loc in trees["sitemap.xml"].iter(SITEMAP_LOC)}
+        findings += [f"sitemap.xml: missing {SITE}{path}" for path in listed if SITE + path not in locs]
+    if "rss.xml" in trees:
+        findings += [f"rss.xml: item {n} has no pubDate" for n, item in enumerate(trees["rss.xml"].iter("item"), 1)
+                     if not (item.findtext("pubDate") or "").strip()]
+    for name in FEEDS:                                # RSS author is an email; this site's feeds carry none
+        if (root / name).is_file():
+            lines = (root / name).read_text(errors="replace").splitlines()
+            findings += [f"{name}:{n}: email address" for n, line in enumerate(lines, 1) if EMAIL.search(line)]
+    for section in ("posts", "leetcode"):             # each source gets a Markdown copy with # title, no front matter
+        for src in sorted((root / "tools" / section / "src").glob("*.md")):
+            md = root / section / src.stem / "index.md"
+            if not md.is_file():
+                findings.append(f"{section}/{src.stem}/index.md: missing (source {src.relative_to(root).as_posix()})")
+            elif md.read_text(errors="replace").startswith("---"):
+                findings.append(f"{section}/{src.stem}/index.md: front matter kept")
+    return findings
+
+
 def check(root, denylist, terms_only=False):
     root = Path(root)
     deny = [(term, term_forms(term)) for term in denylist]
@@ -225,6 +264,10 @@ def check(root, denylist, terms_only=False):
         else:
             after = {path for kind, path, _ in listing[start:] if kind == "a"}
             findings += [f"posts/index.html: #musicgen does not link {url}" for url in MUSICGEN if url not in after]
+    # Every post a listing links, MusicGen included, must be in the sitemap.
+    listed = [path for section in ("posts", "leetcode") for kind, path, _ in links(root, f"{section}/index.html", f"/{section}/")
+              if kind == "a" and (re.fullmatch(rf"/{section}/[^/]+/", path) or path in MUSICGEN)]
+    findings += feed_findings(root, list(dict.fromkeys([*FIXED_PAGES, *listed])))
     # The home page's hand-written copies of the listings must keep up with them.
     count = len(list(root.glob("leetcode/*/index.html")))
     for rel in ("index.html", "posts/index.html"):
