@@ -365,10 +365,11 @@ class MainTest(unittest.TestCase):
     def test_scrubbing_a_crafted_line_stays_fast(self):
         # A gap such as "< >" matches as one tag or as three characters; unless each gap has only one reading, each
         # one doubles the work, so a crafted broken link could hang the site step until the job times out.
-        line = "broken link acme" + "< >" * 24 + "x.html"            # seconds to minutes with two readings
-        start = time.monotonic()
-        scrubber(["acme corp"])(line)
-        self.assertLess(time.monotonic() - start, 1.0)
+        scrub = scrubber(["acme corp"])
+        for gap in ("< >", "<%20>", "<&nbsp;>", "<&#160;>", "<-&nbsp;->"):   # seconds to minutes with two readings
+            start = time.monotonic()
+            scrub("broken link acme" + gap * 24 + "x.html")
+            self.assertLess(time.monotonic() - start, 1.0, gap)
 
     def test_any_tag_shaped_gap_is_hidden(self):
         # A punctuated term has only the loose rule, so every <...> the old rule read as a gap must still be one.
