@@ -279,6 +279,11 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(self.feed_site(**{"leetcode/b/index.md": None}),
                          ["leetcode/b/index.md: missing (source tools/leetcode/src/b.md)"])
 
+    def test_broken_link_in_markdown_copy(self):
+        # The page drops a link to an unwritten post, but its index.md keeps it live; code is never a link.
+        md = "# A\n\nsee [B](../b/), `f[i](x)`\n\n```python\nops[op](a, b)\n```\n"
+        self.assertEqual(self.feed_site(**{"posts/a/index.md": md}), ["posts/a/index.md: broken link ../b/"])
+
     def test_markdown_keeps_front_matter(self):
         out = self.feed_site(**{"posts/a/index.md": "---\ntitle: A\n---\nbody\n"})
         self.assertEqual(out, ["posts/a/index.md: front matter kept"])
