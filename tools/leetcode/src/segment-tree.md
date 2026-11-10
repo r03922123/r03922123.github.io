@@ -14,7 +14,7 @@ Prefix sums answer range-sum queries in \(O(1)\), but one update to the array fo
 | **Range** update and range query | Segment tree with lazy propagation |
 
 ## Fenwick tree (binary indexed tree)
-Store, at 1-based index `i`, the sum of a block of length `i & -i` (the lowest set bit of `i`) ending at `i`. A prefix sum hops down by removing the lowest set bit; an update hops up by adding it. Each takes at most \(\log_2 n\) hops.
+Store, at 1-based index `i`, the sum of a block of length `i & -i` (the lowest set bit of `i`) ending at `i`. A prefix sum hops down by removing the lowest set bit; an update hops up by adding it. Each takes at most \(\lfloor \log_2 n \rfloor + 1\) hops.
 
 ```python
 class Fenwick:

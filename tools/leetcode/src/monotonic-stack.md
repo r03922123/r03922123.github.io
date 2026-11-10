@@ -8,7 +8,7 @@ tags: stack · arrays · amortized analysis
 For each element, "where is the next element to the right that is greater?" naively takes \(O(n)\) per element. A monotonic stack answers it for **all** elements in one pass. The stack holds indices still **waiting** for their answer, and their values are kept in decreasing order. When a new element arrives that is greater than the top, it is the answer for the top: pop it, record, repeat.
 
 ## Why the order is decreasing
-Suppose two waiting indices \(i < j\) with \(A_i \ge A_j\). Any future element greater than \(A_i\) is also greater than \(A_j\), so \(A_j\) is answered first. Waiting elements therefore sit in decreasing order, and an element only leaves when something larger arrives. Each index is pushed once and popped at most once, so the whole scan is \(O(n)\) even though there is a loop inside the loop.
+Suppose two waiting indices \(i < j\). Then \(A_i \ge A_j\), or \(j\) would have answered \(i\) when it arrived. Any future element greater than \(A_i\) is also greater than \(A_j\), so \(A_j\) is answered first. Waiting elements therefore sit in decreasing order, and an element only leaves when something larger arrives. Each index is pushed once and popped at most once, so the whole scan is \(O(n)\) even though there is a loop inside the loop.
 
 ## The template
 One pass gives two answers. When `i` pops `top`, `i` is `top`'s **next greater**. After the pops, whatever remains on top is `i`'s **previous greater-or-equal** element, because everything smaller than `A[i]` was just removed.

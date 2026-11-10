@@ -125,4 +125,4 @@ Forward, the same problem is a [binary search](../binary-search/) over days with
 - [1632. Rank Transform of a Matrix](https://leetcode.com/problems/rank-transform-of-a-matrix/)
 - [721. Accounts Merge](https://leetcode.com/problems/accounts-merge/)
 
-The \(O(\alpha(n))\) bound is due to R. E. Tarjan, "Efficiency of a Good But Not Linear Set Union Algorithm" (1975).
+The \(O(\alpha(n))\) bound is due to R. E. Tarjan, "Efficiency of a Good But Not Linear Set Union Algorithm" (1975); for path halving, R. E. Tarjan and J. van Leeuwen, "Worst-Case Analysis of Set Union Algorithms" (1984).
