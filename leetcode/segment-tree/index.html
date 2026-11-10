@@ -42,7 +42,7 @@
 <p>Prefix sums answer range-sum queries in \(O(1)\), but one update to the array forces an \(O(n)\) rebuild. When updates and queries interleave, you need a structure where <b>both</b> are \(O(\log n)\). Pick the simplest one that covers the operations you need:</p>
 <table><thead><tr><th>Need</th><th>Structure</th></tr></thead><tbody><tr><td>Point update, prefix or range <b>sum</b></td><td>Fenwick tree</td></tr><tr><td>Point update, range query of any associative op (sum, min, max, gcd)</td><td>Segment tree</td></tr><tr><td><b>Range</b> update and range query</td><td>Segment tree with lazy propagation</td></tr></tbody></table>
 <h2 id="fenwick-tree-binary-indexed-tree">Fenwick tree (binary indexed tree)</h2>
-<p>Store, at 1-based index <code>i</code>, the sum of a block of length <code>i &amp; -i</code> (the lowest set bit of <code>i</code>) ending at <code>i</code>. A prefix sum hops down by removing the lowest set bit; an update hops up by adding it. Each takes at most \(\log_2 n\) hops.</p>
+<p>Store, at 1-based index <code>i</code>, the sum of a block of length <code>i &amp; -i</code> (the lowest set bit of <code>i</code>) ending at <code>i</code>. A prefix sum hops down by removing the lowest set bit; an update hops up by adding it. Each takes at most \(\lfloor \log_2 n \rfloor + 1\) hops.</p>
 <pre><code class="language-python">class Fenwick:
     def __init__(self, n):
         self.tree = [0] * (n + 1)

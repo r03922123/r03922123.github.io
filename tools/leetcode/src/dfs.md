@@ -129,7 +129,7 @@ for _ in range(200):
     assert critical_connections(n, edges) == brute(n, edges)
 ```
 
-`skip` is a parent **node**, which is wrong for graphs with parallel edges; LeetCode's inputs have none.
+Skipping `parent` by **node** rather than by edge is wrong for graphs with parallel edges; LeetCode's inputs have none.
 
 ## Practice
 - [1778. Shortest Path in a Hidden Grid](https://leetcode.com/problems/shortest-path-in-a-hidden-grid/) (DFS to map, BFS to measure)
