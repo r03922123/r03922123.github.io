@@ -7,6 +7,8 @@
 <meta name="description" content="Building up text-to-music from parts: codec language models (MusicGen to HeartMuLa), reward models (CLAP to CMI-RM), and DPO alignment, with tensor shapes at every step.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/text-to-music-2026/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Text-to-music in 2026: models, reward models and DPO", "datePublished": "2026-10-31T00:00:00+08:00", "description": "Building up text-to-music from parts: codec language models (MusicGen to HeartMuLa), reward models (CLAP to CMI-RM), and DPO alignment, with tensor shapes at every step.", "author": {"@type": "Person", "name": "Jie-Hong Lin", "url": "https://r03922123.github.io/about.html"}}</script>
@@ -19,17 +21,31 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
 <header class="post-head">
+  <p class="crumb"><a href="/posts/">Long-form</a></p>
   <h1>Text-to-music in 2026: models, reward models and DPO</h1>
-  <div class="meta">October 31, 2026 · 16 min read · music generation · alignment · reward models</div>
 </header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>16 min</dd><dt>Topic</dt><dd>Long-form</dd><dt>Tags</dt><dd>music generation · alignment · reward models</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
+  <li><a href="#parts">The parts</a></li>
+  <li><a href="#models">Models: codec language models, MusicGen to HeartMuLa</a></li>
+  <li><a href="#scoring">Scoring: from CLAP to reward models</a></li>
+  <li><a href="#dpo">Alignment: DPO</a></li>
+  <li><a href="#together">How the three connect</a></li>
+  <li><a href="#cfg">Appendix: why classifier-free guidance works</a></li>
+  <li><a href="#refs">References</a></li>
+</ol></nav>
+</aside>
+<div class="prose">
 
 <p>Three ideas carry most of text-to-music today: a <b>codec language model</b> that writes music as
 discrete tokens, a <b>reward model</b> that judges what it wrote, and <b>preference alignment</b> that
@@ -39,16 +55,6 @@ reward model, and best-of-N to DPO.</p>
 <p class="note"><b>Notation.</b> <span class="tag">[paper]</span> marks a fact stated by the cited source.
 <span class="tag">[illustrative]</span> marks a number or structure chosen to explain an idea, not the model's
 actual setting. The code is shape-annotated pseudocode, not a runnable implementation.</p>
-
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
-  <li><a href="#parts">The parts</a></li>
-  <li><a href="#models">Models: codec language models, MusicGen to HeartMuLa</a></li>
-  <li><a href="#scoring">Scoring: from CLAP to reward models</a></li>
-  <li><a href="#dpo">Alignment: DPO</a></li>
-  <li><a href="#together">How the three connect</a></li>
-  <li><a href="#cfg">Appendix: why classifier-free guidance works</a></li>
-  <li><a href="#refs">References</a></li>
-</ol></nav>
 
 <h2 id="parts">1. The parts</h2>
 <h3>Audio is a long list of numbers</h3>
@@ -427,6 +433,7 @@ classifier.</p>
   month   = {Oct},
   url     = {https://r03922123.github.io/posts/text-to-music-2026/}
 }</code></pre>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

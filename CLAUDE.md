@@ -47,9 +47,14 @@ Preview:     python3 -m http.server 8000
 
 ## Current state (2026-11-11)
 
-- `site-baseline` is merged (PR #3): gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the
-  learning log. `main` is protected: a PR with a green `gates` check, for admins too.
-- `post-feeds` and `blog-theme` are merged (PRs #5–#7), and so is an expert accuracy pass over all 90 posts, whose
-  PR lists the doubts left unedited. Next, in the build order of `CAPABILITY-MAP.md`: `post-voice`, in its own session.
-  Reading-page PRs open with `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR 0002).
+- Merged: `site-baseline` (PR #3: gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the learning
+  log; `main` is protected: a PR with a green `gates` check, for admins too), CI hardening (hash-locked wheels-only
+  install, base64 denylist secret), `post-feeds` (feed files, `index.md` copies, page head tags), `blog-theme`
+  (reading tokens at `:root`, the room's under `body.home`) `reading-shell` (fragment check, then the layout) and an expert accuracy pass
+  over all 90 posts (PR #9, which lists the doubts left unedited).
+- Reading pages: the bar sits outside `.wrap`; the home keeps its own header inside it. After a layout change, run
+  `python3 tools/dev/same_articles.py origin/main` to show no article text moved.
+- Next, in the build order of `CAPABILITY-MAP.md`: `post-voice` (rebases on the 4 long-form pages), `posts-index`,
+  then `site-search`, each in its own session. Reading-page PRs open with
+  `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR 0002).
 - Parked branches: none.

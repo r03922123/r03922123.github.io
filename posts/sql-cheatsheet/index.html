@@ -7,6 +7,8 @@
 <meta name="description" content="A working SQL reference: the order a query is really evaluated in, how NULLs bend counting and NOT IN, joins and anti-joins, window functions and their frames, then Nth highest, top N per group, gaps and islands and deduplication. Every query runs against SQLite with asserts, and PostgreSQL-only syntax is marked.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/sql-cheatsheet/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/sql-cheatsheet/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · Coding and data</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#coding-and-data">Coding and data</a></p>
   <h1>SQL on one page: evaluation order, NULLs, joins, window functions and the classic patterns</h1>
-  <div class="meta">November 1, 2026 · 21 min read · SQL · window functions · PostgreSQL · SQLite · reference</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-tables">The tables</a></li><li><a href="#the-order-a-query-is-evaluated-in">The order a query is evaluated in</a></li><li><a href="#nulls-counting-comparing-and-not-in">NULLs: counting, comparing and NOT IN</a></li><li><a href="#arithmetic-casts-and-case">Arithmetic, casts and CASE</a></li><li><a href="#joins-self-joins-and-anti-joins">Joins, self joins and anti-joins</a></li><li><a href="#window-functions">Window functions</a></li><li><a href="#patterns-worth-knowing-by-heart">Patterns worth knowing by heart</a></li><li><a href="#phrasebook-postgresql-and-sqlite-side-by-side">Phrasebook: PostgreSQL and SQLite side by side</a></li><li><a href="#pitfalls-checklist">Pitfalls checklist</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>21 min</dd><dt>Topic</dt><dd>Coding and data</dd><dt>Tags</dt><dd>SQL · window functions · PostgreSQL · SQLite · reference</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-tables">The tables</a></li><li><a href="#the-order-a-query-is-evaluated-in">The order a query is evaluated in</a></li><li><a href="#nulls-counting-comparing-and-not-in">NULLs: counting, comparing and NOT IN</a></li><li><a href="#arithmetic-casts-and-case">Arithmetic, casts and CASE</a></li><li><a href="#joins-self-joins-and-anti-joins">Joins, self joins and anti-joins</a></li><li><a href="#window-functions">Window functions</a></li><li><a href="#patterns-worth-knowing-by-heart">Patterns worth knowing by heart</a></li><li><a href="#phrasebook-postgresql-and-sqlite-side-by-side">Phrasebook: PostgreSQL and SQLite side by side</a></li><li><a href="#pitfalls-checklist">Pitfalls checklist</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>SQL looks like English, which is exactly why it misleads: you write <code>SELECT</code> first, but the database runs it almost last. Most SQL bugs come from a handful of places where the written order, NULLs or a default setting do something you did not expect. This page collects them, together with the window functions and query shapes that come up again and again in analytics work.</p>
 <p>Nothing here is taken on trust. Each query is shown as plain SQL, then run against an in-memory SQLite database from Python, with asserts on the result. The queries are written in the large subset that PostgreSQL and SQLite share. Where the two differ, the PostgreSQL form is given in a block whose first line says <b>PostgreSQL only</b>, and the phrasebook near the end lines up the date, string and cast functions side by side.</p>
 <h2 id="the-tables">The tables</h2>
@@ -507,6 +513,7 @@ assert q("SELECT CAST('123' AS INTEGER) + 1") == [(124,)]</code></pre>
 <h2 id="pitfalls-checklist">Pitfalls checklist</h2>
 <ul><li>Filtering on an aggregate in <code>WHERE</code>, or on a window result in <code>WHERE</code> or <code>HAVING</code>. Use <code>HAVING</code> for the first and a CTE for the second.</li><li>Integer division: <code>COUNT(*) / total</code> is 0 for any share under 100%. Multiply by <code>100.0</code> first.</li><li><code>NOT IN</code> against a column that can hold NULL. Use <code>NOT EXISTS</code>.</li><li>A right-table condition in the <code>WHERE</code> of a <code>LEFT JOIN</code>, and <code>COUNT(*)</code> over a <code>LEFT JOIN</code>. Move the condition into <code>ON</code> and count a right-side column.</li><li>Forgetting the default frame. With <code>ORDER BY</code> it is <code>RANGE ... CURRENT ROW</code>, so ties move together and <code>LAST_VALUE</code> returns the current row's value (or its last peer's).</li><li><code>ROW_NUMBER</code> or <code>NTILE</code> without a unique sort key: the output can change between runs.</li><li>NULL sort order: last in ascending PostgreSQL sorts, first in descending ones, the reverse in SQLite. Say <code>NULLS LAST</code>.</li><li><code>LAG</code> steps back one row, not one period. Fill in missing periods first.</li><li>A query that only works because SQLite is lenient, such as a <code>SELECT</code> alias used in <code>WHERE</code>. Test on the database you will deploy to.</li></ul>
 <p>The same operations in pandas are in the <a href="../pandas-cheatsheet/">pandas cheatsheet</a>. The free interactive book <a href="https://selectstarsql.com/">Select Star SQL</a> and the PostgreSQL and SQLite documentation on window functions informed this page; the examples, data and explanations here are written fresh.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

@@ -7,6 +7,8 @@
 <meta name="description" content="Full fine-tuning against the main ways to train a sliver of a model instead: adapters, prefix and prompt tuning, IA³, LoRA and QLoRA. Where each one sits in the network, how many parameters and gigabytes it costs at 7B scale, a head-to-head on a small transformer, what each does to serving, and how to choose.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/parameter-efficient-fine-tuning/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/parameter-efficient-fine-tuning/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · LLMs and generative AI</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#llms-and-generative-ai">LLMs and generative AI</a></p>
   <h1>Parameter-efficient fine-tuning: LoRA, QLoRA, adapters and prompts compared</h1>
-  <div class="meta">November 1, 2026 · 16 min read · fine-tuning · LoRA · QLoRA · adapters · prompt tuning</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-menu">The menu</a></li><li><a href="#counting-parameters">Counting parameters</a></li><li><a href="#where-the-gigabytes-go">Where the gigabytes go</a></li><li><a href="#a-head-to-head-on-a-small-transformer">A head-to-head on a small transformer</a></li><li><a href="#serving-merging-swapping-and-forgetting">Serving: merging, swapping and forgetting</a></li><li><a href="#choosing-a-method">Choosing a method</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>16 min</dd><dt>Topic</dt><dd>LLMs and generative AI</dd><dt>Tags</dt><dd>fine-tuning · LoRA · QLoRA · adapters · prompt tuning</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-menu">The menu</a></li><li><a href="#counting-parameters">Counting parameters</a></li><li><a href="#where-the-gigabytes-go">Where the gigabytes go</a></li><li><a href="#a-head-to-head-on-a-small-transformer">A head-to-head on a small transformer</a></li><li><a href="#serving-merging-swapping-and-forgetting">Serving: merging, swapping and forgetting</a></li><li><a href="#choosing-a-method">Choosing a method</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>Fine-tuning a pretrained model used to mean updating every weight. For a 7-billion-parameter model that is a hundred-odd gigabytes of training state and a full new checkpoint for every task. Parameter-efficient fine-tuning (PEFT) is the family of methods that freeze the pretrained weights and train something small next to them: a few extra layers, a few vectors, a low-rank update. The small thing is the whole result of training, often a few megabytes, and the base model is shared.</p>
 <p>The methods differ in <b>where</b> the trainable piece sits and <b>what it does to inference</b>. This post puts them side by side: what each trains, how many parameters and how much memory that costs for a Llama-2-7B-sized model, how they compare on a small transformer where everything else is held fixed, and which to reach for. The mechanics of LoRA itself are covered separately, in <a href="../lora-explained/">LoRA explained</a> and with a full from-scratch build in <a href="/posts/lora-from-scratch/">LoRA from scratch</a>, so here LoRA is one entry on the menu.</p>
 <h2 id="the-menu">The menu</h2>
@@ -329,6 +335,7 @@ assert accuracy(full, "A") &lt; acc_A - 0.3</code></pre>
 <h2 id="pitfalls">Pitfalls</h2>
 <ul><li><b>Using full fine-tuning's learning rate.</b> PEFT methods usually want a larger one, around \(10^{-4}\) to \(3 \times 10^{-4}\) for LoRA on an LLM against around \(10^{-5}\) for full fine-tuning, because they train few, freshly initialized parameters. In the toy above, LoRA at \(10^{-3}\) learned far less in 200 steps than at \(10^{-2}\).</li><li><b>Small datasets overfit quickly anyway.</b> A few hundred examples can be memorized by a LoRA adapter in a few epochs. Watch validation loss, and see the <a href="../overfitting-playbook/">overfitting playbook</a>.</li><li><b>Adapting too little of the network.</b> LoRA on query and value only is the original recipe and the cheapest, but adding the other attention and FFN matrices usually helps more than raising the rank.</li><li><b>Forgetting the chat template.</b> Fine-tune an instruction model with the same prompt format it will see when served, or the adapter learns a different format from the one you use in production.</li><li><b>Comparing by parameter count.</b> Below about 1% trainable, memory is set by the frozen base and the activations. Quality is set by where the trainable parameters sit, not how many there are.</li><li><b>Assuming merged equals unmerged under quantization.</b> For QLoRA, test the model you will actually serve, after any requantization.</li></ul>
 <p>The method details follow the original papers: Houlsby et al. (2019) for adapters, Li and Liang (2021) for prefix tuning, Lester et al. (2021) for prompt tuning, Hu et al. (2021) for LoRA, Liu et al. (2022) for IA³, Dettmers et al. (2023) for QLoRA and NF4, and Biderman et al. (2024) for the learns-less, forgets-less comparison. Some of the practical advice is adapted from Sebastian Raschka's <a href="https://magazine.sebastianraschka.com/p/practical-tips-for-finetuning-llms">practical tips for fine-tuning LLMs with LoRA</a>.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

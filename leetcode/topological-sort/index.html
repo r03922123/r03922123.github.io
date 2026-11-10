@@ -7,6 +7,8 @@
 <meta name="description" content="Why a directed graph can be lined up so every edge points forward exactly when it has no cycle, then the two standard algorithms (Kahn&#x27;s queue of ready nodes and DFS finishing order), each detecting cycles for free, and two harder uses: two-level ordering and longest paths in a DAG.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/leetcode/topological-sort/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/leetcode/topological-sort/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Graphs</p>
 <header class="post-head">
+  <p class="crumb"><a href="/leetcode/#graphs">Graphs</a></p>
   <h1>Topological sort: ordering a DAG</h1>
-  <div class="meta">October 31, 2026 · 10 min read · topological sort · DAG · graphs</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#when-does-an-order-exist">When does an order exist?</a></li><li><a href="#kahn-s-algorithm">Kahn's algorithm</a></li><li><a href="#dfs-finishing-order">DFS finishing order</a></li><li><a href="#two-levels-of-order-1203">Two levels of order: 1203</a></li><li><a href="#longest-path-in-a-dag">Longest path in a DAG</a></li><li><a href="#peeling-leaves-of-a-tree">Peeling leaves of a tree</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>10 min</dd><dt>Topic</dt><dd>Graphs</dd><dt>Tags</dt><dd>topological sort · DAG · graphs</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#when-does-an-order-exist">When does an order exist?</a></li><li><a href="#kahn-s-algorithm">Kahn's algorithm</a></li><li><a href="#dfs-finishing-order">DFS finishing order</a></li><li><a href="#two-levels-of-order-1203">Two levels of order: 1203</a></li><li><a href="#longest-path-in-a-dag">Longest path in a DAG</a></li><li><a href="#peeling-leaves-of-a-tree">Peeling leaves of a tree</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>Dependencies make a directed graph: an edge \(u \to v\) says "\(u\) must come before \(v\)". A <b>topological order</b> lists the nodes so that every edge points forward. Course plans, build systems and spreadsheet recalculation all need one. This post shows when such an order exists and how to find one in linear time. Both algorithms also detect a cycle, the one case in which no order exists.</p>
 <h2 id="when-does-an-order-exist">When does an order exist?</h2>
 <p>A <b>DAG</b> is a directed graph with no directed cycle. Number the nodes \(v_1, \dots, v_n\) in some order; the order is topological if every edge \((v_i, v_j)\) has \(i &lt; j\).</p>
@@ -278,6 +284,7 @@ for _ in range(200):
 <h2 id="practice">Practice</h2>
 <ul><li><a href="https://leetcode.com/problems/course-schedule/">207. Course Schedule</a></li><li><a href="https://leetcode.com/problems/course-schedule-ii/">210. Course Schedule II</a></li><li><a href="https://leetcode.com/problems/sort-items-by-groups-respecting-dependencies/">1203. Sort Items by Groups Respecting Dependencies</a></li><li><a href="https://leetcode.com/problems/minimum-score-after-removals-on-a-tree/">2322. Minimum Score After Removals on a Tree</a> (subtree XORs and entry/exit times on a rooted tree)</li><li><a href="https://leetcode.com/problems/create-components-with-same-value/">2440. Create Components With Same Value</a></li><li><a href="https://leetcode.com/problems/maximum-number-of-k-divisible-components/">2872. Maximum Number of K-Divisible Components</a></li><li><a href="https://leetcode.com/problems/parallel-courses-iii/">2050. Parallel Courses III</a></li><li><a href="https://leetcode.com/problems/alien-dictionary/">269. Alien Dictionary</a> (edges from the first differing letter of adjacent words)</li><li><a href="https://leetcode.com/problems/find-eventual-safe-states/">802. Find Eventual Safe States</a> (Kahn's on the reversed graph)</li><li><a href="https://leetcode.com/problems/largest-color-value-in-a-directed-graph/">1857. Largest Color Value in a Directed Graph</a></li><li><a href="https://leetcode.com/problems/build-a-matrix-with-conditions/">2392. Build a Matrix With Conditions</a></li><li><a href="https://leetcode.com/problems/sequence-reconstruction/">444. Sequence Reconstruction</a> (the order is unique exactly when the queue never holds two nodes)</li></ul>
 <p>Kahn's algorithm is from A. B. Kahn, "Topological sorting of large networks", Communications of the ACM 5(11), 1962.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

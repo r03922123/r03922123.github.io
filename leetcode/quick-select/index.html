@@ -7,6 +7,8 @@
 <meta name="description" content="Partition like quicksort but recurse into one side only. Why that is O(n) on average, why repeated values break the naive version, and how it compares with a heap.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/leetcode/quick-select/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/leetcode/quick-select/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="true">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · Sorting, searching and strings</p>
 <header class="post-head">
+  <p class="crumb"><a href="/leetcode/#sorting-searching-and-strings">Sorting, searching and strings</a></p>
   <h1>Quickselect: the kth element in linear expected time</h1>
-  <div class="meta">October 31, 2026 · 2 min read · selection · partitioning · randomization</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-it-is-linear">Why it is linear</a></li><li><a href="#the-duplicate-trap">The duplicate trap</a></li><li><a href="#quickselect-or-a-heap">Quickselect or a heap?</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>2 min</dd><dt>Topic</dt><dd>Sorting, searching and strings</dd><dt>Tags</dt><dd>selection · partitioning · randomization</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-it-is-linear">Why it is linear</a></li><li><a href="#the-duplicate-trap">The duplicate trap</a></li><li><a href="#quickselect-or-a-heap">Quickselect or a heap?</a></li><li><a href="#practice">Practice</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>To find the \(k\)th largest element (<a href="https://leetcode.com/problems/kth-largest-element-in-an-array/">215. Kth Largest Element in an Array</a>) you do not need a sorted array, only the element that <b>would</b> be at position \(n - k\) if it were sorted. Quickselect partitions around a pivot like quicksort, then throws away the side that cannot contain that position.</p>
 <h2 id="why-it-is-linear">Why it is linear</h2>
 <p>After a partition, the target is on one side, so only that side is searched. With a random pivot, each partition shrinks the range to about three quarters on average, so the expected total work is a geometric series:</p>
@@ -87,6 +93,7 @@ assert kth_largest_heap([3, 2, 3, 1, 2, 4, 5, 5, 6], 4) == 4</code></pre>
 <ul><li>Use <b>quickselect</b> when the data is in memory, you may reorder it, and you want the fastest expected time.</li><li>Use a <b>heap</b> when the data streams in, when you must not modify the input, or when \(k\) is small; its time is also guaranteed, not expected. See <a href="../heap/">heaps</a>.</li></ul>
 <h2 id="practice">Practice</h2>
 <ul><li><a href="https://leetcode.com/problems/k-closest-points-to-origin/">973. K Closest Points to Origin</a></li><li><a href="https://leetcode.com/problems/top-k-frequent-elements/">347. Top K Frequent Elements</a> (also a <a href="../bucket-sort/">bucket sort</a>)</li><li><a href="https://leetcode.com/problems/wiggle-sort-ii/">324. Wiggle Sort II</a> (select the median, then three-way partition)</li></ul>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

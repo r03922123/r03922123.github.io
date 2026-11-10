@@ -7,6 +7,8 @@
 <meta name="description" content="The ideas that make large language models affordable to run and train, each reduced to a small experiment: the KV cache and its memory bill, multi-query and grouped-query attention, speculative decoding and why it is exact, FlashAttention&#x27;s online softmax, mixed precision, loss masking for instruction tuning, and why long contexts are not read evenly.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/transformers-and-llms-key-ideas/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/transformers-and-llms-key-ideas/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · LLMs and generative AI</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#llms-and-generative-ai">LLMs and generative AI</a></p>
   <h1>Transformers and LLMs: the key engineering ideas</h1>
-  <div class="meta">November 1, 2026 · 14 min read · transformers · LLM · inference · KV cache · speculative decoding · mixed precision</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-generation-is-slow">Why generation is slow</a></li><li><a href="#the-kv-cache">The KV cache</a></li><li><a href="#how-big-the-cache-gets">How big the cache gets</a></li><li><a href="#sharing-keys-and-values-mqa-and-gqa">Sharing keys and values: MQA and GQA</a></li><li><a href="#speculative-decoding">Speculative decoding</a></li><li><a href="#attention-without-the-n-by-n-matrix">Attention without the N-by-N matrix</a></li><li><a href="#mixed-precision-training">Mixed precision training</a></li><li><a href="#instruction-tuning-and-cheap-fine-tuning">Instruction tuning and cheap fine-tuning</a></li><li><a href="#long-contexts-are-not-read-evenly">Long contexts are not read evenly</a></li><li><a href="#pitfalls">Pitfalls</a></li><li><a href="#references">References</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>14 min</dd><dt>Topic</dt><dd>LLMs and generative AI</dd><dt>Tags</dt><dd>transformers · LLM · inference · KV cache · speculative decoding · mixed precision</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-generation-is-slow">Why generation is slow</a></li><li><a href="#the-kv-cache">The KV cache</a></li><li><a href="#how-big-the-cache-gets">How big the cache gets</a></li><li><a href="#sharing-keys-and-values-mqa-and-gqa">Sharing keys and values: MQA and GQA</a></li><li><a href="#speculative-decoding">Speculative decoding</a></li><li><a href="#attention-without-the-n-by-n-matrix">Attention without the N-by-N matrix</a></li><li><a href="#mixed-precision-training">Mixed precision training</a></li><li><a href="#instruction-tuning-and-cheap-fine-tuning">Instruction tuning and cheap fine-tuning</a></li><li><a href="#long-contexts-are-not-read-evenly">Long contexts are not read evenly</a></li><li><a href="#pitfalls">Pitfalls</a></li><li><a href="#references">References</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>A transformer language model is a short stack of ideas: attention, an MLP, residual connections, normalization, and a next-token loss. What makes such a model affordable to train and serve is a second set of ideas, mostly about memory. This post covers the ones that matter most, each with the reason it exists, the mechanism, and a small experiment whose assertions check the claim.</p>
 <p>Throughout, \(L\) is the number of layers, \(H\) the number of query heads, \(d_h\) the size of one head, \(N\) the number of tokens in the sequence, and \(p\) and \(q\) are probability distributions over the vocabulary.</p>
 <h2 id="why-generation-is-slow">Why generation is slow</h2>
@@ -272,6 +278,7 @@ assert not torch.allclose(masked, F.cross_entropy(logits, targets))</code></pre>
 <h2 id="references">References</h2>
 <ol><li>Vaswani et al., <a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a>, NeurIPS 2017.</li><li>Shazeer, <a href="https://arxiv.org/abs/1911.02150">Fast Transformer Decoding: One Write-Head is All You Need</a>, 2019. Multi-query attention.</li><li>Ainslie et al., <a href="https://arxiv.org/abs/2305.13245">GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints</a>, EMNLP 2023.</li><li>Kwon et al., <a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for Large Language Model Serving with PagedAttention</a>, SOSP 2023.</li><li>Leviathan, Kalman and Matias, <a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a>, ICML 2023.</li><li>Chen et al., <a href="https://arxiv.org/abs/2302.01318">Accelerating Large Language Model Decoding with Speculative Sampling</a>, 2023.</li><li>Milakov and Gimelshein, <a href="https://arxiv.org/abs/1805.02867">Online normalizer calculation for softmax</a>, 2018.</li><li>Dao et al., <a href="https://arxiv.org/abs/2205.14135">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a>, NeurIPS 2022, and Dao, <a href="https://arxiv.org/abs/2307.08691">FlashAttention-2</a>, 2023.</li><li>Micikevicius et al., <a href="https://arxiv.org/abs/1710.03740">Mixed Precision Training</a>, ICLR 2018.</li><li>Wei et al., <a href="https://arxiv.org/abs/2109.01652">Finetuned Language Models Are Zero-Shot Learners</a>, ICLR 2022.</li><li>Ouyang et al., <a href="https://arxiv.org/abs/2203.02155">Training Language Models to Follow Instructions with Human Feedback</a>, NeurIPS 2022.</li><li>Hu et al., <a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a>, ICLR 2022.</li><li>Liu et al., <a href="https://arxiv.org/abs/2307.03172">Lost in the Middle: How Language Models Use Long Contexts</a>, TACL 2024.</li></ol>
 <p>These topics follow Stanford's CME295 course, Transformers and Large Language Models; the explanations and experiments here are my own.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

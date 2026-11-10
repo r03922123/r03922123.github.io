@@ -7,6 +7,8 @@
 <meta name="description" content="Why the first stage of a recommender cannot score every item with a rich model, and how two encoders that meet only at a dot product get around it. A trained model with in-batch negatives and the logQ correction, an inverted-file index built from scratch, new items served through content features, and hard negatives.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/two-tower-retrieval/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/two-tower-retrieval/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · Recommender systems</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#recommender-systems">Recommender systems</a></p>
   <h1>Two-tower retrieval: from millions of items to a few hundred candidates</h1>
-  <div class="meta">November 1, 2026 · 12 min read · retrieval · recommendation · embeddings · nearest-neighbour search</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-retrieval-needs-a-different-model">Why retrieval needs a different model</a></li><li><a href="#a-small-world-to-learn">A small world to learn</a></li><li><a href="#the-two-towers">The two towers</a></li><li><a href="#training-with-in-batch-negatives">Training with in-batch negatives</a></li><li><a href="#serving-an-offline-index-and-an-online-query">Serving: an offline index and an online query</a></li><li><a href="#new-items-come-through-the-content-features">New items come through the content features</a></li><li><a href="#hard-negatives">Hard negatives</a></li><li><a href="#how-it-compares">How it compares</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>12 min</dd><dt>Topic</dt><dd>Recommender systems</dd><dt>Tags</dt><dd>retrieval · recommendation · embeddings · nearest-neighbour search</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-retrieval-needs-a-different-model">Why retrieval needs a different model</a></li><li><a href="#a-small-world-to-learn">A small world to learn</a></li><li><a href="#the-two-towers">The two towers</a></li><li><a href="#training-with-in-batch-negatives">Training with in-batch negatives</a></li><li><a href="#serving-an-offline-index-and-an-online-query">Serving: an offline index and an online query</a></li><li><a href="#new-items-come-through-the-content-features">New items come through the content features</a></li><li><a href="#hard-negatives">Hard negatives</a></li><li><a href="#how-it-compares">How it compares</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>A recommender with ten million items cannot look carefully at all of them for every request, so it works as a funnel. A cheap first stage, retrieval, pulls a few hundred plausible items from the whole catalogue; a more expensive <a href="../recommendation-ranking/">ranking model</a> orders those with every feature it has; a last pass applies business rules. Each stage sees fewer items and can spend more on each.</p>
 <p>The two-tower model is the standard first stage. One network turns the user into a vector, another turns an item into a vector, and the score is their dot product. That restriction looks severe, and it is exactly what makes retrieval fast. This post builds one, trains it, serves it from an index, and checks each claim in code.</p>
 <h2 id="why-retrieval-needs-a-different-model">Why retrieval needs a different model</h2>
@@ -231,6 +237,7 @@ assert abs(r_cold - r_cold_nodrop) &lt; 0.1                     # dropout is a s
 <h2 id="pitfalls">Pitfalls</h2>
 <ul><li><b>Version skew.</b> User and item vectors share a space only if they come from the same model. Ship both towers and the index as one versioned unit.</li><li><b>Pair features in a tower.</b> "Has this user seen this item before?" belongs to the pair, so neither tower can compute it at serving time. Smuggled into training anyway (say, computed for the training user and fed to the item tower), it makes offline metrics look excellent and then vanishes in production. It belongs in ranking.</li><li><b>Judging by the loss.</b> In-batch loss depends on batch size and temperature. Measure recall at the number of candidates actually passed on, against the full catalogue, on users held out by time; see <a href="/posts/evaluating-ml-systems/">evaluating ML systems</a>.</li><li><b>Silent index loss.</b> Approximate search drops candidates without error. Check index recall against exact search on real queries whenever the index changes.</li><li><b>Feedback loops.</b> Retrieval learns from interactions with items earlier retrieval surfaced, the same loop described in <a href="/posts/position-bias/">position bias</a>. Some exploration traffic keeps the data from narrowing.</li></ul>
 <p>Sources: Po-Sen Huang et al., Learning Deep Structured Semantic Models for Web Search using Clickthrough Data (CIKM 2013); Paul Covington, Jay Adams and Emre Sargin, <a href="https://dl.acm.org/doi/10.1145/2959100.2959190">Deep Neural Networks for YouTube Recommendations</a> (RecSys 2016); Xinyang Yi et al., <a href="https://dl.acm.org/doi/10.1145/3298689.3346996">Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations</a> (RecSys 2019); Jui-Ting Huang et al., <a href="https://arxiv.org/abs/2006.11632">Embedding-based Retrieval in Facebook Search</a> (KDD 2020); Ji Yang et al., Mixed Negative Sampling for Learning Two-tower Neural Networks in Recommendations (WWW 2020); Jeff Johnson, Matthijs Douze and Hervé Jégou, <a href="https://arxiv.org/abs/1702.08734">Billion-scale similarity search with GPUs</a> (2017), the paper behind <a href="https://github.com/facebookresearch/faiss">FAISS</a>; Ruiqi Guo et al., Accelerating Large-Scale Inference with Anisotropic Vector Quantization (ICML 2020, ScaNN); Yu. A. Malkov and D. A. Yashunin, <a href="https://arxiv.org/abs/1603.09320">Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs</a> (2016); Hervé Jégou, Matthijs Douze and Cordelia Schmid, Product Quantization for Nearest Neighbor Search (TPAMI 2011). The serving and system-design framing also draws on Eugene Yan's <a href="https://eugeneyan.com/writing/system-design-for-discovery/">System Design for Recommendations and Search</a> (2021).</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

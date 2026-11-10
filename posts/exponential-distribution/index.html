@@ -7,6 +7,8 @@
 <meta name="description" content="How the waiting time in a Poisson process gets its density, why it is a PDF and not a PMF, and what follows from it: the mean and median, memorylessness and constant hazard, sampling by inverse transform, racing clocks, fitting a rate with censored data, and the waiting-time paradox. Every claim checked by simulation.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/exponential-distribution/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/exponential-distribution/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · Probability</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#probability">Probability</a></p>
   <h1>The exponential distribution: waiting for the next event</h1>
-  <div class="meta">November 1, 2026 · 10 min read · probability · exponential · Poisson process · survival</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#from-counts-to-waiting-times">From counts to waiting times</a></li><li><a href="#mean-variance-and-median">Mean, variance and median</a></li><li><a href="#sampling-by-inverse-transform">Sampling by inverse transform</a></li><li><a href="#memorylessness-and-constant-hazard">Memorylessness and constant hazard</a></li><li><a href="#racing-clocks-the-minimum-of-exponentials">Racing clocks: the minimum of exponentials</a></li><li><a href="#estimating-the-rate-with-and-without-censoring">Estimating the rate, with and without censoring</a></li><li><a href="#the-waiting-time-paradox">The waiting-time paradox</a></li><li><a href="#when-to-use-it-and-pitfalls">When to use it, and pitfalls</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>10 min</dd><dt>Topic</dt><dd>Probability</dd><dt>Tags</dt><dd>probability · exponential · Poisson process · survival</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#from-counts-to-waiting-times">From counts to waiting times</a></li><li><a href="#mean-variance-and-median">Mean, variance and median</a></li><li><a href="#sampling-by-inverse-transform">Sampling by inverse transform</a></li><li><a href="#memorylessness-and-constant-hazard">Memorylessness and constant hazard</a></li><li><a href="#racing-clocks-the-minimum-of-exponentials">Racing clocks: the minimum of exponentials</a></li><li><a href="#estimating-the-rate-with-and-without-censoring">Estimating the rate, with and without censoring</a></li><li><a href="#the-waiting-time-paradox">The waiting-time paradox</a></li><li><a href="#when-to-use-it-and-pitfalls">When to use it, and pitfalls</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>Rides are requested at an average of 6 per hour, independently of each other. How long until the next one? The <a href="../poisson-distribution/">Poisson distribution</a> answers a counting question, how many events land in a fixed window. The exponential distribution answers the matching timing question, how long until the first event. Same process, other side of the coin.</p>
 <p>One correction up front, because it is a common slip: the exponential is a <b>continuous</b> distribution, so it has a probability density function (PDF), not a probability mass function (PMF). A waiting time can be 3.7 minutes or 3.7001 minutes, and the chance of hitting any single exact value is zero. Probabilities come from areas under the density, and the density itself can be larger than 1.</p>
 <h2 id="from-counts-to-waiting-times">From counts to waiting times</h2>
@@ -178,6 +184,7 @@ assert abs(np.diff(bus_times).mean() - 1 / lam) &lt; 0.001     # while the typic
 <ul><li><b>Rate versus scale.</b> \(\lambda\) is a rate; \(1/\lambda\) is the mean. <code>numpy.random.Generator.exponential</code> and <code>scipy.stats.expon</code> both take the scale \(1/\lambda\). Passing the rate instead makes the mean \(\lambda\) rather than \(1/\lambda\), off by a factor of \(\lambda^2\): at 6 per hour, waits come out 36 times too long.</li><li><b>A density is not a probability.</b> \(f(t)\) can exceed 1; only integrals of it are probabilities.</li><li><b>Check the constant-hazard assumption.</b> A quick diagnostic: the coefficient of variation (sd over mean) should be near 1, and \(\ln S(t)\) estimated from data should be a straight line in \(t\). Bursty traffic gives a CV well above 1; scheduled events give one well below.</li><li><b>Censoring.</b> Survival-type data almost always contain units still waiting. Use events over total exposure, not the mean of finished waits.</li><li><b>Mean versus median.</b> For skewed waits, the median (\(0.69/\lambda\)) describes the typical experience; the mean drives capacity planning.</li><li><b>Sampling by time.</b> Waits and gaps observed from a random moment are length-biased, as in the paradox above.</li></ul>
 <p>For the discrete side of the same process see <a href="../poisson-distribution/">Poisson distribution</a>, and for a compact table of distributions see the <a href="../probability-cheatsheet/">probability cheatsheet</a>.</p>
 <p>The derivation from the Poisson zero-count probability is the standard textbook argument; its whole-unit version is laid out in a <a href="https://math.stackexchange.com/a/1089139">Mathematics Stack Exchange answer</a> and in Milefoot's <a href="https://www.milefoot.com/math/stat/pdfc-exponential.htm">notes on the exponential distribution</a>, which this post rewrites and extends.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

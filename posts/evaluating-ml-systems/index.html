@@ -7,6 +7,8 @@
 <meta name="description" content="A reference for evaluating classification, recommendation, search and generative systems: from business value to model metrics, offline tests to online experiments.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/evaluating-ml-systems/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Evaluating ML systems: classification, ranking, search and generative models", "datePublished": "2026-10-31T00:00:00+08:00", "description": "A reference for evaluating classification, recommendation, search and generative systems: from business value to model metrics, offline tests to online experiments.", "author": {"@type": "Person", "name": "Jie-Hong Lin", "url": "https://r03922123.github.io/about.html"}}</script>
@@ -19,24 +21,21 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
 <header class="post-head">
+  <p class="crumb"><a href="/posts/">Long-form</a></p>
   <h1>Evaluating ML systems: classification, ranking, search and generative models</h1>
-  <div class="meta">October 31, 2026 · 8 min read · evaluation · experimentation · reference</div>
 </header>
-
-<p>A model metric is only useful if moving it moves something people care about. This reference follows
-the same chain for four kinds of system: <b>business value → product metric → model metric</b>, then how
-to test offline and online, and the problems that tend to break each step. The formulas are written out,
-and the metric code at the end runs as is.</p>
-
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>8 min</dd><dt>Topic</dt><dd>Long-form</dd><dt>Tags</dt><dd>evaluation · experimentation · reference</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
   <li><a href="#chain">The chain from value to metric</a></li>
   <li><a href="#classification">Classification</a></li>
   <li><a href="#recsys">Recommendation</a></li>
@@ -46,6 +45,13 @@ and the metric code at the end runs as is.</p>
   <li><a href="#code">Metric code</a></li>
   <li><a href="#refs">References</a></li>
 </ol></nav>
+</aside>
+<div class="prose">
+
+<p>A model metric is only useful if moving it moves something people care about. This reference follows
+the same chain for four kinds of system: <b>business value → product metric → model metric</b>, then how
+to test offline and online, and the problems that tend to break each step. The formulas are written out,
+and the metric code at the end runs as is.</p>
 
 <h2 id="chain">The chain from value to metric</h2>
 <p>Start from what one more correct prediction is worth, and work down:</p>
@@ -253,6 +259,7 @@ assert round(z, 2) == 3.53 and round(lift, 3) == 0.05</code></pre>
   month   = {Oct},
   url     = {https://r03922123.github.io/posts/evaluating-ml-systems/}
 }</code></pre>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

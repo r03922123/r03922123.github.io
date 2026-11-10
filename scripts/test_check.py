@@ -31,6 +31,10 @@ SITEMAP = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sit
 FIXED = ("/", "/about.html", "/posts/", "/leetcode/")
 TAGGED = PAGE.replace("</head>", "{head}</head>")
 LD = '<script type="application/ld+json">{"@type": "BlogPosting"}</script>\n'
+SHELL_FONTS = ("source-serif-4/source-serif-4-latin-wght-normal.woff2", "inter/inter-latin-wght-normal.woff2")
+PRELOAD = '<link rel="preload" href="/fonts/{}" as="font" type="font/woff2" crossorigin>\n'
+PRELOADS = "".join(map(PRELOAD.format, SHELL_FONTS))
+ARTICLE = '<article class="post-body"><aside class="post-side"></aside><div class="prose"></div></article>'
 
 
 def head(path, post=False, md=False):
@@ -180,6 +184,29 @@ class CheckTest(unittest.TestCase):
     def test_missing_fragment_on_the_same_page(self):
         out = self.findings(self.fragment_site('<h2 id="here">h</h2><a href="#missing">x</a>'))
         self.assertEqual(out, ["index.html: broken fragment #missing"])
+
+    # SPEC-reading-shell: each page on the stylesheet but the home preloads both reading fonts, and each article has
+    # the side and text columns, so a hand-written page cannot keep the old markup unnoticed.
+    def shell_site(self, about_head, article):
+        css = '<link rel="stylesheet" href="/style.css">\n'
+        return {**{f"fonts/{font}": b"\0" for font in SHELL_FONTS}, "style.css": "",
+                "index.html": TAGGED.format(head=css, body=""), "about.html": TAGGED.format(head=css + about_head, body=""),
+                "posts/index.html": PAGE.format(body='<a href="a/">a</a>' + MUSICGEN), "posts/a/index.html": PAGE.format(body=article)}
+
+    def test_shell_site_passes(self):
+        self.assertEqual(self.findings(self.shell_site(PRELOADS, ARTICLE)), [])
+
+    def test_reading_page_without_a_font_preload(self):
+        out = self.findings(self.shell_site(PRELOAD.format(SHELL_FONTS[0]), ARTICLE))
+        self.assertEqual(out, [f"about.html: no preload for /fonts/{SHELL_FONTS[1]}"])
+
+    def test_article_without_the_side_column(self):
+        out = self.findings(self.shell_site(PRELOADS, ARTICLE.replace('<aside class="post-side"></aside>', "")))
+        self.assertEqual(out, ["posts/a/index.html: article without post-side"])
+
+    def test_article_without_the_prose_column(self):
+        out = self.findings(self.shell_site(PRELOADS, ARTICLE.replace('class="prose"', 'class="text"')))
+        self.assertEqual(out, ["posts/a/index.html: article without prose"])
 
     def test_missing_head_fields(self):
         out = self.findings({"index.html": "<html><body>x</body></html>"})

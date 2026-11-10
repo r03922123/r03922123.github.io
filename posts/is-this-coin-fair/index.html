@@ -7,6 +7,8 @@
 <meta name="description" content="A coin lands tails 8 times in 10. The exact binomial test computed by brute force, what a non-significant result does and does not tell you, how many flips you actually need, the normal approximation for large samples, a Bayesian reading, and a check that a count test cannot do.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/is-this-coin-fair/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/is-this-coin-fair/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · Probability</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#probability">Probability</a></p>
   <h1>Is this coin fair? Testing a proportion from ten flips to a million</h1>
-  <div class="meta">November 1, 2026 · 10 min read · hypothesis testing · binomial test · power · probability</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-question-made-precise">The question, made precise</a></li><li><a href="#the-exact-test-by-brute-force">The exact test, by brute force</a></li><li><a href="#not-significant-is-not-fair">"Not significant" is not "fair"</a></li><li><a href="#how-many-flips-would-it-take">How many flips would it take?</a></li><li><a href="#large-samples-the-normal-approximation">Large samples: the normal approximation</a></li><li><a href="#a-bayesian-reading">A Bayesian reading</a></li><li><a href="#what-a-count-cannot-see">What a count cannot see</a></li><li><a href="#which-test-and-pitfalls">Which test, and pitfalls</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>10 min</dd><dt>Topic</dt><dd>Probability</dd><dt>Tags</dt><dd>hypothesis testing · binomial test · power · probability</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-question-made-precise">The question, made precise</a></li><li><a href="#the-exact-test-by-brute-force">The exact test, by brute force</a></li><li><a href="#not-significant-is-not-fair">"Not significant" is not "fair"</a></li><li><a href="#how-many-flips-would-it-take">How many flips would it take?</a></li><li><a href="#large-samples-the-normal-approximation">Large samples: the normal approximation</a></li><li><a href="#a-bayesian-reading">A Bayesian reading</a></li><li><a href="#what-a-count-cannot-see">What a count cannot see</a></li><li><a href="#which-test-and-pitfalls">Which test, and pitfalls</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>A simulated coin is flipped 10 times and comes up tails 8 times. Is it broken? The question is small, but answering it properly uses most of the machinery behind every A/B test and every "is this metric really different" check: a null hypothesis, a p-value, the difference between "not significant" and "fine", and the number of samples it takes before a test can tell you anything.</p>
 <p>This post works the example by hand, checks each number by brute force and against SciPy, then scales it up to large samples and looks at it from the Bayesian side.</p>
 <h2 id="the-question-made-precise">The question, made precise</h2>
@@ -192,6 +198,7 @@ assert abs(np.mean(np.array(pv_fair) &lt; 0.05) - 0.05) &lt; 0.02       # about 
 <table><thead><tr><th>situation</th><th>use</th></tr></thead><tbody><tr><td>any \(n\), one coin vs a fixed \(p_0\)</td><td>exact binomial test, with a Clopper–Pearson or Wilson interval</td></tr><tr><td>large \(n\), want a formula or a sample size</td><td>one-sample z-test, ideally with continuity correction</td></tr><tr><td>more than two outcomes (a die, a categorical simulator)</td><td>chi-squared goodness of fit, or an exact multinomial test for small counts</td></tr><tr><td>two coins or two variants</td><td>two-sample test for proportions; see <a href="../ab-testing/">A/B testing</a></td></tr><tr><td>order matters, not just counts</td><td>runs test, or autocorrelation of the sequence</td></tr><tr><td>you want a probability about \(p\) itself</td><td>Beta posterior</td></tr></tbody></table>
 <ul><li><b>Decide the number of flips before flipping.</b> Flipping until the p-value dips below 0.05 and then stopping makes a false alarm far more likely than 5%, because every peek is another chance to cross the line. More on reading them in <a href="../p-values/">P-values</a>.</li><li><b>Report the interval, not only the verdict.</b> "p = 0.11" hides that the data allow anything from a heavily biased coin to a fair one.</li><li>**With a huge \(n\), everything is significant.** A million flips detect a bias of 0.2 percentage points that may not matter for any purpose. Ask how large a bias would matter, then check whether the interval rules it in or out.</li><li><b>Testing many coins means many chances of a false alarm.</b> Check 100 fair coins at \(\alpha = 0.05\) and expect around five to look biased by chance alone (somewhat fewer with a conservative exact test).</li><li>**Rules of thumb such as \(n \ge 30\) are not a licence for the normal approximation.** What matters is that \(n p_0\) and \(n (1 - p_0)\) are both comfortably large; far in the tails even large \(n\) leaves the approximation off by a sizable factor (above, \(2.0 \times 10^{-9}\) against an exact \(1.1 \times 10^{-9}\)). When in doubt, run the exact test.</li></ul>
 <p>The tests here are textbook material. The exact interval is from Clopper and Pearson (1934), the score interval from Wilson (1927), and the runs test from Wald and Wolfowitz (1940).</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

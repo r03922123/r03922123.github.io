@@ -7,6 +7,8 @@
 <meta name="description" content="The ideas behind low-rank adaptation rather than the code: why a fine-tuning update can be squeezed into two thin matrices, what that costs when it cannot, why B starts at zero, what the alpha over r scale really does, which layers to adapt, and the variants that change each of these choices.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/lora-explained/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/lora-explained/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · LLMs and generative AI</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#llms-and-generative-ai">LLMs and generative AI</a></p>
   <h1>LoRA explained: why low rank, how it starts, and where it goes</h1>
-  <div class="meta">November 1, 2026 · 12 min read · LoRA · fine-tuning · PEFT · LLM</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-bet-the-update-is-low-rank">The bet: the update is low rank</a></li><li><a href="#what-it-saves">What it saves</a></li><li><a href="#initialization-why-b-starts-at-zero-and-a-does-not">Initialization: why B starts at zero and A does not</a></li><li><a href="#the-alpha-over-r-scale-is-a-learning-rate-knob">The alpha over r scale is a learning-rate knob</a></li><li><a href="#where-to-put-the-adapters">Where to put the adapters</a></li><li><a href="#merge-or-keep-the-adapter-separate">Merge, or keep the adapter separate</a></li><li><a href="#variants">Variants</a></li><li><a href="#when-to-use-it-and-pitfalls">When to use it, and pitfalls</a></li><li><a href="#references">References</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>12 min</dd><dt>Topic</dt><dd>LLMs and generative AI</dd><dt>Tags</dt><dd>LoRA · fine-tuning · PEFT · LLM</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-bet-the-update-is-low-rank">The bet: the update is low rank</a></li><li><a href="#what-it-saves">What it saves</a></li><li><a href="#initialization-why-b-starts-at-zero-and-a-does-not">Initialization: why B starts at zero and A does not</a></li><li><a href="#the-alpha-over-r-scale-is-a-learning-rate-knob">The alpha over r scale is a learning-rate knob</a></li><li><a href="#where-to-put-the-adapters">Where to put the adapters</a></li><li><a href="#merge-or-keep-the-adapter-separate">Merge, or keep the adapter separate</a></li><li><a href="#variants">Variants</a></li><li><a href="#when-to-use-it-and-pitfalls">When to use it, and pitfalls</a></li><li><a href="#references">References</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>Fine-tuning a 7-billion-parameter model the ordinary way means a gradient and two optimizer moments for every parameter, and a full copy of the model per task. LoRA (Hu et al., 2021) freezes the pretrained weights and learns each layer's change as the product of two thin matrices. The trainable part shrinks by a factor of hundreds to thousands, and afterwards the change can be folded back into the weights, so the merged model runs exactly as fast as the original.</p>
 <p>The implementation, step by step with asserts, is in <a href="/posts/lora-from-scratch/">LoRA from scratch</a>. This post is the conceptual companion: why the trick works, what it gives up, and what each design choice (initialization, the \(\alpha / r\) scale, which layers to adapt) does to training.</p>
 <h2 id="the-bet-the-update-is-low-rank">The bet: the update is low rank</h2>
@@ -207,6 +213,7 @@ assert changed &gt; 0.01                                           # a few perce
 <p>For the surrounding architecture, see <a href="../transformers-and-llms-key-ideas/">transformers and LLMs: key ideas</a> and <a href="../foundation-models/">foundation models</a>.</p>
 <h2 id="references">References</h2>
 <ul><li>E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen. <a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a>. ICLR 2022.</li><li>C. Li, H. Farkhoor, R. Liu, J. Yosinski. <a href="https://arxiv.org/abs/1804.08838">Measuring the Intrinsic Dimension of Objective Landscapes</a>. ICLR 2018.</li><li>A. Aghajanyan, L. Zettlemoyer, S. Gupta. <a href="https://arxiv.org/abs/2012.13255">Intrinsic Dimensionality Explains the Effectiveness of Language Model Fine-Tuning</a>. ACL 2021.</li><li>T. Dettmers, A. Pagnoni, A. Holtzman, L. Zettlemoyer. <a href="https://arxiv.org/abs/2305.14314">QLoRA: Efficient Finetuning of Quantized LLMs</a>. NeurIPS 2023.</li><li>D. Kalajdzievski. <a href="https://arxiv.org/abs/2312.03732">A Rank Stabilization Scaling Factor for Fine-Tuning with LoRA</a>. 2023.</li><li>D. Biderman et al. <a href="https://arxiv.org/abs/2405.09673">LoRA Learns Less and Forgets Less</a>. TMLR 2024.</li></ul>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

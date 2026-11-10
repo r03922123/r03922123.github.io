@@ -7,6 +7,8 @@
 <meta name="description" content="How a batch of matched pairs becomes a classification problem whose answer is in the batch. The InfoNCE loss and its CLIP and SimCLR forms, what the gradient does to each negative, why the embeddings are normalized and the temperature is small, a worked two-encoder example, and the popularity bias that in-batch negatives bring with them.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/contrastive-loss/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/contrastive-loss/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · Machine learning fundamentals</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#machine-learning-fundamentals">Machine learning fundamentals</a></p>
   <h1>Contrastive loss: InfoNCE from the ground up</h1>
-  <div class="meta">November 1, 2026 · 13 min read · contrastive learning · InfoNCE · embeddings · retrieval</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#a-classification-problem-whose-answer-is-in-the-batch">A classification problem whose answer is in the batch</a></li><li><a href="#in-batch-negatives-in-both-directions">In-batch negatives, in both directions</a></li><li><a href="#what-the-gradient-does-to-each-negative">What the gradient does to each negative</a></li><li><a href="#why-normalize-and-why-the-temperature-is-small">Why normalize, and why the temperature is small</a></li><li><a href="#a-worked-example-two-encoders-one-space">A worked example: two encoders, one space</a></li><li><a href="#the-batch-is-a-sample-and-samples-have-biases">The batch is a sample, and samples have biases</a></li><li><a href="#older-relatives-pairwise-and-triplet-losses">Older relatives: pairwise and triplet losses</a></li><li><a href="#when-to-use-it-and-what-goes-wrong">When to use it, and what goes wrong</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>13 min</dd><dt>Topic</dt><dd>Machine learning fundamentals</dd><dt>Tags</dt><dd>contrastive learning · InfoNCE · embeddings · retrieval</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#a-classification-problem-whose-answer-is-in-the-batch">A classification problem whose answer is in the batch</a></li><li><a href="#in-batch-negatives-in-both-directions">In-batch negatives, in both directions</a></li><li><a href="#what-the-gradient-does-to-each-negative">What the gradient does to each negative</a></li><li><a href="#why-normalize-and-why-the-temperature-is-small">Why normalize, and why the temperature is small</a></li><li><a href="#a-worked-example-two-encoders-one-space">A worked example: two encoders, one space</a></li><li><a href="#the-batch-is-a-sample-and-samples-have-biases">The batch is a sample, and samples have biases</a></li><li><a href="#older-relatives-pairwise-and-triplet-losses">Older relatives: pairwise and triplet losses</a></li><li><a href="#when-to-use-it-and-what-goes-wrong">When to use it, and what goes wrong</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>Plenty of systems need an embedding space where "close" means "related": a photo and its caption, a search query and the document that answers it, a user and the item they bought, two crops of the same picture. Graded labels for "how related" are rare. Matched pairs are cheap: the caption came with the photo, the click came after the query. A contrastive loss learns from nothing more than those pairs. It makes the two halves of each pair similar, and makes each one dissimilar to everything it was not paired with.</p>
 <p>The modern form, InfoNCE, is ordinary softmax cross-entropy with an unusual set of classes. This post builds it from there: its gradient, the temperature, a small trained model, and the bias of drawing negatives from the batch.</p>
 <h2 id="a-classification-problem-whose-answer-is-in-the-batch">A classification problem whose answer is in the batch</h2>
@@ -254,6 +260,7 @@ assert sims.grad[1] &gt; sims.grad[2] &gt; sims.grad[3]</code></pre>
 <p>Use a contrastive loss when the supervision is pairs rather than labels, and when the product is an embedding that will be searched by nearest neighbour: text-to-image search, query-to-document retrieval, candidate generation in a recommender, or self-supervised pretraining from augmentations. If you have a fixed set of labelled classes, plain classification is simpler. If you have graded relevance for a query's candidates, a ranking loss uses that information and InfoNCE throws it away.</p>
 <ul><li><b>Too few negatives.</b> Representations usually improve with batch size because more negatives mean more hard ones and a higher ceiling, \(\log N\), on the mutual-information bound. The similarity matrix grows as \(N^2\), though. CLIP shares embeddings across all devices so that each one computes its rows of a single large similarity matrix, and MoCo (He et al., 2020) keeps a queue of keys from earlier batches, encoded by a slowly updated copy of the encoder, so that the number of negatives no longer depends on the batch.</li><li><b>A temperature that is too low for the data.</b> It sharpens training, but noisy pairs and near-duplicate negatives then receive the strongest gradients. If the loss is unstable, raise \(\tau\) or let it be learned, with a clip.</li><li><b>Comparing loss values across settings.</b> The loss depends on \(N\) and \(\tau\): a value of 2.0 is good with 4,096 negatives and poor with 16. Track retrieval metrics on a fixed held-out candidate set instead, such as recall at \(k\).</li><li><b>Duplicates and popularity.</b> Mask duplicate items in the batch, and apply the logQ correction when negatives come from logged interactions and the model should rank as a full softmax would.</li></ul>
 <p>Sources: Aäron van den Oord, Yazhe Li and Oriol Vinyals, <a href="https://arxiv.org/abs/1807.03748">Representation Learning with Contrastive Predictive Coding</a> (2018); Ting Chen et al., <a href="https://arxiv.org/abs/2002.05709">A Simple Framework for Contrastive Learning of Visual Representations</a> (SimCLR, 2020); Alec Radford et al., <a href="https://arxiv.org/abs/2103.00020">Learning Transferable Visual Models From Natural Language Supervision</a> (CLIP, 2021); Kaiming He et al., <a href="https://arxiv.org/abs/1911.05722">Momentum Contrast for Unsupervised Visual Representation Learning</a> (MoCo, 2020); Tongzhou Wang and Phillip Isola, Understanding Contrastive Representation Learning through Alignment and Uniformity on the Hypersphere (2020); Feng Wang and Huaping Liu, Understanding the Behaviour of Contrastive Loss (2021); Xinyang Yi et al., Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations (RecSys 2019); Raia Hadsell, Sumit Chopra and Yann LeCun, Dimensionality Reduction by Learning an Invariant Mapping (2006); Florian Schroff, Dmitry Kalenichenko and James Philbin, <a href="https://arxiv.org/abs/1503.03832">FaceNet</a> (2015); Kihyuk Sohn, Improved Deep Metric Learning with Multi-class N-pair Loss Objective (2016).</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
