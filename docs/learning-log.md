@@ -2,6 +2,23 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-feeds head tags
+
+1. **One function writes the tags.** `head_tags()` in `tools/leetcode/build.py` makes the canonical link, feed link,
+   JSON-LD and Markdown alternate for both builds, and its output was pasted into the six hand-written pages. It is
+   like a rubber stamp instead of hand-lettering 94 labels. Trade-off: the six hand-written pages do not follow a
+   later change to the function. Risk: they drift, and `check.py` sees only what it checks: a missing or wrong URL,
+   JSON that does not parse, an email, but not a renamed author.
+2. **A canonical link names the original.** The same post answers at `/posts/x/` and `/posts/x/index.html`; the
+   canonical link tells a crawler which one to index, like a DOI that names the paper among its mirrors. Trade-off:
+   one more line per page. Risk: a canonical that points at another page quietly drops this one from search, so the
+   check requires exactly one, equal to the page's own URL.
+3. **Two renderings of one source must agree.** The page drops a link to an unwritten post, but `index.md` is the
+   raw source, so the link stayed live there. `check.py` now runs the page's link check on every Markdown link
+   outside code, like proofreading the PDF and the HTML version of a paper, not just one. Trade-off: the build does
+   not unlink, so such a link now fails the gate instead of waiting for its post. Risk: a regex is not a Markdown
+   parser, so an unusual link shape could slip past.
+
 ## 2026-11-11 · build: post-feeds feed files
 
 1. **Same input, same bytes.** The feed build reads no clock: dates come from the posts' fixed dates, and ties keep
