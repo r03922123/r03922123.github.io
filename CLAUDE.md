@@ -12,7 +12,7 @@ All gates:   sh scripts/gates.sh          # run before every push; about 4 min, 
 Check tests: (cd scripts && python3 -m unittest test_check)
 Site check:  python3 scripts/check.py     # --denylist-only for terms only; --show-terms only when debugging locally
 Builds:      python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py .
-Set secret:  gh secret set SITE_DENYLIST < scripts/denylist.local.txt
+Set secret:  base64 < scripts/denylist.local.txt | gh secret set SITE_DENYLIST   # base64: see gates.yml
 Read back:   gh api repos/r03922123/r03922123.github.io/branches/main/protection
 Preview:     python3 -m http.server 8000
 ```
@@ -30,12 +30,13 @@ Preview:     python3 -m http.server 8000
   whenever the local file changes, or CI checks against an old list.
 - Never print a denylist term anywhere: not in a commit, PR, log or chat. `check.py` scrubs its own output, but
   your own commands do not. Use `grep -l` or `grep -c`, never `grep -n`, on text that might hold a term.
-- Commit as `-c user.name=r03922123 -c user.email=11392464+r03922123@users.noreply.github.com`, and check
-  `git log --format='%ae %ce'` before every push: the machine's default email is personal.
+- Commit with `-c user.name=r03922123 -c user.email=<the account's GitHub noreply address>` (as on `main`'s
+  commits), and check `git log --format='%ae %ce'` before every push: the machine's default email is personal.
 - Merge PRs with rebase, not squash, since squash can take the account's default email.
 - `check.py` walks the whole folder. Keep virtualenvs and worktrees outside the repo, or their files become findings.
 - A new branch made from `origin/main` tracks it; unset the upstream so a bare `git push` cannot target `main`.
 - The post build forwards its whole environment to every post script, so no secret may be job-level in CI.
+- `--show-terms` refuses to run when `CI` is set, so a gates.sh edit cannot unscrub the public log.
 - `README.md` still describes version 1 (the desk scene); `docs/ARCHITECTURE.md` will replace its layout section.
 
 ## Current state (2026-11-10)
