@@ -139,7 +139,7 @@ All of this assumes each batch is a fair sample of the data. When it is not, Bat
 | 32 | 0.17 |
 | 128 | 0.085 |
 
-At batch size 2 every training-mode output is \(+1\) or \(-1\) (up to \(\epsilon\)), whatever the input. Detection and segmentation models, which often fit one or two images per GPU, therefore swap BatchNorm for GroupNorm, whose accuracy Wu and He showed stays flat as the batch shrinks, or synchronize the statistics across devices (`nn.SyncBatchNorm`).
+At batch size 2 every training-mode output is \(+1\) or \(-1\) (up to \(\epsilon\)), whatever the input. Detection and segmentation models, which often fit one or two images per GPU, therefore freeze BatchNorm at its pretrained statistics, swap it for GroupNorm, whose accuracy Wu and He showed stays flat as the batch shrinks, or synchronize the statistics across devices (`nn.SyncBatchNorm`).
 
 **Batches that are not a random sample.** A batch drawn from one class or one user has the statistics of that slice only. In contrastive learning, BatchNorm also lets the examples in a batch exchange information, which the model can exploit instead of learning useful features; MoCo shuffles examples across devices before BatchNorm to stop this (see [contrastive loss](../contrastive-loss/)).
 
