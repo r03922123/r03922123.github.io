@@ -47,6 +47,8 @@ SITE = "https://r03922123.github.io"
 FEEDS = ("rss.xml", "sitemap.xml", "robots.txt", "llms.txt")
 FIXED_PAGES = ("/", "/about.html", "/posts/", "/leetcode/")
 SITEMAP_LOC = "{http://www.sitemaps.org/schemas/sitemap/0.9}loc"
+MD_LINK = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")    # the link syntax tools/leetcode/build.py renders
+MD_CODE = re.compile(r"^```.*?^```|`[^`\n]+`", re.S | re.M)   # fences and code spans, which it renders as no link
 EMAIL = re.compile(r"[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")   # not a pinned name@1.2.3
 # Hand-written LeetCode post counts on the home page and posts index; build.py only rewrites the series page.
 LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&middot;)\s+(\d+)|\b(\d+)\s+pattern\b"
@@ -202,8 +204,13 @@ def feed_findings(root, listed):
             md = root / section / src.stem / "index.md"
             if not md.is_file():
                 findings.append(f"{section}/{src.stem}/index.md: missing (source {src.relative_to(root).as_posix()})")
-            elif md.read_text(errors="replace").startswith("---"):
+                continue
+            text = md.read_text(errors="replace")
+            if text.startswith("---"):
                 findings.append(f"{section}/{src.stem}/index.md: front matter kept")
+            # The page drops a link to an unwritten post (build.py's link()); the Markdown copy keeps it live.
+            findings += [f"{section}/{src.stem}/index.md: broken link {url}" for url in MD_LINK.findall(MD_CODE.sub("", text))
+                         if not link_ok(root, md, url)]
     return findings
 
 
