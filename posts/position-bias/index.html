@@ -117,8 +117,8 @@ the actual best item, at rank 8, has a seventh of its CTR. IPS recovers every it
   <a href="#ref-3">[3]</a>; the exponent depends on the surface. A search results page, a feed and a
   horizontal carousel decay very differently.</li>
   <li><b>Estimate without intervention.</b> Treat examination and relevance as latent variables and fit both
-  from regular logs with expectation–maximization <a href="#ref-5">[5]</a>, using the fact that the same
-  query–item pair appears at different ranks over time.</li>
+  from regular logs with expectation–maximization <a href="#ref-5">[5]</a>, with relevance modelled as a
+  regression on query–item features, so that similar pairs seen at different ranks tell the two apart.</li>
 </ul>
 
 <h2 id="variance">Variance and clipping</h2>
