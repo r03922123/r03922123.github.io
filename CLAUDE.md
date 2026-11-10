@@ -51,7 +51,8 @@ Preview:     python3 -m http.server 8000
 - Merged: `site-baseline` (PR #3: gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the learning
   log; `main` is protected: a PR with a green `gates` check, for admins too), CI hardening (hash-locked wheels-only
   install, base64 denylist secret), `post-feeds` (feed files, `index.md` copies, page head tags), `blog-theme`
-  (reading tokens at `:root`, the room's under `body.home`) and `reading-shell` (fragment check, then the layout).
+  (reading tokens at `:root`, the room's under `body.home`), `reading-shell` (fragment check, then the layout)
+  and an expert accuracy pass over all 90 posts (PR #9, which lists the doubts left unedited).
 - `posts-index` (merged): both list pages are topic cards, a count and `section.group`s in `.groups`, built by
   `topic_list` in `tools/leetcode/build.py`; the `#fragment` is the filter, with no JavaScript. `check.py` matches
   each card's count to its section's rows.

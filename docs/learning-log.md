@@ -2,6 +2,22 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: expert accuracy pass over all 90 posts
+
+1. **Fix facts apart from style.** This pass changed only claims that a specialist in each field would mark wrong or
+   out of date: 14 edits in 13 of the 90 posts. Wording, structure and voice wait for `post-voice`. It is like a paper's
+   errata versus its next draft: an erratum lists one fix per claim, so a reader can check each one. Trade-off: two
+   passes over the same posts instead of one. Risk: `post-voice` later rewrites a fixed sentence and brings the old
+   claim back, so its reviewer should read this PR's list.
+2. **Split reviewers by field, not by file count.** Ten reviewers each took one field (statistics, LLMs, recommender
+   systems, algorithms and so on), so each read posts it could judge. Like peer review, a paper goes to someone who
+   knows its area. Trade-off: the groups are uneven, from 6 to 16 posts. Risk: a post spanning two fields was
+   checked from one side only.
+3. **Leave what you cannot verify.** Reviewers left 37 doubts unedited because they could not confirm them
+   from what they knew, among them 2026 paper details and whether a library is still maintained. A wrong
+   "correction" on a public page is worse than a cautious sentence. Trade-off: some soft spots stay live. Risk: those
+   doubts live only in the PR description, so nothing reminds anyone to come back to them.
+
 ## 2026-11-11 · build: site-search
 
 A search box on the Posts and LeetCode lists, over all 92 entries, from a 65.5 KB index (21.7 KB gzipped).
