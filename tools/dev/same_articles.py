@@ -4,7 +4,9 @@ from pathlib import Path
 
 def text(page):
     m = re.search(r"<article\b.*?</article>", page, re.S) or re.search(r"<main\b.*?</main>", page, re.S)
-    t = re.sub(r"<[^>]+>", " ", m.group(0)) if m else ""
+    body = m.group(0) if m else ""                 # chrome the shell moves: title block, side column, contents, crumb
+    body = re.sub(r"<(header|aside|nav)\b.*?</\1>|<p class=\"crumb\">.*?</p>", " ", body, flags=re.S)
+    t = re.sub(r"<[^>]+>", " ", body)
     return " ".join(html.unescape(t).split())
 
 ref, changed, n = sys.argv[1], [], 0
