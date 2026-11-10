@@ -337,6 +337,16 @@ class MainTest(unittest.TestCase):
         self.assertEqual(scrub("posts/planning.html: channel acmecorporate"), "posts/planning.html: channel acmecorporate")
         self.assertEqual(scrub("img/acmecorp.png Ann"), "img/[term #2].png [term #1]")
 
+    def test_phone_term_in_a_path_is_hidden(self):
+        # Detection reads _ and / in a name as gaps, so the scrubber must hide a number written with them.
+        scrub = scrubber(["0912 345 678"])
+        for line in ("img/tel0912_345_678.png", "img/0912/345/678x.png", "img/886_912_345_678.png"):
+            self.assertNotIn("345", scrub(line), line)
+
+    def test_term_with_punctuation_in_a_file_name_is_found(self):
+        out = check(self.site({"posts/acme-corp/index.html": "x"}), ["acme-corp"], terms_only=True)
+        self.assertEqual(out, ["posts/acme-corp/index.html: private term in file name 'acme-corp'"])
+
     def test_traceback_is_scrubbed(self):
         with mock.patch("check.check", side_effect=OSError("cannot read posts/acme-corp/index.html")):
             out = self.assert_fails_without_leak({"index.html": PAGE.format(body="")})
