@@ -63,7 +63,7 @@ one allowed wording hit, no change to generated pages.
 ```
 All gates:   sh scripts/gates.sh
 Check tests: (cd scripts && python3 -m unittest test_check)
-Set secret:  gh secret set SITE_DENYLIST < scripts/denylist.local.txt
+Set secret:  base64 < scripts/denylist.local.txt | gh secret set SITE_DENYLIST   # amended in review: see gates.yml
 Read back:   gh api repos/r03922123/r03922123.github.io/branches/main/protection
 Preview:     python3 -m http.server 8000
 ```

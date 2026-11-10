@@ -23,7 +23,7 @@ post_wording() {
 
 # Generated HTML is committed: after the builds the tree must equal HEAD, with no untracked files either.
 rebuild_clean() {
-  changes=$(git status --short)
+  changes=$(git status --short) || { echo "git status failed"; return 1; }   # an error must not read as clean
   [ -z "$changes" ] || { echo "$changes"; return 1; }
 }
 
