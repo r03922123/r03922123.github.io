@@ -139,7 +139,7 @@ assert 150_000 < n < 160_000
 assert abs(rejects(p0, p1) - power) < 0.03 and abs(rejects(p0, p0) - alpha) < 0.015
 ```
 
-If the unit is a user, about 155,000 per arm is roughly 6% of one day's 5 million users, so sample size is not the bottleneck; the test should still run for at least a full week to cover weekday patterns. The simulation treats each observation as independent; in practice impressions from the same user are correlated, so analyse per user (or with the delta method) as [A/B testing](../ab-testing/) explains.
+If the unit is a user, about 155,000 per arm, or 310,000 across both arms, is roughly 6% of one day's 5 million users, so sample size is not the bottleneck; the test should still run for at least a full week to cover weekday patterns. The simulation treats each observation as independent; in practice impressions from the same user are correlated, so analyse per user (or with the delta method) as [A/B testing](../ab-testing/) explains.
 
 ## Step 7: plan the serving path
 Decide what is computed per request and what is precomputed. The usual levers:
