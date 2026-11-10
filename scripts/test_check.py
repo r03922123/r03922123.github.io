@@ -159,6 +159,28 @@ class CheckTest(unittest.TestCase):
                  "style.css": "", "x.css": ""}
         self.assertEqual(self.findings(files), ["index.html: broken link a/../../x.css"])
 
+    # SPEC-reading-shell: a contents link or a room door with no matching id lands at the top of the page, silently.
+    def fragment_site(self, body):
+        return {"index.html": PAGE.format(body=body), "about.html": PAGE.format(body='<h2 id="tiktok">t</h2>'),
+                "posts/index.html": PAGE.format(body='<h2 id="intro">i</h2>' + MUSICGEN)}
+
+    def test_matching_fragments_pass(self):
+        body = ('<h2 id="here">h</h2><a href="#here">a</a><a href="about.html#tiktok">b</a><a href="/posts/#intro">c</a>'
+                '<a href="#">d</a><a href="#top">e</a><a href="/musicgen-prune-inference/#x">f</a>')
+        self.assertEqual(self.findings(self.fragment_site(body)), [])
+
+    def test_missing_fragment_on_another_page(self):
+        out = self.findings(self.fragment_site('<a href="about.html#missing">x</a>'))
+        self.assertEqual(out, ["index.html: broken fragment about.html#missing"])
+
+    def test_missing_fragment_on_a_folder_page(self):
+        out = self.findings(self.fragment_site('<a href="/posts/#missing">x</a>'))
+        self.assertEqual(out, ["index.html: broken fragment /posts/#missing"])
+
+    def test_missing_fragment_on_the_same_page(self):
+        out = self.findings(self.fragment_site('<h2 id="here">h</h2><a href="#missing">x</a>'))
+        self.assertEqual(out, ["index.html: broken fragment #missing"])
+
     def test_missing_head_fields(self):
         out = self.findings({"index.html": "<html><body>x</body></html>"})
         self.assertEqual(len(out), 4)  # lang, viewport, title, description
@@ -179,7 +201,8 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(out, ["leetcode/index.html: leetcode/heap/ is not listed"])
 
     def test_svg_links_need_an_aria_label(self):
-        body = '<svg viewBox="0 0 10 10"><a href="#x" aria-label="X"><rect/></a><a href="#y"><rect/></a></svg>'
+        body = '<svg viewBox="0 0 10 10"><a href="#x" aria-label="X"><rect/></a><a href="#y"><rect/></a></svg>' \
+               '<h2 id="x">x</h2><h2 id="y">y</h2>'                               # the doors' targets exist
         out = self.findings({"index.html": PAGE.format(body=body)})
         self.assertEqual(out, ["index.html: link inside SVG without aria-label: #y"])
 
