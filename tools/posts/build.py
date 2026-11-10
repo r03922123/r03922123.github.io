@@ -55,7 +55,8 @@ def build(site, slug):
     minutes = max(1, round(len(re.sub(r"<[^>]+>", " ", content).split()) / 230))
     toc_html = "".join(f'<li><a href="#{h}">{lc.inline(t)}</a></li>' for h, t in toc)
     page = HEAD.format(title=html.escape(meta["title"]), summary=html.escape(meta["summary"]),
-                       assets=lc.POST_ASSETS, current="true") + f"""<article class="post-body">
+                       assets=lc.head_tags(f"/posts/{slug}/", (meta["title"], meta["summary"], DATE), markdown=True)
+                       + lc.POST_ASSETS, current="true") + f"""<article class="post-body">
 <p class="crumb"><a href="/posts/">Posts</a> · {html.escape(meta["group"])}</p>
 <header class="post-head">
   <h1>{lc.inline(meta["title"])}</h1>
@@ -91,7 +92,7 @@ def index(site):
                           f'<ul class="series">\n{lis}\n</ul>\n</section>')
     leetcode_count = len(list((Path(site) / "leetcode").glob("*/index.html")))
     page = HEAD.format(title="Posts", summary="Technical posts on machine learning, statistics, LLMs, recommender systems and ML systems, each with the code and numbers behind it.",
-                       assets="", current="page") + f"""<section class="intro">
+                       assets=lc.head_tags("/posts/"), current="page") + f"""<section class="intro">
   <h1>Posts</h1>
   <p>Technical notes on machine learning, each with the code and numbers behind it: {len(LONGFORM)} long-form posts
   first, then {len(posts)} shorter posts by topic.</p>
