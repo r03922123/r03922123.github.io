@@ -59,6 +59,12 @@ def term_rx(term):
     return re.compile(r"(?<!\w)" + WORD_SEP.join(map(re.escape, term.split())) + r"(?!\w)", re.I)
 
 
+def term_forms(term):
+    """The term as listed, and with its - _ . / read as gaps: names and pages are read that way before matching, so
+    acme-corp must also match acme_corp.png and "acme corp"."""
+    return [term_rx(form) for form in dict.fromkeys([term, NAME_SEP.sub(" ", term).strip()]) if form]
+
+
 def scrubber(terms):
     """A function that replaces every form of each term in a line with its denylist number, longest term first so
     that a term inside a longer one cannot leave the rest of the longer one showing."""
@@ -158,21 +164,21 @@ def links(root, rel, base):
 
 def check(root, denylist, terms_only=False):
     root = Path(root)
-    deny = [(term, term_rx(term)) for term in denylist]
+    deny = [(term, term_forms(term)) for term in denylist]
     findings = []
     # Names too, binary files included: the builds print paths and Pages serves names, so acme-corp.png leaks.
     for path in sorted(root.rglob("*")):
         if path.is_file() and ".git" not in path.parts:
             rel = path.relative_to(root).as_posix()
-            findings += [f"{rel}: private term in file name {term!r}" for term, rx in deny
-                         if any(rx.search(name) for name in (unquote(rel), NAME_SEP.sub(" ", unquote(rel))))]
+            findings += [f"{rel}: private term in file name {term!r}" for term, rxs in deny
+                         if any(rx.search(name) for rx in rxs for name in (unquote(rel), NAME_SEP.sub(" ", unquote(rel))))]
     for path, text in text_files(root):
         rel = path.relative_to(root).as_posix()
         decoded = unquote(text)                       # a link such as /%61cme%20corp/ is the term once served
         # Each also with file-name gaps (acme-corp quoted in a page); NAME_SEP swaps one char for one, keeping lines.
         bodies = {b for body in (text, decoded) for b in (body, NAME_SEP.sub(" ", body))}
-        for term, rx in deny:                         # whole text, so a term split across lines is still found
-            lines = sorted({body.count("\n", 0, m.start()) + 1 for body in bodies for m in rx.finditer(body)})
+        for term, rxs in deny:                        # whole text, so a term split across lines is still found
+            lines = sorted({body.count("\n", 0, m.start()) + 1 for body in bodies for rx in rxs for m in rx.finditer(body)})
             findings += [f"{rel}:{n}: private term {term!r}" for n in lines]
         if terms_only:
             continue

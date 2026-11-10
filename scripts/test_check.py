@@ -347,6 +347,23 @@ class MainTest(unittest.TestCase):
         out = check(self.site({"posts/acme-corp/index.html": "x"}), ["acme-corp"], terms_only=True)
         self.assertEqual(out, ["posts/acme-corp/index.html: private term in file name 'acme-corp'"])
 
+    def test_term_with_punctuation_is_found_in_its_other_spellings(self):
+        # Names and pages are read with - _ . / as gaps, so the listed term must be read that way too.
+        for name in ("img/acme_corp.png", "img/acme.corp.png", "files/acme%20corp.pdf"):
+            self.assertEqual(check(self.site({name: b"\x89PNG\0"}), ["acme-corp"]),
+                             [f"{name}: private term in file name 'acme-corp'"], name)
+        self.assertEqual(check(self.site({"img/acme-io.png": b"\x89PNG\0"}), ["acme.io"]),
+                         ["img/acme-io.png: private term in file name 'acme.io'"])
+        self.assertEqual(check(self.site({"notes.md": "x acme corp y"}), ["acme-corp"]),
+                         ["notes.md:1: private term 'acme-corp'"])
+
+    def test_raw_form_is_scrubbed_before_decoding(self):
+        # Decoding first would turn %41 into a letter glued to the term, so the term no longer ends at a word edge.
+        self.assertEqual(scrubber(["acme corp"])("broken link acme%20corp%41.html"), "broken link [term #1]A.html")
+
+    def test_term_at_the_end_of_a_longer_word_is_left_alone(self):
+        self.assertEqual(scrubber(["ann"])("joann and ann"), "joann and [term #1]")
+
     def test_traceback_is_scrubbed(self):
         with mock.patch("check.check", side_effect=OSError("cannot read posts/acme-corp/index.html")):
             out = self.assert_fails_without_leak({"index.html": PAGE.format(body="")})
