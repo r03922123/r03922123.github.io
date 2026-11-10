@@ -127,8 +127,12 @@ body:has(.post-body) .wrap { max-width: 752px; }
   .details { display: block; margin: 0 0 24px; font-size: inherit; }
   .details dt { margin-top: .8em; }
   .details dd { margin: 0; }
-  /* Code and tables of 5+ columns grow left as far as their content needs, ending at the text's right edge. */
-  .prose > pre, .prose > table:has(th:nth-child(5)) { width: max-content; min-width: 100%; max-width: calc(100% + var(--hang)); margin-left: auto; }
+  /* Code and tables of 5+ columns grow left as far as their content needs, ending at the text's right edge. A box
+     wider than its parent overflows toward the parent's end side, so .prose is right-to-left and each child turns
+     back to left-to-right: a wide block then spills left, never into the side column. */
+  .prose { direction: rtl; }
+  .prose > * { direction: ltr; }
+  .prose > pre, .prose > table:has(th:nth-child(5)) { width: max-content; min-width: 100%; max-width: calc(100% + var(--hang)); }
   .post-body .toc { margin: 0; padding: 0 0 0 14px; background: none; border: 0; border-left: 2px solid var(--line); border-radius: 0; }
   .post-body .toc h2 { font: 700 .78rem/1.4 var(--font-display); letter-spacing: .1em; color: var(--muted); }
   .post-body .toc ol { padding-left: 1.1em; }
