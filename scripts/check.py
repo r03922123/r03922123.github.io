@@ -185,6 +185,56 @@ class Anchors(HTMLParser):
                 self.latest = None
 
 
+class Topics(HTMLParser):
+    """SPEC-posts-index: the text of each card in nav.topics, by href, and the number of rows (<li>) in each
+    section.group, by id. shortcut: assumes navs and sections are not nested, as the two templates write them."""
+
+    def __init__(self, text):
+        super().__init__()
+        self.cards, self.rows, self.nav, self.card, self.section = {}, {}, False, None, None
+        self.feed(text)
+        self.close()
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get("class") or "").split()
+        if tag == "nav" and "topics" in classes:
+            self.nav = True
+        elif tag == "a" and self.nav:
+            self.card = attrs.get("href") or ""
+            self.cards[self.card] = ""
+        elif tag == "section" and "group" in classes:
+            self.section = attrs.get("id") or ""
+            self.rows[self.section] = 0
+        elif tag == "li" and self.section is not None:
+            self.rows[self.section] += 1
+
+    def handle_endtag(self, tag):
+        if tag == "nav":
+            self.nav = False
+        elif tag == "a":
+            self.card = None
+        elif tag == "section":
+            self.section = None
+
+    def handle_data(self, data):
+        if self.card is not None:
+            self.cards[self.card] += data
+
+
+def topic_findings(rel, text):
+    """Every section.group on a list page has a card, and the count the card says is its number of rows."""
+    topics, findings = Topics(text), []
+    for sid, rows in topics.rows.items():
+        card = topics.cards.get(f"#{sid}")
+        said = re.search(r"(\d+)\s+posts?\s*$", card or "")
+        if card is None:
+            findings.append(f"{rel}: section #{sid} has no topic card")
+        elif not said or int(said.group(1)) != rows:
+            findings.append(f"{rel}: card #{sid} says {said.group(0).strip() if said else 'no count'}, its section has {rows} rows")
+    return findings
+
+
 def site_path(base, href):
     """Where an href on a page at `base` points: a path on this site, or the full URL for other schemes and hosts."""
     joined = urljoin(base, href)
@@ -360,6 +410,8 @@ def check(root, denylist, terms_only=False):
         for post in sorted(root.glob(f"{section}/*/index.html")):
             if f"/{section}/{post.parent.name}/" not in linked:
                 findings.append(f"{section}/index.html: {section}/{post.parent.name}/ is not listed")
+        if (root / section / "index.html").is_file():
+            findings += topic_findings(f"{section}/index.html", (root / section / "index.html").read_text(errors="replace"))
     # SPEC-reskin: the posts index also lists the MusicGen posts, under #musicgen (the radio's door).
     listing = links(root, "posts/index.html", "/posts/")
     if (root / "posts/index.html").exists():
