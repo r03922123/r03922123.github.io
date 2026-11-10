@@ -73,10 +73,8 @@ def scrubber(terms):
             line = rx.sub(label, line)
         return line
 
-    def scrub(line):                                  # a %-encoded term is printed decoded, so it is redacted too
-        decoded = unquote(line)
-        clean = redact(decoded)
-        return clean if clean != decoded else redact(line)
+    def scrub(line):                                  # raw forms first, then the decoded line, so neither hides
+        return redact(unquote(redact(line)))          # the other; a %-encoded term is printed decoded and redacted
     return scrub
 
 

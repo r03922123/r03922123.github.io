@@ -37,6 +37,8 @@ Preview:     python3 -m http.server 8000
 - A new branch made from `origin/main` tracks it; unset the upstream so a bare `git push` cannot target `main`.
 - The post build forwards its whole environment to every post script, so no secret may be job-level in CI.
 - `--show-terms` refuses to run when `CI` is set, so a gates.sh edit cannot unscrub the public log.
+- Detection misses two term shapes the list does not hold today: a phone number written in `+886` form (write it
+  in national form) and a CJK term inside CJK text. Fix `term_rx` in `check.py` before adding either.
 - `README.md` still describes version 1 (the desk scene); `docs/ARCHITECTURE.md` will replace its layout section.
 
 ## Current state (2026-11-10)
