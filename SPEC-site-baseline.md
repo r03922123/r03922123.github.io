@@ -78,7 +78,8 @@ docs/adr/0002-redesign-before-understand.md → the phase exception and its limi
 scripts/gates.sh                       → the six gates, the only place they are spelled out
 scripts/check.py                       → scrubbed output by default, --show-terms, --denylist-only, fails on no terms
 scripts/test_check.py                  → gains the scrubbing and empty-denylist cases
-requirements-ci.txt                    → pinned packages for the post code
+requirements-ci.in                     → the six pins for the post code
+requirements-ci.txt                    → amended in review: the full Linux lock with hashes, made from the .in file
 .github/workflows/gates.yml            → writes the denylist, runs scripts/gates.sh
 .gitignore                             → gains .codex/
 CONSTRAINTS.md                         → gates now point at gates.sh; "there is no CI" removed
