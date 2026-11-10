@@ -360,7 +360,7 @@ def contrast(a, b):
 
 
 # The four token blocks (SPEC-blog-theme): reading pages at :root, the common room under body.home, each in light and
-# dark. A block inside @media ends at the media rule's own closing brace.
+# dark. Each block ends at its own closing brace, so a rule after it inside the same @media is still scanned.
 PALETTES = {
     "reading paper": r"^:root \{",
     "reading night": r"^@media \(prefers-color-scheme: dark\) \{\s*:root \{",
@@ -385,16 +385,23 @@ ROOM_FONTS = {   # the home requests no new font: it keeps the system body stack
 
 
 def palette_spans(css):
-    """{name: (start, end)} of each token block, end just past its closing brace (and its @media brace)."""
+    """{name: (start, end)} of each token block, end just past the block's own closing brace."""
     spans = {}
     for name, pattern in PALETTES.items():
         found = list(re.finditer(pattern, css, re.M))
-        assert len(found) == 1, f"{name}: expected one token block, found {len(found)}"
-        close = css.index("}", found[0].end())
-        if found[0].group().startswith("@media"):
-            close = css.index("}", close + 1)
-        spans[name] = (found[0].start(), close + 1)
+        if len(found) != 1:                       # not assert: python -O would skip it and read the first match
+            raise AssertionError(f"{name}: expected one token block, found {len(found)}")
+        spans[name] = (found[0].start(), css.index("}", found[0].end()) + 1)
     return spans
+
+
+def stray_colours(css):
+    """Colour literals on every line outside the four token blocks, up to the scene art, which may use literals."""
+    rest, last = "", 0
+    for a, b in sorted(palette_spans(css).values()):
+        rest, last = rest + css[last:a], b
+    rest += css[last:].split("/* Scene", 1)[0]
+    return re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", rest)
 
 
 class ThemeTest(unittest.TestCase):
@@ -426,14 +433,15 @@ class ThemeTest(unittest.TestCase):
         self.assertEqual(fonts, ROOM_FONTS)
 
     def test_no_hard_coded_colours_outside_tokens_and_scene(self):
+        self.assertEqual(stray_colours(STYLE.read_text()), [], "colours outside the token blocks")
+
+    def test_stray_colour_inside_a_dark_media_rule_is_found(self):
+        # A dark-only tweak placed after the tokens, inside the same @media rule, is outside the token block.
         css = STYLE.read_text()
-        spans = sorted(palette_spans(css).values())
-        rest, last = "", 0
-        for a, b in spans:                                                       # every line outside the four blocks
-            rest, last = rest + css[last:a], b
-        rest += css[last:].split("/* Scene", 1)[0]                                # scene art may use literal colours
-        stray = re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", rest)
-        self.assertEqual(stray, [], "colours outside the token blocks")
+        for block, colour in ((r":root", "#ff00ff"), (r"body\.home", "#00ff00")):
+            css = re.sub(rf"(@media \(prefers-color-scheme: dark\) \{{\s*{block} \{{[^}}]*\}})",
+                         rf"\1\n  .stray {{ color: {colour}; }}", css, count=1)
+        self.assertEqual(stray_colours(css), ["#ff00ff", "#00ff00"])
 
 
 LEAK = re.compile(r"acme(?:[\W_]|%20)*corp", re.I)        # the term below in any case, spacing or path form
