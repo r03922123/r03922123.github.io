@@ -1,17 +1,42 @@
 /* r03922123: one stylesheet. Sections: tokens, base, header/footer, reading pages, About, LeetCode, room, lo-fi.
-   Colours live only in the token blocks (parchment = light, candlelit = dark) and in the scene art. */
+   Colours live only in the four token blocks (reading pages at :root, the room under body.home, each light and dark)
+   and in the scene art. */
 @font-face { font-family: "Cinzel"; src: url("/fonts/cinzel/cinzel-latin.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+/* Reading fonts (SPEC-blog-theme): variable, Latin subset, OFL. A browser fetches a face only when text uses it,
+   so the home, which keeps its own stacks below, never downloads them. */
+@font-face { font-family: "Source Serif 4"; src: url("/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2") format("woff2"); font-weight: 200 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Source Serif 4"; src: url("/fonts/source-serif-4/source-serif-4-latin-wght-italic.woff2") format("woff2"); font-weight: 200 900; font-style: italic; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/inter/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+/* Reading pages: warm paper, near-black text, links in the text colour, one green accent. */
 :root {
+  --bg: #f8f5ec; --fg: #1d1b16; --muted: #5e594e; --line: #e3dfd2; --card: #efebdf;
+  --accent: #1b6554; --link: #1d1b16; --signal: #1b6554; --gold: #1b6554;
+  --code-builtin: #8a4b08; --code-keyword: #a3172f;
+  --font-body: "Source Serif 4", Georgia, serif;
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --leading: 1.53;   /* 17 px on a 26 px line */
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #191815; --fg: #ede9df; --muted: #aaa597; --line: #35332e; --card: #252320;
+    --accent: #7ccdb6; --link: #ede9df; --signal: #7ccdb6; --gold: #7ccdb6;
+    --code-builtin: #ffa657; --code-keyword: #ff7b72;
+  }
+}
+/* The room keeps its own palette and fonts: its art and lo-fi page were drawn for parchment (light) and candlelit
+   (dark). scripts/test_check.py pins these values. */
+body.home {
   --bg: #f3e9d2; --fg: #2b2118; --muted: #6b5a45; --line: #dccfb0; --card: #f8f1df;
   --accent: #8a2a1a; --link: #7a2414; --signal: #8a6d1f; --gold: #b8860b;
   --code-builtin: #8a4b08; --code-keyword: #a3172f;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Helvetica, Arial, sans-serif;
   --font-display: "Cinzel", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color-scheme: light dark;
+  --leading: 1.65;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  body.home {
     --bg: #1a1410; --fg: #efe3c8; --muted: #b9a88a; --line: #3a2e24; --card: #231b15;
     --accent: #e0a85a; --link: #e8bf7a; --signal: #f0c869; --gold: #d9a441;
     --code-builtin: #ffa657; --code-keyword: #ff7b72;
@@ -20,7 +45,7 @@
 
 /* Base */
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.65 var(--font-body); -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/var(--leading) var(--font-body); -webkit-text-size-adjust: 100%; }
 .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
 a { color: var(--link); text-decoration: none; text-underline-offset: .15em; }
 a:hover { text-decoration: underline; }
@@ -45,8 +70,9 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 
 /* Lists of posts: the home (until the scene), the posts index, the series page */
 .intro { padding: 40px 0 24px; }
-.intro h1 { font-size: 2rem; margin: 0 0 .3em; }
-.intro h1, .post-head h1, .post-body h2, .about h2, .group > h2, .lofi h1, .lost h1, .toc h2 { font-family: var(--font-display); letter-spacing: .03em; }
+.intro h1 { font-size: 2.25rem; line-height: 1.14; margin: 0 0 .3em; }   /* 36 px on a 41 px line */
+.intro h1, .post-head h1, .post-body h2, .about h2, .group > h2, .lofi h1, .lost h1, .toc h2 { font-family: var(--font-display); }
+.lofi h1 { letter-spacing: .03em; }   /* Cinzel's tracking, kept on the home only; the sans headings need none */
 .intro p { color: var(--muted); margin: 0; }
 .post { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; margin: 16px 0; color: var(--fg); }
 .post:hover { text-decoration: none; border-color: var(--link); }
@@ -61,11 +87,12 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 
 /* Reading pages: long-form posts and LeetCode posts */
 .post-head { padding: 40px 0 8px; }
-.post-head h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 .4em; }
+.post-head h1 { font-size: 2.25rem; line-height: 1.14; margin: 0 0 .4em; }
+@media (max-width: 480px) { .intro h1, .post-head h1 { font-size: 1.75rem; } }   /* 28 px on phones; after both rules */
 .post-head .meta { font: 600 .8rem/1.6 var(--font-display); letter-spacing: .08em; color: var(--muted); }   /* a game-menu line */
 .post-body { overflow-wrap: break-word; }
-.post-body h2 { font-size: 1.4rem; margin: 2em 0 .5em; }
-.post-body h3 { font-size: 1.1rem; margin: 1.5em 0 .4em; }
+.post-body h2 { font-size: 1.375rem; margin: 2em 0 .5em; }   /* 22 px */
+.post-body h3 { font-size: 1.125rem; margin: 1.5em 0 .4em; }  /* 18 px */
 .post-body h4 { font-size: 1rem; margin: 1.4em 0 .3em; }
 .post-body li { margin: .35em 0; }
 .toc { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin: 24px 0; }
@@ -97,7 +124,7 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .refs li:target { background: var(--card); }
 
 /* About page: roles as a heading row (name · dates) over a subheading row (title · place). */
-.about h2 { font-size: 1.3rem; margin: 40px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.about h2 { font-size: 1.375rem; margin: 40px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .about .intro p { color: var(--fg); }
 .about .intro p + p { margin-top: .8em; }
 .role { margin: 20px 0; }
