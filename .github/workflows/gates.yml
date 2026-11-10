@@ -10,8 +10,10 @@ on:
 permissions:
   contents: read
 
-concurrency:                     # a newer push to a PR cancels its older run; every main commit finishes its own
-  group: gates-${{ github.ref }}
+# A newer push to a PR cancels its older run. Each main commit gets its own group, because one shared group would
+# still cancel a waiting main run when a third push arrives, and every main commit is live.
+concurrency:
+  group: gates-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
