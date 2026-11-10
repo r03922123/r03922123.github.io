@@ -4,6 +4,7 @@ import io
 import os
 import re
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -360,6 +361,14 @@ class MainTest(unittest.TestCase):
     def test_raw_form_is_scrubbed_before_decoding(self):
         # Decoding first would turn %41 into a letter glued to the term, so the term no longer ends at a word edge.
         self.assertEqual(scrubber(["acme corp"])("broken link acme%20corp%41.html"), "broken link [term #1]A.html")
+
+    def test_scrubbing_a_crafted_line_stays_fast(self):
+        # A gap such as "< >" matches as one tag or as three characters; without a possessive repeat each one
+        # doubles the work, so a crafted broken link could hang the site step until the job times out.
+        line = "broken link acme" + "< >" * 24 + "x.html"            # ~7 s with backtracking, ~0 s without
+        start = time.monotonic()
+        scrubber(["acme corp"])(line)
+        self.assertLess(time.monotonic() - start, 1.0)
 
     def test_term_at_the_end_of_a_longer_word_is_left_alone(self):
         self.assertEqual(scrubber(["ann"])("joann and ann"), "joann and [term #1]")

@@ -10,9 +10,9 @@ on:
 permissions:
   contents: read
 
-concurrency:                     # a newer push to the same branch cancels the older run
+concurrency:                     # a newer push to a PR cancels its older run; every main commit finishes its own
   group: gates-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gates:
