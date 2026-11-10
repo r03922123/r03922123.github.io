@@ -2,10 +2,14 @@
 
 GitHub Pages serves every file in this repo, so the private-term denylist is scanned across every served
 text file and is itself kept out of git (scripts/denylist.local.txt). Usage: python3 scripts/check.py
+[--denylist-only] [--show-terms]. Actions logs on this public repo are public, so every output line is scrubbed of
+private terms unless --show-terms is given (local debugging only).
 """
+import argparse
 import os
 import re
 import sys
+import traceback
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -42,6 +46,8 @@ LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&mid
                             r"|has\s+(\d+)\s+short\s+posts")
 PHONE_SEP = r"(?:[-. ()\u00a0\u2011]|&#8209;|&#x2011;|&nbsp;)*"
 WORD_SEP = r"(?:\s|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)+"     # what a browser shows as a space between two words
+NAME_SEP = re.compile(r"[-_/]|%20")               # how a file name separates words; Pages serves names as URLs
+LOOSE_SEP = r"(?:[\W_]|%20|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)*"   # scrubbing over-redacts: any gap, or none
 
 
 def term_rx(term):
@@ -51,6 +57,22 @@ def term_rx(term):
         prefix = rf"(?:886{PHONE_SEP})?(?:0{PHONE_SEP})?"  # each separator run follows a digit: no backtracking blowup
         return re.compile(r"(?<!\d)" + prefix + PHONE_SEP.join(core) + r"(?!\d)")
     return re.compile(r"(?<!\w)" + WORD_SEP.join(map(re.escape, term.split())) + r"(?!\w)", re.I)
+
+
+def scrubber(terms):
+    """A function that replaces every form of each term in a line with its denylist number, longest term first so
+    that a term inside a longer one cannot leave the rest of the longer one showing."""
+    rules = []
+    for n, term in sorted(enumerate(terms, 1), key=lambda item: -len(item[1])):
+        words = re.findall(r"[^\W_]+", term)
+        loose = [re.compile(LOOSE_SEP.join(map(re.escape, words)), re.I)] if words else []
+        rules += [(rx, f"[term #{n}]") for rx in [term_rx(term), *loose]]
+
+    def scrub(line):
+        for rx, label in rules:
+            line = rx.sub(label, line)
+        return line
+    return scrub
 
 
 def text_files(root):
@@ -130,15 +152,23 @@ def links(root, rel, base):
     return [(kind, site_path(base, value) if kind == "a" else value, latest) for kind, value, latest in items]
 
 
-def check(root, denylist):
+def check(root, denylist, terms_only=False):
     root = Path(root)
     deny = [(term, term_rx(term)) for term in denylist]
     findings = []
+    # Names too, binary files included: the builds print paths and Pages serves names, so acme-corp.png leaks.
+    for path in sorted(root.rglob("*")):
+        if path.is_file() and ".git" not in path.parts:
+            rel = path.relative_to(root).as_posix()
+            findings += [f"{rel}: private term in file name {term!r}" for term, rx in deny
+                         if rx.search(NAME_SEP.sub(" ", rel))]
     for path, text in text_files(root):
         rel = path.relative_to(root).as_posix()
         for term, rx in deny:                         # whole text, so a term split across lines is still found
             lines = sorted({text.count("\n", 0, m.start()) + 1 for m in rx.finditer(text)})
             findings += [f"{rel}:{n}: private term {term!r}" for n in lines]
+        if terms_only:
+            continue
         if path.suffix in PAGES or (path.suffix == ".md" and path.parent.relative_to(root).as_posix() == SOURCES):
             for n, line in enumerate(text.splitlines(), 1):
                 findings += [f"{rel}:{n}: {name}" for name, rx in HTML_PATTERNS.items() if rx.search(line)]
@@ -154,6 +184,8 @@ def check(root, denylist):
         for script, style in CDN.findall(text):
             if not PINNED.search(script or style):
                 findings.append(f"{rel}: unpinned CDN {script or style}")
+    if terms_only:
+        return findings
     home = root / "index.html"
     if home.exists():                                 # SPEC-scene: the home page (HTML + stylesheet) stays light
         weight = home.stat().st_size + ((root / "style.css").stat().st_size if (root / "style.css").exists() else 0)
@@ -192,11 +224,22 @@ def check(root, denylist):
 
 
 def main(argv=None, root=None, denylist=DENYLIST):
+    parser = argparse.ArgumentParser(description="Site checks; output is scrubbed of private terms.")
+    parser.add_argument("--denylist-only", action="store_true", help="only the private-term scan of contents and names")
+    parser.add_argument("--show-terms", action="store_true", help="print terms unscrubbed (local debugging only)")
+    args = parser.parse_args(argv)
     if not denylist.exists():
         sys.exit(f"missing {denylist}: create it with one private term per line (see README)")
-    terms = [t.strip() for t in denylist.read_text().splitlines() if t.strip() and not t.startswith("#")]
-    findings = check(root or Path(__file__).resolve().parent.parent, terms)
-    print("\n".join(findings) or "ok")
+    # Strip before testing for '#', so an indented comment is not loaded as a term.
+    terms = [t for t in (line.strip() for line in denylist.read_text().splitlines()) if t and not t.startswith("#")]
+    if not terms:                                     # an unset CI secret writes an empty file: fail closed
+        sys.exit(f"no terms in {denylist.name}: the privacy check would pass vacuously")
+    scrub = (lambda line: line) if args.show_terms else scrubber(terms)
+    try:
+        findings = check(root or Path(__file__).resolve().parent.parent, terms, terms_only=args.denylist_only)
+    except Exception:                                 # a traceback can quote a path or page text: scrub it too
+        findings = traceback.format_exc().splitlines()
+    print("\n".join(map(scrub, findings)) or "ok")
     sys.exit(1 if findings else 0)
 
 
