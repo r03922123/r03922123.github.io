@@ -31,11 +31,12 @@ jobs:
       # Every package pinned by hash, and wheels only (a source build would fetch unhashed build tools), since the
       # post code runs while the denylist is on disk.
       - name: Install the post code's packages
-        run: python -m pip install --require-hashes --only-binary :all: -r requirements-ci.txt
+        # Quoted, because ":all: " unquoted is a YAML mapping and the whole workflow fails to parse.
+        run: 'python -m pip install --require-hashes --only-binary :all: -r requirements-ci.txt'
       # The secret reaches this one step only, through step-level env: the post build forwards its whole
       # environment to every post script. It is stored base64-encoded because the runner masks each line of a
-      # secret as a substring of every log line, so a short term inside a longer word would show as "pl***ing"
-      # and be readable from the letters around it. Unset (forks, or before it is set), it decodes to an empty
+      # secret as a substring of every log line, so a short term inside a longer word would show as *** with
+      # its neighbouring letters around it, and could be guessed from them. Unset (forks, or before it is set), it decodes to an empty
       # file and check.py fails closed.
       - name: Write the denylist
         env:
