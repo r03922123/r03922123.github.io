@@ -47,9 +47,10 @@ LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&mid
 PHONE_SEP = r"(?:[-. ()_/\u00a0\u2011]|&#8209;|&#x2011;|&nbsp;)*"   # _ and /: names are scanned with them as gaps
 WORD_SEP = r"(?:\s|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)+"     # what a browser shows as a space between two words
 NAME_SEP = re.compile(r"[-_/.]")                  # how a file name separates words; Pages serves names as URLs
-# Scrubbing over-redacts: any gap, or none. A tag must start with a letter: "< >" read as either one tag or three
-# characters would give each gap two parses, doubling the time per gap; this way every gap has exactly one.
-LOOSE_SEP = r"(?:[\W_]|%20|&nbsp;|&#0*160;|&#x0*a0;|</?[a-zA-Z][^>]*>)*"
+# Scrubbing over-redacts: any gap, or none. A <...> counts as a tag only if a letter or digit comes before any inner
+# "<": an all-punctuation "< >" read as one tag or as three characters would give each gap two readings and double
+# the time per gap, and the punctuation branch can never read a letter, so each gap has exactly one reading.
+LOOSE_SEP = r"(?:[\W_]|%20|&nbsp;|&#0*160;|&#x0*a0;|<(?=[^<>]*[^\W_])[^>]*>)*"
 
 
 def term_rx(term):

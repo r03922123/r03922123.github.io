@@ -5,15 +5,18 @@ The three most important whys of each change, newest first. Each heading reads `
 ## 2026-11-11 · understand: CI hardening from the site-baseline review
 
 1. **Give a pattern one way to match.** The scrubber read `< >` as one tag or as three characters, so each such gap
-   doubled the work, like a maze where every fork leads to the same room. A tag now has to start with a letter,
-   so each gap has one reading. Trade-off: none in what it matches. Risk: a quick fix (a possessive repeat) made
-   the pattern miss `%20`, and only the existing tests caught it. A speed fix still needs the correctness tests.
+   doubled the work, like a maze where every fork leads to the same room. A `<...>` now counts as a tag only if
+   it holds a letter or digit, which the punctuation branch can never read, so each gap has one reading.
+   Trade-off: a harder pattern to read. Risk: two quicker fixes each hid less. A possessive repeat missed `%20`,
+   and "a tag starts with a letter" missed `<1>`, which let a punctuated term print in clear text. The tests and a
+   fresh reviewer caught them. A speed fix needs correctness tests for every shape the old rule matched.
 2. **Measure the slow case in a test.** The new test times a crafted line: 8.4 s before, under 0.01 s after.
    Trade-off: a timing test can flake on a slow machine, so it allows 1 s for a case that takes milliseconds.
    Risk: the bound is loose enough that a smaller slowdown would pass.
 3. **Cancel stale PR runs, never `main`'s.** A newer push to a PR makes the older run pointless. Each commit on
-   `main` is live, though, so each one finishes its own check. Trade-off: two quick merges run in parallel. Risk:
-   none beyond the minutes they cost.
+   `main` is live, though, so each one gets its own concurrency group and finishes its own check. One shared
+   group was not enough: GitHub keeps one waiting run per group and cancels it when a third push arrives.
+   Trade-off: quick merges run in parallel and cost more minutes. Risk: none beyond those minutes.
 
 ## 2026-11-10 · stop the bleeding: site-baseline (gates script, CI, protected main)
 

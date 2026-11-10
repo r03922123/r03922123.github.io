@@ -363,12 +363,18 @@ class MainTest(unittest.TestCase):
         self.assertEqual(scrubber(["acme corp"])("broken link acme%20corp%41.html"), "broken link [term #1]A.html")
 
     def test_scrubbing_a_crafted_line_stays_fast(self):
-        # A gap such as "< >" matches as one tag or as three characters; without a possessive repeat each one
-        # doubles the work, so a crafted broken link could hang the site step until the job times out.
-        line = "broken link acme" + "< >" * 24 + "x.html"            # ~7 s with backtracking, ~0 s without
+        # A gap such as "< >" matches as one tag or as three characters; unless each gap has only one reading, each
+        # one doubles the work, so a crafted broken link could hang the site step until the job times out.
+        line = "broken link acme" + "< >" * 24 + "x.html"            # seconds to minutes with two readings
         start = time.monotonic()
         scrubber(["acme corp"])(line)
         self.assertLess(time.monotonic() - start, 1.0)
+
+    def test_any_tag_shaped_gap_is_hidden(self):
+        # A punctuated term has only the loose rule, so every <...> the old rule read as a gap must still be one.
+        scrub = scrubber(["acme-corp"])
+        for gap in ("<1>", "<!--x-->", "< b>", "</ b>", "<_x>", "<!DOCTYPE html>", "<?xml v?>", "<b>", "< >"):
+            self.assertNotIn("acme", scrub(f"x acme{gap}corp.png"), gap)
 
     def test_term_at_the_end_of_a_longer_word_is_left_alone(self):
         self.assertEqual(scrubber(["ann"])("joann and ann"), "joann and [term #1]")
