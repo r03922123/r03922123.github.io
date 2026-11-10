@@ -12,6 +12,9 @@ All gates:   sh scripts/gates.sh          # run before every push; about 4 min, 
 Check tests: (cd scripts && python3 -m unittest test_check)
 Site check:  python3 scripts/check.py     # --denylist-only for terms only; --show-terms only when debugging locally
 Builds:      python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py .
+Lock CI:     uv pip compile requirements-ci.in --generate-hashes --python-version 3.12 \
+               --python-platform x86_64-manylinux_2_28 --index-strategy unsafe-best-match \
+               --emit-index-url -o requirements-ci.txt   # after any change to requirements-ci.in
 Set secret:  base64 < scripts/denylist.local.txt | gh secret set SITE_DENYLIST   # base64: see gates.yml
 Read back:   gh api repos/r03922123/r03922123.github.io/branches/main/protection
 Preview:     python3 -m http.server 8000

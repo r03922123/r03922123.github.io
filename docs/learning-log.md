@@ -12,9 +12,11 @@ The three most important whys of each change, newest first. Each heading reads `
    one scrubber, like one security gate at an airport instead of a guard at every shop. A term shows as
    `[term #3]`. Trade-off: local debugging needs `--show-terms`. Risk: commands outside `check.py` are not
    scrubbed, so privacy runs first and stops the run, and the wording gate prints names and counts, never lines.
+   Hiding too much leaks as well: a label inside `planning` would mark `ann` as private, so the scrubber hides only
+   whole words, with the same word gaps that detection uses. Making those gaps match found a term already on `main`.
 3. **The same script locally and in CI.** `scripts/gates.sh` is the only place the gates are written, like one
    recipe card used at home and in the restaurant. Trade-off: CI must install the post code's exact packages
-   (`requirements-ci.txt`). Risk: numbers can differ on Linux; if a post fails only there, stop and report it
+   (`requirements-ci.txt`, every package locked by hash, because post code runs while the denylist is on disk). Risk: numbers can differ on Linux; if a post fails only there, stop and report it
    rather than loosen an assert.
 
 ## 2026-11-10 · stop the bleeding: capability map v4 and seven module specs (PR #2)
