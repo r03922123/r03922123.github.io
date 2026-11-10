@@ -50,6 +50,7 @@ FIXED_PAGES = ("/", "/about.html", "/posts/", "/leetcode/")
 SITEMAP_LOC = "{http://www.sitemaps.org/schemas/sitemap/0.9}loc"
 MD_LINK = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")    # the link syntax tools/leetcode/build.py renders
 MD_CODE = re.compile(r"^```.*?^```|`[^`\n]+`", re.S | re.M)   # fences and code spans, which it renders as no link
+FONTS = ("/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2", "/fonts/inter/inter-latin-wght-normal.woff2")
 EMAIL = re.compile(r"[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")   # not a pinned name@1.2.3
 # Hand-written LeetCode post counts on the home page and posts index; build.py only rewrites the series page.
 LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&middot;)\s+(\d+)|\b(\d+)\s+pattern\b"
@@ -261,6 +262,17 @@ def head_findings(root):
     return findings
 
 
+def shell_findings(rel, text):
+    """SPEC-reading-shell: each page on the stylesheet but the home preloads both reading fonts, and each article
+    has its side and text columns, so a hand-written page cannot keep the old markup unnoticed."""
+    tags, findings = HeadTags(text), []
+    if rel != "index.html" and any(href.endswith("style.css") for href in tags.hrefs("stylesheet") if href):
+        findings += [f"{rel}: no preload for {font}" for font in FONTS if font not in tags.hrefs("preload")]
+    if 'class="post-body"' in text:
+        findings += [f"{rel}: article without {name}" for name in ("post-side", "prose") if f'class="{name}"' not in text]
+    return findings
+
+
 def feed_findings(root, listed):
     """SPEC-post-feeds. Active once tools/feeds/build.py exists, so a deleted or broken feed fails instead of passing."""
     if not (root / "tools/feeds/build.py").is_file():
@@ -327,6 +339,7 @@ def check(root, denylist, terms_only=False):
         urls = [a or b for a, b in LINK.findall(text)]
         findings += [f"{rel}: broken link {url}" for url in urls if not link_ok(root, path, url)]
         findings += [f"{rel}: broken fragment {url}" for url in urls if not fragment_ok(root, path, url, ids)]
+        findings += shell_findings(rel, text)
         for svg in SVG.findall(text):                 # scene doors: links drawn in SVG must still be named
             for tag, href in SVG_LINK.findall(svg):
                 if "aria-label=" not in tag:
