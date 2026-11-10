@@ -23,6 +23,11 @@ DENY = ["secret-term", "555-0100"]
 # posts/index.html must keep the MusicGen section and its two posts, which another repo deploys
 MUSICGEN = ('<section id="musicgen"><h2>MusicGen</h2></section>'
             '<a href="/musicgen-prune-inference/">j</a><a href="/musicgen-prune-inference/decoding/">d</a>')
+MUSICGEN_PATHS = ("/musicgen-prune-inference/", "/musicgen-prune-inference/decoding/")
+SITE = "https://r03922123.github.io"
+RSS = '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>r</title>{}</channel></rss>\n'
+ITEM = f"<item><title>A</title><link>{SITE}/posts/a/</link><pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate></item>"
+SITEMAP = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{}</urlset>\n'
 
 
 class CheckTest(unittest.TestCase):
@@ -223,6 +228,49 @@ class CheckTest(unittest.TestCase):
         out = self.findings({"index.html": PAGE.format(body=""), "posts/a/index.html": PAGE.format(body="")})
         self.assertEqual(len(out), 1)
         self.assertIn("posts/a/", out[0])
+
+    def feed_site(self, drop_url=None, item=ITEM, **files):
+        """A small site with every feed file in order; a keyword replaces one file, None deletes it."""
+        urls = [u for u in ("/", "/about.html", "/posts/", "/leetcode/", "/posts/a/", *MUSICGEN_PATHS) if u != drop_url]
+        site = {"index.html": PAGE.format(body=""), "posts/index.html": PAGE.format(body='<a href="a/">a</a>' + MUSICGEN),
+                "posts/a/index.html": PAGE.format(body=""), "posts/a/index.md": "# A\n\nbody\n",
+                "tools/posts/src/a.md": "---\ntitle: A\n---\nbody\n", "tools/feeds/build.py": "",
+                "rss.xml": RSS.format(item), "sitemap.xml": SITEMAP.format("".join(f"<url><loc>{SITE}{u}</loc></url>" for u in urls)),
+                "robots.txt": f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n", "llms.txt": "# r\n\n> s\n"}
+        site.update(files)
+        return self.findings({path: text for path, text in site.items() if text is not None})
+
+    def test_feed_site_passes(self):
+        self.assertEqual(self.feed_site(), [])
+
+    def test_feed_files_are_required_once_the_feed_build_exists(self):
+        # Deleting a feed must fail, not pass; a site without the feed build has nothing to require yet.
+        self.assertEqual(self.feed_site(**{"rss.xml": None}), ["rss.xml: missing"])
+        self.assertEqual(self.feed_site(**{name: None for name in ("tools/feeds/build.py", "rss.xml", "sitemap.xml",
+                                                                    "robots.txt", "llms.txt")}), [])
+
+    def test_listed_post_missing_from_sitemap(self):
+        self.assertEqual(self.feed_site(drop_url="/posts/a/"), [f"sitemap.xml: missing {SITE}/posts/a/"])
+        self.assertEqual(self.feed_site(drop_url=MUSICGEN_PATHS[1]), [f"sitemap.xml: missing {SITE}{MUSICGEN_PATHS[1]}"])
+
+    def test_malformed_feed_xml(self):
+        out = self.feed_site(**{"rss.xml": "<rss><channel></rss>"})
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith("rss.xml: malformed XML"), out)
+
+    def test_feed_item_without_pubdate(self):
+        self.assertEqual(self.feed_site(item=re.sub(r"<pubDate>.*</pubDate>", "", ITEM)), ["rss.xml: item 1 has no pubDate"])
+
+    def test_email_in_feed(self):
+        out = self.feed_site(**{"llms.txt": "# r\n\n> s, katex@0.16.11\nwrite to someone@example.com\n"})
+        self.assertEqual(out, ["llms.txt:4: email address"])
+
+    def test_post_source_without_markdown(self):
+        self.assertEqual(self.feed_site(**{"posts/a/index.md": None}), ["posts/a/index.md: missing (source tools/posts/src/a.md)"])
+
+    def test_markdown_keeps_front_matter(self):
+        out = self.feed_site(**{"posts/a/index.md": "---\ntitle: A\n---\nbody\n"})
+        self.assertEqual(out, ["posts/a/index.md: front matter kept"])
 
     def test_main_block_comes_last(self):
         # unittest.main() exits, so any test class defined after it would not run when this file is executed
