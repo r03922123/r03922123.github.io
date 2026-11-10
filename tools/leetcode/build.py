@@ -6,11 +6,13 @@ Source format: front matter (title, summary, group, order) between '---' lines, 
 ## / ### headings, paragraphs, '- ' and '1. ' lists, ```python fences, `code`, **bold**, [text](url), \\( math \\).
 """
 import html
+import json
 import os
 import re
 import tempfile
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -45,6 +47,27 @@ POST_ASSETS = """<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
 <script defer src="/post.js"></script>
 """
+SITE = "https://r03922123.github.io"
+AUTHOR = {"@type": "Person", "name": "Jie-Hong Lin", "url": SITE + "/about.html"}   # no email (SPEC-post-feeds)
+
+
+def head_tags(path, post=None, markdown=False):
+    """Head tags for the page served at path (SPEC-post-feeds): its canonical URL and the feed; for a post, given as
+    (title, summary, 'October 31, 2026'), BlogPosting JSON-LD, and with markdown=True the index.md beside it."""
+    tags = (f'<link rel="canonical" href="{SITE}{path}">\n'
+            f'<link rel="alternate" type="application/rss+xml" title="r03922123" href="{SITE}/rss.xml">\n')
+    if markdown:
+        tags += f'<link rel="alternate" type="text/markdown" href="{SITE}{path}index.md">\n'
+    if post:
+        title, summary, date = post
+        published = datetime.strptime(date, "%B %d, %Y").replace(tzinfo=timezone(timedelta(hours=8))).isoformat()
+        data = {"@context": "https://schema.org", "@type": "BlogPosting", "headline": title,
+                "datePublished": published, "description": summary, "author": AUTHOR}
+        ld = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")   # "</" would end the script; same JSON
+        tags += f'<script type="application/ld+json">{ld}</script>\n'
+    return tags
+
+
 FOOT = """</main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
 </div>
@@ -186,7 +209,8 @@ def build(site, slug):
     minutes = max(1, round(words / 230))
     toc_html = "".join(f'<li><a href="#{h}">{inline(t)}</a></li>' for h, t in toc)
     page = HEAD.format(title=html.escape(meta["title"]), summary=html.escape(meta["summary"]),
-                       assets=POST_ASSETS, current="true") + f"""<article class="post-body">
+                       assets=head_tags(f"/leetcode/{slug}/", (meta["title"], meta["summary"], DATE), markdown=True)
+                       + POST_ASSETS, current="true") + f"""<article class="post-body">
 <p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · {html.escape(meta["group"])}</p>
 <header class="post-head">
   <h1>{inline(meta["title"])}</h1>
@@ -217,7 +241,7 @@ def series(site):
         lis = "\n".join(f'  <li><a href="{slug}/">{inline(m["title"])}</a><span>{inline(m["summary"])}</span></li>' for m, slug in items)
         sections.append(f'<h2 id="{slugify(group)}">{html.escape(group)}</h2>\n<ul class="series">\n{lis}\n</ul>')
     page = HEAD.format(title="LeetCode patterns", summary="Short posts on the algorithm patterns behind LeetCode problems: the idea, a reusable Python template, worked problems and practice links.",
-                       assets="", current="page") + f"""<section class="intro">
+                       assets=head_tags("/leetcode/"), current="page") + f"""<section class="intro">
   <h1>LeetCode patterns</h1>
   <p>{len(posts)} short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
