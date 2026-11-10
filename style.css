@@ -117,6 +117,8 @@ body:has(.post-body) .wrap { max-width: 752px; }
 .toc { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin: 24px 0; }
 .toc h2 { font-size: 1rem; margin: 0 0 .4em; }
 .toc ol { margin: 0; padding-left: 1.3em; }
+/* The wide layout needs :has and container units; a browser without either keeps the one-column layout below. */
+@supports selector(:has(a)) and (width: 1cqw) {
 @media (min-width: 1200px) {   /* columns: room for code, text, gap, side; the wrap holds 1320 px, so the room is 0-320 px */
   body:has(.post-body) .wrap { max-width: 1352px; }
   .post-body { display: grid; grid-template-columns: minmax(0, 320px) 720px 40px 240px; container-type: inline-size; }
@@ -129,14 +131,17 @@ body:has(.post-body) .wrap { max-width: 752px; }
   .details dd { margin: 0; }
   /* Code and tables of 5+ columns grow left as far as their content needs, ending at the text's right edge. A box
      wider than its parent overflows toward the parent's end side, so .prose is right-to-left and each child turns
-     back to left-to-right: a wide block then spills left, never into the side column. */
-  .prose { direction: rtl; }
+     back to left-to-right: a wide block then spills left, never into the side column. Display maths is bare text in
+     .prose until KaTeX renders it (and stays so without JavaScript), so plaintext lets that text take its own
+     left-to-right direction instead of the column's. */
+  .prose { direction: rtl; unicode-bidi: plaintext; }
   .prose > * { direction: ltr; }
   .prose > pre, .prose > table:has(th:nth-child(5)) { width: max-content; min-width: 100%; max-width: calc(100% + var(--hang)); }
   .post-body .toc { margin: 0; padding: 0 0 0 14px; background: none; border: 0; border-left: 2px solid var(--line); border-radius: 0; }
   .post-body .toc h2 { font: 700 .78rem/1.4 var(--font-display); letter-spacing: .1em; color: var(--muted); }
   .post-body .toc ol { padding-left: 1.1em; }
   .post-body .toc li { margin: .3em 0; }
+}
 }
 .post-body pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-x: auto; font-size: .85em; line-height: 1.5; }
 .post-body pre code.hljs { background: none; padding: 0; }
