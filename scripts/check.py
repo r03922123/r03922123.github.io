@@ -65,7 +65,8 @@ def scrubber(terms):
     rules = []
     for n, term in sorted(enumerate(terms, 1), key=lambda item: -len(item[1])):
         words = re.findall(r"[^\W_]+", term)
-        loose = [re.compile(LOOSE_SEP.join(map(re.escape, words)), re.I)] if words else []
+        # Word edges: a label inside "planning" would mark "ann" as private beside public text that fills the gap.
+        loose = [re.compile(r"(?<![^\W_])" + LOOSE_SEP.join(map(re.escape, words)) + r"(?![^\W_])", re.I)] if words else []
         rules += [(rx, f"[term #{n}]") for rx in [term_rx(term), *loose]]
 
     def redact(line):
@@ -168,9 +169,10 @@ def check(root, denylist, terms_only=False):
     for path, text in text_files(root):
         rel = path.relative_to(root).as_posix()
         decoded = unquote(text)                       # a link such as /%61cme%20corp/ is the term once served
+        # Each also with file-name gaps (acme-corp quoted in a page); NAME_SEP swaps one char for one, keeping lines.
+        bodies = {b for body in (text, decoded) for b in (body, NAME_SEP.sub(" ", body))}
         for term, rx in deny:                         # whole text, so a term split across lines is still found
-            lines = sorted({body.count("\n", 0, m.start()) + 1
-                            for body in {text, decoded} for m in rx.finditer(body)})
+            lines = sorted({body.count("\n", 0, m.start()) + 1 for body in bodies for m in rx.finditer(body)})
             findings += [f"{rel}:{n}: private term {term!r}" for n in lines]
         if terms_only:
             continue

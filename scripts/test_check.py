@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 from urllib.parse import unquote
 
-from check import check, main
+from check import check, main, scrubber
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -317,6 +317,11 @@ class MainTest(unittest.TestCase):
             out = check(self.site({name: b"\x89PNG\0"}), ["acme corp"])
             self.assertEqual(out, [f"{name}: private term in file name 'acme corp'"])
 
+    def test_term_joined_by_punctuation_in_text_is_found(self):
+        # Contents get the same word gaps as file names: a folder named acme-corp quoted in a page is the term.
+        for text in ("x acme-corp y", "x acme_corp y", "x acme.corp y", "x acme/corp y"):
+            self.assertEqual(check(self.site({"notes.md": text}), ["acme corp"]), ["notes.md:1: private term 'acme corp'"])
+
     def test_percent_encoded_term_in_a_link_is_found_and_hidden(self):
         out = self.assert_fails_without_leak({"index.html": PAGE.format(body='<a href="/%61cme%20corp/">x</a>')})
         self.assertIn("private term", out)
@@ -325,6 +330,12 @@ class MainTest(unittest.TestCase):
         failed, out = self.run_main({"notes.md": "Acme Corp"}, "acme\nacme corp\n")
         self.assertTrue(failed)
         self.assertNotIn("corp", out.lower())
+
+    def test_term_inside_another_word_is_left_alone(self):
+        # A label inside "planning" would mark "ann" as private next to public text that fills the gap.
+        scrub = scrubber(["ann", "acme corp"])
+        self.assertEqual(scrub("posts/planning.html: channel acmecorporate"), "posts/planning.html: channel acmecorporate")
+        self.assertEqual(scrub("img/acmecorp.png Ann"), "img/[term #2].png [term #1]")
 
     def test_traceback_is_scrubbed(self):
         with mock.patch("check.check", side_effect=OSError("cannot read posts/acme-corp/index.html")):
