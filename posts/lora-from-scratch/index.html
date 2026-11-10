@@ -67,8 +67,9 @@ matrices and leaves \(W_0\) frozen:</p>
   <li><b>Initialization.</b> \(B = 0\) and \(A\) is small and random. The product \(BA\) is then exactly zero, so
   training starts from the pretrained model's behavior. \(A\) cannot also be zero, or the gradients of
   both factors would be zero and nothing would train.</li>
-  <li><b>The \(\alpha / r\) scale.</b> This keeps the update's size roughly stable as you change \(r\), so the learning
-  rate does not need retuning. Setting \(\alpha = r\) gives a scale of 1.</li>
+  <li><b>The \(\alpha / r\) scale.</b> This is meant to save retuning the learning rate when you change \(r\), though
+  at higher ranks it shrinks updates too much, which is why rsLoRA scales by \(\alpha / \sqrt{r}\) instead. Setting
+  \(\alpha = r\) gives a scale of 1.</li>
   <li><b>Inference.</b> \(W = W_0 + \frac{\alpha}{r} BA\) can be computed once, after which the adapted model costs
   exactly what the original did.</li>
 </ul>
@@ -227,7 +228,7 @@ with torch.no_grad():
     out_wrapped = model(x_b)
 assert torch.equal(out_before, out_wrapped), "B = 0 must make wrapping an exact no-op"</code></pre>
 <p>It prints 1,536 trainable parameters out of 60,384 (2.5%), and the outputs match bit for bit. Adding
-\(0.5 \times 0\) to a float changes nothing, so exact equality is the right test.</p>
+\(1 \times 0\) to a float changes nothing, so exact equality is the right test.</p>
 
 <h2 id="finetune">Fine-tuning only the adapters</h2>
 <p>The optimizer sees only \(A\) and \(B\). Every frozen tensor is snapshotted first, to prove that none of them

@@ -102,7 +102,7 @@ the same way. The sigmoid \(\sigma(x) = 1/(1 + e^{-x})\) squashes any real numbe
 reads it through cross-attention while generating codec tokens <a href="#ref-2">[2]</a>
 <span class="tag">[paper]</span>.</p>
 <p><b>Delay pattern.</b> Each frame has four tokens. Predicting them one per step would take 4 × 1500 steps.
-MusicGen instead shifts codebook \(k\) back by \(k\) steps, so each step emits four tokens at once, about
+MusicGen instead delays codebook \(k\) by \(k\) steps, so each step emits four tokens at once, about
 \(T + K - 1 = 1503\) steps in total.</p>
 <p><b>Classifier-free guidance (CFG).</b> Each step runs the model twice, with and without the text, and
 amplifies the difference (the <a href="#cfg">appendix</a> explains why this works):</p>
