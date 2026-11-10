@@ -28,6 +28,7 @@ SITE = "https://r03922123.github.io"
 RSS = '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>r</title>{}</channel></rss>\n'
 ITEM = f"<item><title>A</title><link>{SITE}/posts/a/</link><pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate></item>"
 SITEMAP = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{}</urlset>\n'
+FIXED = ("/", "/about.html", "/posts/", "/leetcode/")
 
 
 class CheckTest(unittest.TestCase):
@@ -230,11 +231,15 @@ class CheckTest(unittest.TestCase):
         self.assertIn("posts/a/", out[0])
 
     def feed_site(self, drop_url=None, item=ITEM, **files):
-        """A small site with every feed file in order; a keyword replaces one file, None deletes it."""
-        urls = [u for u in ("/", "/about.html", "/posts/", "/leetcode/", "/posts/a/", *MUSICGEN_PATHS) if u != drop_url]
+        """A small site with every feed file in order: a topic post and a LeetCode post, each with a source and its
+        index.md. A keyword replaces one file, None deletes it."""
+        urls = [u for u in (*FIXED, "/posts/a/", *MUSICGEN_PATHS, "/leetcode/b/") if u != drop_url]
         site = {"index.html": PAGE.format(body=""), "posts/index.html": PAGE.format(body='<a href="a/">a</a>' + MUSICGEN),
                 "posts/a/index.html": PAGE.format(body=""), "posts/a/index.md": "# A\n\nbody\n",
                 "tools/posts/src/a.md": "---\ntitle: A\n---\nbody\n", "tools/feeds/build.py": "",
+                "leetcode/index.html": PAGE.format(body='<a href="b/">b</a>'), "leetcode/b/index.html": PAGE.format(body=""),
+                "leetcode/b/index.md": "# B\n\nsee [A](../../posts/a/)\n",
+                "tools/leetcode/src/b.md": "---\ntitle: B\n---\nsee [A](../../posts/a/)\n",
                 "rss.xml": RSS.format(item), "sitemap.xml": SITEMAP.format("".join(f"<url><loc>{SITE}{u}</loc></url>" for u in urls)),
                 "robots.txt": f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n", "llms.txt": "# r\n\n> s\n"}
         site.update(files)
@@ -250,8 +255,12 @@ class CheckTest(unittest.TestCase):
                                                                     "robots.txt", "llms.txt")}), [])
 
     def test_listed_post_missing_from_sitemap(self):
-        self.assertEqual(self.feed_site(drop_url="/posts/a/"), [f"sitemap.xml: missing {SITE}/posts/a/"])
-        self.assertEqual(self.feed_site(drop_url=MUSICGEN_PATHS[1]), [f"sitemap.xml: missing {SITE}{MUSICGEN_PATHS[1]}"])
+        for url in ("/posts/a/", MUSICGEN_PATHS[1], "/leetcode/b/"):
+            self.assertEqual(self.feed_site(drop_url=url), [f"sitemap.xml: missing {SITE}{url}"])
+
+    def test_fixed_page_missing_from_sitemap(self):
+        # No listing links About, so only the fixed list keeps it in the sitemap.
+        self.assertEqual(self.feed_site(drop_url="/about.html"), [f"sitemap.xml: missing {SITE}/about.html"])
 
     def test_malformed_feed_xml(self):
         out = self.feed_site(**{"rss.xml": "<rss><channel></rss>"})
@@ -267,6 +276,8 @@ class CheckTest(unittest.TestCase):
 
     def test_post_source_without_markdown(self):
         self.assertEqual(self.feed_site(**{"posts/a/index.md": None}), ["posts/a/index.md: missing (source tools/posts/src/a.md)"])
+        self.assertEqual(self.feed_site(**{"leetcode/b/index.md": None}),
+                         ["leetcode/b/index.md: missing (source tools/leetcode/src/b.md)"])
 
     def test_markdown_keeps_front_matter(self):
         out = self.feed_site(**{"posts/a/index.md": "---\ntitle: A\n---\nbody\n"})
