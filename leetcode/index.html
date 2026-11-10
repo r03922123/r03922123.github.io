@@ -11,6 +11,7 @@
 <link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/leetcode/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
+<style>:root:has(#two-pointers-windows-and-prefix-sums:target) .topics a[href="#two-pointers-windows-and-prefix-sums"], :root:has(#sorting-searching-and-strings:target) .topics a[href="#sorting-searching-and-strings"], :root:has(#stacks-queues-heaps-and-hashing:target) .topics a[href="#stacks-queues-heaps-and-hashing"], :root:has(#trees-and-range-queries:target) .topics a[href="#trees-and-range-queries"], :root:has(#graphs:target) .topics a[href="#graphs"], :root:has(#dynamic-programming-bits-and-games:target) .topics a[href="#dynamic-programming-bits-and-games"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }</style>
 </head>
 <body>
 <header class="site">
@@ -26,7 +27,18 @@
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
   asserts pass.</p>
 </section>
-<h2 id="two-pointers-windows-and-prefix-sums">Two pointers, windows and prefix sums</h2>
+<nav class="topics" id="topics" aria-label="Topics">
+  <a href="#two-pointers-windows-and-prefix-sums"><b>Two pointers, windows and prefix sums</b><span>5 posts</span></a>
+  <a href="#sorting-searching-and-strings"><b>Sorting, searching and strings</b><span>7 posts</span></a>
+  <a href="#stacks-queues-heaps-and-hashing"><b>Stacks, queues, heaps and hashing</b><span>4 posts</span></a>
+  <a href="#trees-and-range-queries"><b>Trees and range queries</b><span>4 posts</span></a>
+  <a href="#graphs"><b>Graphs</b><span>6 posts</span></a>
+  <a href="#dynamic-programming-bits-and-games"><b>Dynamic programming, bits and games</b><span>5 posts</span></a>
+</nav>
+<p class="count">31 articles</p>
+<div class="groups">
+<section class="group" id="two-pointers-windows-and-prefix-sums">
+<h2>Two pointers, windows and prefix sums</h2><a class="all" href="#topics">All topics</a>
 <ul class="series">
   <li><a href="two-pointers/">Two pointers: move the side that limits you</a><span>Two indices walking toward each other over sorted or bounded data. Three sum, container with most water, and trapping rain water, each reduced to one rule about which pointer moves.</span></li>
   <li><a href="sliding-window/">Sliding window: three templates and the exactly-k trick</a><span>A window over a contiguous stretch that grows on the right and shrinks on the left. Templates for the shortest valid window, the longest valid window, and counting windows with exactly k of something.</span></li>
@@ -34,7 +46,9 @@
   <li><a href="sweep-line/">Sweep line: turn intervals into events</a><span>Replace each interval with a +change at its start and a −change at its end, then sweep in order. Difference arrays, sorted events, and answering point queries with binary search.</span></li>
   <li><a href="majority-vote-and-sieve/">Majority vote and the sieve of Eratosthenes</a><span>Two small classics. Boyer–Moore voting finds a majority element in one pass and O(1) space, and generalizes to elements above n/3. The sieve finds every prime below n in O(n log log n).</span></li>
 </ul>
-<h2 id="sorting-searching-and-strings">Sorting, searching and strings</h2>
+</section>
+<section class="group" id="sorting-searching-and-strings">
+<h2>Sorting, searching and strings</h2><a class="all" href="#topics">All topics</a>
 <ul class="series">
   <li><a href="binary-search/">Binary search on the answer</a><span>What bisect_left and bisect_right count, and two loop templates — the first k where a predicate turns true, the last k where it is still true — applied to problems that never mention sorting.</span></li>
   <li><a href="sorting/">Merge sort, quicksort and the Dutch flag partition</a><span>The two comparison sorts worth writing from memory, what each guarantees, and the three-way partition that keeps quicksort fast when values repeat.</span></li>
@@ -44,21 +58,27 @@
   <li><a href="rolling-hash/">Rolling hash (Rabin–Karp)</a><span>Hash every length-m window of a string in O(1) per step by sliding a polynomial hash. Substring search, then the real use, comparing many substrings at once, with binary search on length.</span></li>
   <li><a href="string-matching/">String matching with KMP and the Z-function</a><span>Two linear-time tools that reuse what a failed comparison already revealed. The KMP failure table, the Z-array, and how each finds a pattern or scores a string against its own prefixes.</span></li>
 </ul>
-<h2 id="stacks-queues-heaps-and-hashing">Stacks, queues, heaps and hashing</h2>
+</section>
+<section class="group" id="stacks-queues-heaps-and-hashing">
+<h2>Stacks, queues, heaps and hashing</h2><a class="all" href="#topics">All topics</a>
 <ul class="series">
   <li><a href="monotonic-stack/">Monotonic stack: next greater, previous smaller</a><span>A stack kept in sorted order answers "nearest larger or smaller element" for every position in one pass. The template, why it is O(n), and its two classic uses, daily temperatures and the largest rectangle.</span></li>
   <li><a href="monotonic-queue/">Monotonic queue: the window maximum in O(1)</a><span>A deque kept in sorted order gives the maximum of a sliding window at every step in amortized O(1). Sliding window maximum, then the harder use, shortest subarray with sum at least k over prefix sums.</span></li>
   <li><a href="heap/">Heaps: from an array to four patterns</a><span>A binary heap built from scratch on a plain list, then the four ways heaps show up in problems — top k, two heaps for a running median, greedy with a heap of options, and k-way merging.</span></li>
   <li><a href="hash-table/">Hash tables from scratch: chaining, hash functions, resizing</a><span>Build a hash map with separate chaining. The division, multiplication and universal hash functions, an operator-precedence bug that quietly changes which bits you keep, and why doubling keeps operations O(1) on average.</span></li>
 </ul>
-<h2 id="trees-and-range-queries">Trees and range queries</h2>
+</section>
+<section class="group" id="trees-and-range-queries">
+<h2>Trees and range queries</h2><a class="all" href="#topics">All topics</a>
 <ul class="series">
   <li><a href="tree-traversal/">Binary tree traversal without recursion</a><span>Preorder, inorder and postorder with an explicit stack, one template that does all three, Morris traversal in O(1) space, and the traversals behind validating a BST and vertical order.</span></li>
   <li><a href="trie/">Tries: prefix trees for word search and autocomplete</a><span>A tree keyed by characters, where every path from the root spells a prefix. Insert and search in O(word length), then the two places tries pay off — searching a grid for many words at once, and top-k autocomplete.</span></li>
   <li><a href="segment-tree/">Range queries: Fenwick trees, segment trees, lazy propagation</a><span>Three structures for arrays that change while you query them. A Fenwick tree for prefix sums, an iterative segment tree for any associative operation, and lazy propagation for updating whole ranges, each checked against brute force.</span></li>
   <li><a href="union-find/">Union–find: merging groups in nearly constant time</a><span>A forest of parent pointers that merges sets and answers "same group?" in amortized near-O(1). Path halving and union by size, then connectivity, cycle detection, and processing events in reverse.</span></li>
 </ul>
-<h2 id="graphs">Graphs</h2>
+</section>
+<section class="group" id="graphs">
+<h2>Graphs</h2><a class="all" href="#topics">All topics</a>
 <ul class="series">
   <li><a href="bfs/">BFS: shortest paths by layers, and from both ends</a><span>Breadth-first search finds shortest paths when every step costs the same. The layer-by-layer template, BFS over a state space larger than the grid, 0-1 BFS for two edge costs, and bidirectional search.</span></li>
   <li><a href="dfs/">DFS: reachability, components and connectivity</a><span>Depth-first search as the tool for "what can I reach?". An iterative template, counting components, testing whether a directed graph is strongly connected with one reversed pass, and finding bridges with low-link values.</span></li>
@@ -67,7 +87,9 @@
   <li><a href="topological-sort/">Topological sort: ordering a DAG</a><span>Why a directed graph can be lined up so every edge points forward exactly when it has no cycle, then the two standard algorithms (Kahn's queue of ready nodes and DFS finishing order), each detecting cycles for free, and two harder uses: two-level ordering and longest paths in a DAG.</span></li>
   <li><a href="graph-algorithms/">Spanning trees, Euler paths and matchings</a><span>Three classic graph algorithms beyond shortest paths. Minimum spanning trees from the cut and cycle properties (Kruskal, Prim, and the O(n²) dense Prim), Hierholzer's algorithm for Euler paths, and Kuhn's augmenting paths for bipartite matching.</span></li>
 </ul>
-<h2 id="dynamic-programming-bits-and-games">Dynamic programming, bits and games</h2>
+</section>
+<section class="group" id="dynamic-programming-bits-and-games">
+<h2>Dynamic programming, bits and games</h2><a class="all" href="#topics">All topics</a>
 <ul class="series">
   <li><a href="dynamic-programming/">Dynamic programming: SRTBOT, subsequences and stock state machines</a><span>A six-step recipe for writing any DP, then four classics built with it — longest common subsequence, palindromic subsequences, the whole stock-trading family as one state machine, and Kadane's maximum subarray.</span></li>
   <li><a href="knapsack/">Knapsack: choosing items under a budget</a><span>0/1 and unbounded knapsack written three ways (memoized recursion, a full table, one rolling row), why the inner loop runs backwards for one and forwards for the other, how to read the chosen items back out, and four LeetCode problems that are knapsack in disguise.</span></li>
@@ -75,6 +97,8 @@
   <li><a href="bit-manipulation/">Bit manipulation: identities, XOR tricks and counting bits</a><span>The handful of two's-complement identities that power most bit tricks (lowest set bit, clearing it, popcount, parity, rounding to powers of two, reversing bits, Gosper's hack), then XOR for the Single Number family and a DP for counting bits.</span></li>
   <li><a href="game-theory/">Game theory: minimax on the score difference</a><span>Two players, perfect information, both playing their best. One recurrence on "my score minus yours" solves the stone-game family (877, 486, 1406, 1140), and a win/lose labelling of positions explains Nim, with a short look at Sprague–Grundy numbers.</span></li>
 </ul>
+</section>
+</div>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
 </div>
