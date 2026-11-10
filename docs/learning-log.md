@@ -2,6 +2,22 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-feeds feed files
+
+1. **Same input, same bytes.** The feed build reads no clock: dates come from the posts' fixed dates, and ties keep
+   the listing's order. It is like a seeded experiment, where rerunning gives the identical table. Trade-off: no
+   `lastBuildDate` or `lastmod`, which feed readers and crawlers would like. Risk: a "now" added later would make
+   every rebuild a change, and the rebuild gate would fail on every run.
+2. **Leave out the field instead of filling it.** RSS's `author` must be an email, and the site's feeds carry none,
+   so the field is omitted and `check.py` fails on any email in a feed file. It is like dropping a column that
+   would identify a patient instead of hoping no one reads it. Trade-off: feed readers show no author name. Risk:
+   the email pattern skips `name@1.2.3`, so a CDN pin is not a finding, and an address with an unusual shape could
+   slip past.
+3. **A check must fail when its subject is gone.** The feed rules switch on once `tools/feeds/build.py` exists and
+   then require every output, like a lab check that flags a missing sample instead of skipping that row. Trade-off:
+   the rule depends on a file existing, which a test pins down. Risk: renaming the build file switches the rules off
+   quietly, so a rename must update `check.py` too.
+
 ## 2026-11-11 · understand: CI hardening from the site-baseline review
 
 1. **Give a pattern one way to match.** The scrubber read `< >` as one tag or as three characters, so each such gap
