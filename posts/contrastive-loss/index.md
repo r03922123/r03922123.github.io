@@ -1,0 +1,278 @@
+# Contrastive loss: InfoNCE from the ground up
+
+Plenty of systems need an embedding space where "close" means "related": a photo and its caption, a search query and the document that answers it, a user and the item they bought, two crops of the same picture. Graded labels for "how related" are rare. Matched pairs are cheap: the caption came with the photo, the click came after the query. A contrastive loss learns from nothing more than those pairs. It makes the two halves of each pair similar, and makes each one dissimilar to everything it was not paired with.
+
+The modern form, InfoNCE, is ordinary softmax cross-entropy with an unusual set of classes. This post builds it from there: its gradient, the temperature, a small trained model, and the bias of drawing negatives from the batch.
+
+## A classification problem whose answer is in the batch
+Take a batch of \(N\) pairs \((x_i, y_i)\). Two encoders \(f\) and \(g\), possibly the same network, map them to vectors, which are scaled to unit length: \(q_i = f(x_i) / \lVert f(x_i) \rVert\) and \(k_i = g(y_i) / \lVert g(y_i) \rVert\). The similarity of any query and any key is their cosine, \(s_{ij} = q_i^\top k_j\). For query \(i\), the loss is
+
+\[ \ell_i = -\log \frac{\exp(s_{ii} / \tau)}{\sum_{j=1}^{N} \exp(s_{ij} / \tau)} \]
+
+Read it as classification. Query \(i\) is an example, the \(N\) keys in the batch are the classes, \(s_{ij} / \tau\) are the logits, and the correct class is \(i\), its own partner. The other \(N - 1\) keys are the negatives. The denominator includes the positive, so this is exactly \(-\log \operatorname{softmax}\) of the correct class, and [numerically stable softmax and cross-entropy](../stable-softmax-cross-entropy/) applies unchanged. The temperature \(\tau > 0\) scales the logits.
+
+The loss was named InfoNCE by van den Oord, Li and Vinyals in their 2018 paper on Contrastive Predictive Coding, where they also showed that it bounds the mutual information between the two views: \(I(x; y) \ge \log N - \mathbb{E}[\ell]\). Since the loss cannot go below zero, the bound can never certify more than \(\log N\) nats, which is one theoretical reason large batches help.
+
+In code, the whole batch is one matrix product followed by a cross-entropy whose targets are the diagonal:
+
+```python
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+rng = np.random.default_rng(0)
+torch.manual_seed(0)
+
+
+def unit(x):
+    return x / np.linalg.norm(x, axis=-1, keepdims=True)
+
+
+def info_nce(q, k, tau):
+    """Mean InfoNCE over a batch: row i of q is paired with row i of k, every other row is a negative."""
+    logits = unit(q) @ unit(k).T / tau                              # (N, N): queries by keys
+    m = logits.max(axis=1, keepdims=True)
+    lse = (m + np.log(np.exp(logits - m).sum(axis=1, keepdims=True))).ravel()
+    return np.mean(lse - np.diag(logits))                           # log-sum-exp minus the positive logit
+
+
+def info_nce_loop(q, k, tau):                                       # the formula, one query at a time
+    q, k = unit(q), unit(k)
+    total = 0.0
+    for i in range(len(q)):
+        num = np.exp(q[i] @ k[i] / tau)
+        den = sum(np.exp(q[i] @ k[j] / tau) for j in range(len(k)))
+        total += -np.log(num / den)
+    return total / len(q)
+
+
+q = rng.normal(size=(8, 5))
+k = q + 0.5 * rng.normal(size=(8, 5))                               # noisy copies: each key matches its query
+assert np.isclose(info_nce(q, k, 0.1), info_nce_loop(q, k, 0.1))
+
+logits_t = F.normalize(torch.tensor(q), dim=1) @ F.normalize(torch.tensor(k), dim=1).T / 0.1
+assert np.isclose(info_nce(q, k, 0.1), F.cross_entropy(logits_t, torch.arange(8)).item())
+
+unrelated = info_nce(rng.normal(size=(512, 256)), rng.normal(size=(512, 256)), 1.0)
+assert abs(unrelated - np.log(512)) < 0.05                          # no signal: a uniform guess over N classes
+```
+
+The last check is a useful smoke test for a real training run. When queries and keys are unrelated and the logits are near zero, the loss is close to \(\log N\), the cross-entropy of a uniform guess.
+
+## In-batch negatives, in both directions
+The negatives cost nothing extra: \(2N\) encoder passes give \(N^2\) similarities, so each query meets \(N - 1\) negatives that were computed anyway.
+
+CLIP (Radford et al., 2021), which matches images with their captions, uses the matrix in both directions. Rows are images classifying captions, columns are captions classifying images, and the loss is the average of the two cross-entropies. SimCLR (Chen et al., 2020) uses a single encoder on two random augmentations of each image. That gives \(2N\) views, and each view has one positive, its twin, and \(2N - 2\) negatives. A view's similarity with itself is always 1 and must be masked out. The paper calls this version NT-Xent, for normalized temperature-scaled cross-entropy.
+
+```python
+def clip_loss(a, b, tau):
+    """Symmetric InfoNCE: a[i] and b[i] are a pair (an image and its caption, say)."""
+    logits = F.normalize(a, dim=1) @ F.normalize(b, dim=1).T / tau
+    target = torch.arange(len(a))
+    return (F.cross_entropy(logits, target) + F.cross_entropy(logits.T, target)) / 2
+
+
+def nt_xent(z1, z2, tau):
+    """SimCLR's loss: z1[i] and z2[i] are two views of item i; all other 2N - 2 views are negatives."""
+    n = len(z1)
+    z = F.normalize(torch.cat([z1, z2]), dim=1)
+    logits = z @ z.T / tau
+    logits.fill_diagonal_(float("-inf"))                            # a view is not its own candidate
+    target = torch.cat([torch.arange(n, 2 * n), torch.arange(n)])   # view i's twin sits at i + n, and back
+    return F.cross_entropy(logits, target)
+
+
+a, b = torch.randn(6, 4, dtype=torch.float64), torch.randn(6, 4, dtype=torch.float64)
+assert np.isclose(clip_loss(a, b, 0.1).item(), (info_nce(a.numpy(), b.numpy(), 0.1) + info_nce(b.numpy(), a.numpy(), 0.1)) / 2)
+
+z = F.normalize(torch.cat([a, b]), dim=1).numpy()
+brute = 0.0
+for i in range(12):
+    twin = (i + 6) % 12
+    den = sum(np.exp(z[i] @ z[j] / 0.1) for j in range(12) if j != i)
+    brute += -np.log(np.exp(z[i] @ z[twin] / 0.1) / den)
+assert np.isclose(nt_xent(a, b, 0.1).item(), brute / 12)
+```
+
+## What the gradient does to each negative
+Because \(\ell_i\) is a softmax cross-entropy in the logits \(s_{ij} / \tau\), its gradient with respect to the similarities is softmax minus one-hot, divided by \(\tau\). Write \(p_{ij}\) for the softmax weight of key \(j\) in row \(i\). Then
+
+\[ \frac{\partial \ell_i}{\partial s_{ii}} = -\frac{1 - p_{ii}}{\tau}, \qquad \frac{\partial \ell_i}{\partial s_{ij}} = \frac{p_{ij}}{\tau} \quad (j \ne i) \]
+
+The positive is pulled in with strength \((1 - p_{ii}) / \tau\), and the negatives are pushed away with strengths that add up to exactly that amount. The negatives share a fixed budget, and the softmax decides how it is split: a negative that already looks like the query gets a large share, and one that is far away gets almost nothing. So the loss focuses itself on **hard negatives** without anyone mining for them. Wang and Liu (2021) analysed this hardness-aware property in detail.
+
+The temperature sets how sharp that focus is. As \(\tau\) grows, every negative gets nearly the same share. As \(\tau \to 0\), log-sum-exp becomes a hard maximum, and
+
+\[ \tau \, \ell_i \;\to\; \max\Big(0,\ \max_{j \ne i} s_{ij} - s_{ii}\Big) \]
+
+which is a triplet loss against the single hardest negative, with zero margin. Small temperatures train against the worst confusions in the batch, and large ones against all of them on average.
+
+```python
+s = torch.tensor(np.r_[0.6, rng.uniform(-0.3, 0.5, size=63)], requires_grad=True)   # s[0] is the positive
+tau = 0.1
+(-torch.log_softmax(s / tau, dim=0)[0]).backward()
+p = torch.softmax(s / tau, dim=0).detach()
+assert np.isclose(s.grad[0].item(), -(1 - p[0].item()) / tau)
+assert torch.allclose(s.grad[1:], p[1:] / tau)
+assert np.isclose(s.grad[1:].sum().item(), -s.grad[0].item())     # push budget equals pull
+
+sd = s.detach()
+share = [torch.softmax(sd[1:] / t, dim=0).max().item() for t in (1.0, 0.5, 0.1, 0.05, 0.02)]
+assert all(x < y for x, y in zip(share, share[1:]))                # colder: more of the push on the hardest negative
+assert share[0] < 0.03 and share[-1] > 0.35                        # 63 negatives: from about even to one dominant
+
+for t in (0.01, 0.001):
+    hinge = max(0.0, sd[1:].max().item() - sd[0].item())
+    loss = -torch.log_softmax(sd / t, dim=0)[0].item()
+    assert abs(t * loss - hinge) < 5 * t                           # the hard-max limit
+```
+
+## Why normalize, and why the temperature is small
+Normalizing to unit length fixes the scale. Cosines lie in \([-1, 1]\), so every logit lies in \([-1/\tau, 1/\tau]\), and the model can only lower the loss by getting the directions right. Without normalization, once the rankings are right it can keep lowering the loss by inflating the vector lengths, which changes no ranking at all.
+
+With normalization, the temperature caps how confident the model can be. Even in the best case for a single query, positive at cosine 1 and every negative at \(-1\) (which no batch can achieve for all its queries at once), the loss is at least
+
+\[ \ell_i \ge \log\left(1 + (N - 1)\, e^{-2/\tau}\right) \]
+
+With \(\tau = 1\) and 256 pairs per batch, that floor is about 3.57 nats. The loss can never get close to zero, and the gradient keeps pushing every negative as if it were still a problem. With \(\tau = 0.07\) the floor is about \(10^{-10}\). This is why the values used in practice are well below 1. CLIP goes further and learns the temperature: it is a trained parameter, kept on a log scale, initialized to 0.07 and clipped so that it never multiplies the logits by more than 100. SimCLR's ablations likewise found that normalization and the choice of temperature both make a large difference.
+
+Wang and Isola (2020) gave a geometric reading of what the normalized loss optimizes. As the number of negatives grows, it splits into an **alignment** term, which draws positive pairs together, and a **uniformity** term, which spreads all embeddings evenly over the sphere. Uniformity is what keeps the encoder from collapsing everything to one point.
+
+```python
+def floor(n, t):
+    return np.log1p((n - 1) * np.exp(-2 / t))
+
+
+assert 3.56 < floor(256, 1.0) < 3.58
+assert floor(256, 0.07) < 1e-9
+
+def raw_info_nce(x, y):                                        # InfoNCE on raw dot products, tau = 1
+    logits = x @ y.T
+    return np.mean(np.log(np.exp(logits).sum(axis=1)) - np.diag(logits))
+
+
+e1 = unit(rng.normal(size=(32, 16)))
+e2 = e1 + 0.05 * rng.normal(size=(32, 16))                      # paired: every row's partner scores highest
+assert ((e1 @ e2.T).argmax(1) == np.arange(32)).all()
+for scale in (0.3, 1.0, 2.0):
+    assert np.array_equal(((scale * e1) @ e2.T).argmax(1), (e1 @ e2.T).argmax(1))   # same rankings...
+assert raw_info_nce(0.3 * e1, e2) > raw_info_nce(e1, e2) > raw_info_nce(2.0 * e1, e2)  # ...lower loss
+```
+
+## A worked example: two encoders, one space
+Here is the full recipe on synthetic data. A hidden 8-dimensional factor generates two different observations: a 32-dimensional linear view with additive noise, and a 24-dimensional nonlinear view. Neither encoder sees the factor. Each is a small MLP, and they are trained with the symmetric loss from above. Afterwards, every held-out view-A vector is used as a query against 1,000 view-B vectors, and we check whether its own partner comes out on top.
+
+```python
+d_z, d_a, d_b = 8, 32, 24
+A, B = rng.normal(size=(d_z, d_a)), rng.normal(size=(d_z, d_b))
+
+
+def make_pairs(n):
+    zz = rng.normal(size=(n, d_z))
+    xa = zz @ A + rng.normal(size=(n, d_a))
+    xb = np.tanh(zz @ B) + 0.3 * rng.normal(size=(n, d_b))
+    return torch.tensor(xa, dtype=torch.float32), torch.tensor(xb, dtype=torch.float32)
+
+
+train_a, train_b = make_pairs(20_000)
+test_a, test_b = make_pairs(1_000)
+enc_a = torch.nn.Sequential(torch.nn.Linear(d_a, 64), torch.nn.ReLU(), torch.nn.Linear(64, 16))
+enc_b = torch.nn.Sequential(torch.nn.Linear(d_b, 64), torch.nn.ReLU(), torch.nn.Linear(64, 16))
+
+
+@torch.no_grad()
+def top1_retrieval():
+    sim = F.normalize(enc_a(test_a), dim=1) @ F.normalize(enc_b(test_b), dim=1).T
+    return (sim.argmax(dim=1) == torch.arange(len(test_a))).float().mean().item()
+
+
+before = top1_retrieval()
+opt = torch.optim.Adam([*enc_a.parameters(), *enc_b.parameters()], lr=3e-3)
+for step in range(600):
+    idx = torch.randint(0, len(train_a), (256,))
+    loss = clip_loss(enc_a(train_a[idx]), enc_b(train_b[idx]), tau=0.1)
+    opt.zero_grad()
+    loss.backward()
+    opt.step()
+after = top1_retrieval()
+
+assert before < 0.02          # chance is 1 in 1,000
+assert after > 0.5            # the partner is the nearest of 1,000 candidates most of the time
+```
+
+Top-1 retrieval among 1,000 candidates goes from chance to about 70 percent, with nothing but pairs as supervision. The retrieval step is a nearest-neighbour search by cosine. At catalogue scale, that `argmax` over every key is replaced by an approximate nearest-neighbour index, which is the setup of [two-tower retrieval](../two-tower-retrieval/) and the job of a [vector database](../vector-databases/).
+
+## The batch is a sample, and samples have biases
+In-batch negatives are not drawn uniformly. In a recommender trained on interaction logs, the batch is a sample of interactions, so an item turns up as a negative in proportion to how often it turns up at all: its popularity \(q_j\). The in-batch loss is therefore a sampled softmax with a skewed sampler, and it does not estimate what a softmax over the whole catalogue would.
+
+The skew is easiest to see with the model stripped to one learnable score \(b_j\) per item and no user at all. The best such model is popularity itself, and a softmax over the full catalogue learns \(b_j = \log q_j\) plus a constant. With in-batch negatives and all scores equal, every column of the batch gets softmax weight \(1/N\). Item \(j\), present \(n_j\) times, is then pushed \(N \cdot n_j \cdot 1/N = n_j\) times and pulled \(n_j\) times, so the gradient is exactly zero. Since each batch's loss is convex in the scores, equal scores are the optimum: the uncorrected loss does not merely fail to learn popularity, it removes it. Started from the full-softmax answer, in-batch training drives every score back to the same value. Yi et al. (RecSys 2019) correct for this by subtracting \(\log q_j\) from each logit, the standard correction for sampled softmax, often called the logQ correction. It moves the stationary point back to where the full softmax puts it.
+
+```python
+n_items, n_batch, steps = 50, 128, 300
+pop = 1 / np.arange(1, n_items + 1) ** 1.1
+pop /= pop.sum()
+log_q = torch.tensor(np.log(pop), dtype=torch.float32)
+batches = torch.tensor(rng.choice(n_items, size=(steps, n_batch), p=pop))   # interactions, as logged
+
+
+def fit_item_scores(mode, init=None):
+    b = torch.zeros(n_items) if init is None else torch.tensor(init, dtype=torch.float32)
+    b.requires_grad_(True)
+    opt = torch.optim.Adam([b], lr=0.1)
+    for items in batches:
+        if mode == "full":                                   # softmax over the whole catalogue
+            logits, target = b.expand(n_batch, n_items), items
+        else:                                                # in-batch: candidates are the batch's own items
+            logits, target = b[items].expand(n_batch, n_batch), torch.arange(n_batch)
+            if mode == "logq":
+                logits = logits - log_q[items]
+        loss = F.cross_entropy(logits, target)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    b = b.detach().numpy()
+    return b - b.mean()
+
+
+full, in_batch, corrected = (fit_item_scores(m) for m in ("full", "in_batch", "logq"))
+truth = np.log(pop) - np.log(pop).mean()
+assert np.corrcoef(full, truth)[0, 1] > 0.95                 # the catalogue softmax recovers popularity
+assert np.allclose(in_batch, 0)                              # in-batch: exactly zero gradient at equal scores
+from_truth = fit_item_scores("in_batch", init=np.log(pop))
+assert from_truth.std() < 0.01 * truth.std()                 # ...and it erases popularity it was given
+assert np.allclose(corrected, truth, atol=1e-3)              # logQ correction: back to log q
+```
+
+Whether to favour popular items is a product decision; the correction makes sure it is made on purpose, not by the batch sampler.
+
+The same sampling causes **false negatives**. A popular item can show up twice in one batch, and two captions can describe the same photo. Each copy is then treated as a negative for the other's query. Masking exact duplicates before the softmax is cheap. Near-duplicates are harder, and a very low temperature makes them worse, because it puts the biggest push on exactly the negatives that look most like the positive.
+
+## Older relatives: pairwise and triplet losses
+Before InfoNCE, "contrastive loss" usually meant a pairwise loss, in the form given by Hadsell, Chopra and LeCun (2006). For a pair at distance \(d\) with \(y = 1\) for similar and \(y = 0\) for dissimilar, it is, up to constant factors, \(y\, d^2 + (1 - y) \max(0, m - d)^2\). The triplet loss used in FaceNet (Schroff et al., 2015) compares an anchor's distance to one positive and one negative, \(\max(0,\ d(a, p) - d(a, n) + m)\), with \(d\) the squared Euclidean distance.
+
+Both use one negative at a time and stop learning from it once it is beyond the margin. Random triplets satisfy the margin almost at once, which is why FaceNet relied on mining informative triplets inside each mini-batch, choosing semi-hard negatives: farther than the positive but still within the margin. InfoNCE uses every negative in the batch, never quite reaches zero gradient, and weights hard negatives through the softmax. Sohn's N-pair loss (2016) made the same move from one negative to many, in the same softmax form.
+
+```python
+def triplet(sa_p, sa_n, margin):                             # similarity version: want s(a, p) > s(a, n) + margin
+    return torch.clamp(sa_n - sa_p + margin, min=0)
+
+
+sp_, sn_ = torch.tensor(0.9, requires_grad=True), torch.tensor(0.2, requires_grad=True)
+triplet(sp_, sn_, 0.5).backward()
+assert sp_.grad == 0 and sn_.grad == 0                       # margin met: this triplet teaches nothing
+
+sims = torch.tensor([0.9, 0.2, 0.1, -0.3], requires_grad=True)
+(-torch.log_softmax(sims / 0.1, dim=0)[0]).backward()
+assert (sims.grad[1:] > 0).all()                             # InfoNCE still pushes every negative, the closest most
+assert sims.grad[1] > sims.grad[2] > sims.grad[3]
+```
+
+## When to use it, and what goes wrong
+Use a contrastive loss when the supervision is pairs rather than labels, and when the product is an embedding that will be searched by nearest neighbour: text-to-image search, query-to-document retrieval, candidate generation in a recommender, or self-supervised pretraining from augmentations. If you have a fixed set of labelled classes, plain classification is simpler. If you have graded relevance for a query's candidates, a ranking loss uses that information and InfoNCE throws it away.
+
+- **Too few negatives.** Representations usually improve with batch size because more negatives mean more hard ones and a higher ceiling, \(\log N\), on the mutual-information bound. The similarity matrix grows as \(N^2\), though. CLIP shares embeddings across all devices so that each one computes its rows of a single large similarity matrix, and MoCo (He et al., 2020) keeps a queue of keys from earlier batches, encoded by a slowly updated copy of the encoder, so that the number of negatives no longer depends on the batch.
+- **A temperature that is too low for the data.** It sharpens training, but noisy pairs and near-duplicate negatives then receive the strongest gradients. If the loss is unstable, raise \(\tau\) or let it be learned, with a clip.
+- **Comparing loss values across settings.** The loss depends on \(N\) and \(\tau\): a value of 2.0 is good with 4,096 negatives and poor with 16. Track retrieval metrics on a fixed held-out candidate set instead, such as recall at \(k\).
+- **Duplicates and popularity.** Mask duplicate items in the batch, and apply the logQ correction when negatives come from logged interactions and the model should rank as a full softmax would.
+
+Sources: Aäron van den Oord, Yazhe Li and Oriol Vinyals, [Representation Learning with Contrastive Predictive Coding](https://arxiv.org/abs/1807.03748) (2018); Ting Chen et al., [A Simple Framework for Contrastive Learning of Visual Representations](https://arxiv.org/abs/2002.05709) (SimCLR, 2020); Alec Radford et al., [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) (CLIP, 2021); Kaiming He et al., [Momentum Contrast for Unsupervised Visual Representation Learning](https://arxiv.org/abs/1911.05722) (MoCo, 2020); Tongzhou Wang and Phillip Isola, Understanding Contrastive Representation Learning through Alignment and Uniformity on the Hypersphere (2020); Feng Wang and Huaping Liu, Understanding the Behaviour of Contrastive Loss (2021); Xinyang Yi et al., Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations (RecSys 2019); Raia Hadsell, Sumit Chopra and Yann LeCun, Dimensionality Reduction by Learning an Invariant Mapping (2006); Florian Schroff, Dmitry Kalenichenko and James Philbin, [FaceNet](https://arxiv.org/abs/1503.03832) (2015); Kihyuk Sohn, Improved Deep Metric Learning with Multi-class N-pair Loss Objective (2016).

@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+  <title>r03922123</title>
+  <link>https://r03922123.github.io/</link>
+  <description>Technical posts on machine learning, statistics, LLMs, recommender systems and ML systems, and short posts on LeetCode patterns, each with the code and numbers behind it.</description>
+  <language>en</language>
+  <atom:link href="https://r03922123.github.io/rss.xml" rel="self" type="application/rss+xml"/>
+  <item>
+    <title>ML fundamentals: a quick reference</title>
+    <link>https://r03922123.github.io/posts/ml-fundamentals-quick-reference/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/ml-fundamentals-quick-reference/</guid>
+    <description>Losses, autograd, optimizers, learning-rate schedules, activations, initialization, normalization, dropout, softmax temperature and attention masks: the one idea behind each, with code that checks it and links to the longer posts.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>The bias-variance tradeoff, measured</title>
+    <link>https://r03922123.github.io/posts/bias-variance-tradeoff/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/bias-variance-tradeoff/</guid>
+    <description>Expected test error splits into bias, variance and noise. This post derives the split, measures each term by retraining models on hundreds of simulated datasets, reads them off learning curves, shows which term bagging and boosting each attack, and ends with double descent, where the classic U-shaped curve breaks.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Regression as maximum likelihood: where squared error and cross-entropy come from</title>
+    <link>https://r03922123.github.io/posts/regression-as-maximum-likelihood/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/regression-as-maximum-likelihood/</guid>
+    <description>Squared error, absolute error, cross-entropy and Poisson loss are one recipe applied to different noise models: write down the likelihood, take the negative log. Derived and checked in code, along with the noise variance, the separable-data trap, and L2 and L1 regularization as priors.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Why classifiers use cross-entropy, not squared error</title>
+    <link>https://r03922123.github.io/posts/cross-entropy-vs-mse/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/cross-entropy-vs-mse/</guid>
+    <description>Put squared error behind a sigmoid and a confidently wrong model all but stops learning. The gradient algebra, a training run that stalls for thousands of steps, the likelihood view, where squared error is still the right tool, and how to compute log loss without overflow.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Numerically stable softmax and cross-entropy</title>
+    <link>https://r03922123.github.io/posts/stable-softmax-cross-entropy/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/stable-softmax-cross-entropy/</guid>
+    <description>Why the textbook formulas for softmax and cross-entropy return nan and inf on ordinary logits, and the two fixes every framework uses: shift by the max, and compute log-probabilities with log-sum-exp. With the gradient, the binary case and the bugs that quietly undo both.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Entropy and information: surprise, cross-entropy and KL divergence</title>
+    <link>https://r03922123.github.io/posts/entropy-and-information/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/entropy-and-information/</guid>
+    <description>Entropy as average surprise, cross-entropy as the price of a wrong model and KL divergence as the gap between them, each checked in code, then where they show up in ML: the classification loss, perplexity, decision-tree splits and mutual information.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>L1 and L2 regularization: shrinkage, sparsity and weight decay</title>
+    <link>https://r03922123.github.io/posts/regularization-l1-l2/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/regularization-l1-l2/</guid>
+    <description>Why an L2 penalty shrinks every weight while an L1 penalty sets some of them exactly to zero, worked out on a single weight and checked against scikit-learn. Then correlated features and the elastic net, the priors behind each penalty, and why weight decay under Adam needs AdamW.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Dropout: random masks, ensembles and a hidden L2 penalty</title>
+    <link>https://r03922123.github.io/posts/dropout/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/dropout/</guid>
+    <description>What dropout does in a forward pass, why the survivors are scaled by 1/(1-p), and what it buys on a small network. Then the two exact results behind the "ensemble" story, the L2 penalty it becomes on a linear model, why it should sit after the last batch-norm layer rather than before one, and where it is still used.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>The overfitting playbook: diagnose, then pick the lever</title>
+    <link>https://r03922123.github.io/posts/overfitting-playbook/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/overfitting-playbook/</guid>
+    <description>How to tell overfitting from underfitting, distribution shift and leakage using learning curves, then the levers that fix it — more data, augmentation, weight decay, dropout, label smoothing, early stopping and capacity — each checked with a small experiment, and the order in which to reach for them.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>BatchNorm vs LayerNorm: one formula, two axes</title>
+    <link>https://r03922123.github.io/posts/batchnorm-vs-layernorm/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/batchnorm-vs-layernorm/</guid>
+    <description>Both layers subtract a mean and divide by a standard deviation; they differ only in which numbers they average over. Both built from scratch and matched to PyTorch, then what the choice of axis decides: running statistics, batch-of-one failures, folding at inference, padding and causal leaks in Transformers, and RMSNorm.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Why attention divides by the square root of d</title>
+    <link>https://r03922123.github.io/posts/attention-scaling/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/attention-scaling/</guid>
+    <description>A dot product of two random d-dimensional vectors has a standard deviation of about the square root of d, so without a correction attention scores grow with head size, softmax saturates and its gradient dies. The variance argument, measured, plus where it stops holding and the bugs that undo it.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Contrastive loss: InfoNCE from the ground up</title>
+    <link>https://r03922123.github.io/posts/contrastive-loss/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/contrastive-loss/</guid>
+    <description>How a batch of matched pairs becomes a classification problem whose answer is in the batch. The InfoNCE loss and its CLIP and SimCLR forms, what the gradient does to each negative, why the embeddings are normalized and the temperature is small, a worked two-encoder example, and the popularity bias that in-batch negatives bring with them.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Conditional probability and Bayes' rule, by counting</title>
+    <link>https://r03922123.github.io/posts/conditional-probability-bayes/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/conditional-probability-bayes/</guid>
+    <description>Conditioning means shrinking the set of outcomes you count. From that one idea come the addition and multiplication rules, the condition under which the "at least one" shortcut works, Bayes' rule and its odds form, the reason a detector with 90% recall can still be wrong two times in three, and the fix for a classifier trained at the wrong base rate.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Bernoulli and binomial: one yes-or-no, then many</title>
+    <link>https://r03922123.github.io/posts/bernoulli-binomial/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/bernoulli-binomial/</guid>
+    <description>The Bernoulli distribution for a single binary outcome and the binomial for counting them, with the mean and variance derived the short way, the PMF checked against brute-force enumeration, and worked examples on click-through rates, majority-vote ensembles and a suspicious coin, plus the assumptions that quietly break in real data.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>The Poisson distribution: counting events in a window</title>
+    <link>https://r03922123.github.io/posts/poisson-distribution/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/poisson-distribution/</guid>
+    <description>Where the Poisson comes from as the limit of many unlikely trials, why its mean and variance are both λ, how it splits, merges and links to exponential waiting times, and how to fit it and tell when real counts break it, each claim checked in code.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>The exponential distribution: waiting for the next event</title>
+    <link>https://r03922123.github.io/posts/exponential-distribution/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/exponential-distribution/</guid>
+    <description>How the waiting time in a Poisson process gets its density, why it is a PDF and not a PMF, and what follows from it: the mean and median, memorylessness and constant hazard, sampling by inverse transform, racing clocks, fitting a rate with censored data, and the waiting-time paradox. Every claim checked by simulation.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>The normal distribution: the bell curve, checked</title>
+    <link>https://r03922123.github.io/posts/normal-distribution/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/normal-distribution/</guid>
+    <description>Where the bell curve's formula comes from, why one table of the standard normal answers every normal question, which sums stay normal and which do not, how fast the central limit theorem kicks in, when the normal approximation to the binomial works, and the tail and skew pitfalls that bite in practice. Every claim checked in code.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Uncertainty in a rate: the Beta posterior, the standard error and the bootstrap</title>
+    <link>https://r03922123.github.io/posts/beta-uncertainty/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/beta-uncertainty/</guid>
+    <description>Three heads in four flips and 300 in 400 give the same rate but very different confidence. The Beta distribution as a belief about a probability, priors as pseudo-counts and why they fix rankings of new items, the probability that B beats A, the standard error of a mean derived and simulated, and the bootstrap for statistics with no formula, each checked in code.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Is this coin fair? Testing a proportion from ten flips to a million</title>
+    <link>https://r03922123.github.io/posts/is-this-coin-fair/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/is-this-coin-fair/</guid>
+    <description>A coin lands tails 8 times in 10. The exact binomial test computed by brute force, what a non-significant result does and does not tell you, how many flips you actually need, the normal approximation for large samples, a Bayesian reading, and a check that a count test cannot do.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Coin flips and the normal approximation: a binomial tail by hand</title>
+    <link>https://r03922123.github.io/posts/coin-flips-normal-approximation/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/coin-flips-normal-approximation/</guid>
+    <description>How likely is a fair coin to land heads at least 480 times in 900 flips? Solving it with nothing but a square root and the 68-95-99.7 rule, then checking how good that answer is: the continuity correction, why the rough answer is right partly by luck, where the approximation breaks, and a bound that never does.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Probability on one page: the rules, the distributions and the traps</title>
+    <link>https://r03922123.github.io/posts/probability-cheatsheet/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/probability-cheatsheet/</guid>
+    <description>A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Every formula is checked in code.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>MLE and MAP: estimating a parameter from data</title>
+    <link>https://r03922123.github.io/posts/statistical-estimation-mle-map/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/statistical-estimation-mle-map/</guid>
+    <description>Maximum likelihood picks the parameter that makes the data most probable; MAP also weighs in a prior. The recipe, where it breaks (biased variances, a uniform's endpoint, no closed form), why the MLE is approximately normal, MAP as shrinkage and as add-k smoothing, and the reparametrization trap that MAP falls into and MLE does not, each checked in code.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>P-values: what they measure and how they mislead</title>
+    <link>https://r03922123.github.io/posts/p-values/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/p-values/</guid>
+    <description>A p-value is a tail probability computed in a world where nothing is going on. Its definition checked by simulation, why rejecting at p ≤ α caps false alarms, a paired permutation test for two models on one test set, and the traps of reading it as a probability that the null is true, peeking, and testing many things at once.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>A/B testing: sample size, peeking, variance reduction and overlapping experiments</title>
+    <link>https://r03922123.github.io/posts/ab-testing/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/ab-testing/</guid>
+    <description>The parts of an online experiment around the z-test: how many users a test needs and why underpowered tests say little, why checking every day turns 5% false alarms into 25%, CUPED variance reduction and the covariate that erases your effect, and hashing users into overlapping experiments, each checked by simulation.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Causal inference without a randomized experiment</title>
+    <link>https://r03922123.github.io/posts/causal-inference/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/causal-inference/</guid>
+    <description>Why a raw comparison of treated and untreated users lies, and the toolkit for when you cannot randomize: adjusting for observed confounders, difference-in-differences, instrumental variables, regression discontinuity and synthetic control, each checked on a simulation where the true effect is known.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Simulation-based evaluation: testing a change before it meets real users</title>
+    <link>https://r03922123.github.io/posts/simulation-based-evaluation/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/simulation-based-evaluation/</guid>
+    <description>Three ways to estimate what a new policy would do before or without a live experiment (replaying logs with off-policy estimators, synthetic control, and simulating the population) each checked in a toy world where the true answer is known, plus how a simulator sizes the live test that should follow.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>ROC AUC vs PR AUC: what each curve sees</title>
+    <link>https://r03922123.github.io/posts/roc-auc-vs-pr-auc/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/roc-auc-vs-pr-auc/</guid>
+    <description>ROC AUC is the chance a random positive outranks a random negative, and it does not move when the classes get rarer. Precision does. Both curves built from scratch, the pairwise meaning of AUC checked by brute force, a model that wins on one curve and loses on the other, and how to compute and report them without fooling yourself.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Naive Bayes: count, smooth, and you have a linear classifier</title>
+    <link>https://r03922123.github.io/posts/naive-bayes/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/naive-bayes/</guid>
+    <description>Bayes' rule plus one bold assumption, that features are independent once you know the class. The multinomial model for text fitted by counting, why smoothing is not optional, the proof that it is a linear classifier in log space, the Bernoulli and Gaussian variants checked against scikit-learn, why its probabilities are overconfident, and when it beats logistic regression.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>From decision trees to boosting: one tree, then many</title>
+    <link>https://r03922123.github.io/posts/decision-trees-to-boosting/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/decision-trees-to-boosting/</guid>
+    <description>A decision tree grown from scratch and matched against scikit-learn, why one tree is fragile, how bagging and random forests average the fragility away, and how AdaBoost, gradient boosting and XGBoost build trees one after another, each fixing the last one's mistakes.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Statistics on one page: estimates, intervals, tests and the traps</title>
+    <link>https://r03922123.github.io/posts/statistics-cheatsheet/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/statistics-cheatsheet/</guid>
+    <description>A compact reference for the statistics behind experiments and model comparisons: standard errors, what a confidence interval does and does not promise, the testing loop and its two kinds of error, which test to use for which data, power and sample size, multiple comparisons and peeking, MLE versus MAP, and Simpson's paradox. The formulas and numerical claims are checked in code.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Foundation models: what a pretrained LLM actually is</title>
+    <link>https://r03922123.github.io/posts/foundation-models/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/foundation-models/</guid>
+    <description>A large language model is a next-token predictor trained once on broad text and then adapted to many tasks. The objective, the causal mask, where the parameters live, how compute is split between model size and data, the KV cache and sampling, each checked in code, then how a base model becomes an assistant.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Transformers and LLMs: the key engineering ideas</title>
+    <link>https://r03922123.github.io/posts/transformers-and-llms-key-ideas/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/transformers-and-llms-key-ideas/</guid>
+    <description>The ideas that make large language models affordable to run and train, each reduced to a small experiment: the KV cache and its memory bill, multi-query and grouped-query attention, speculative decoding and why it is exact, FlashAttention's online softmax, mixed precision, loss masking for instruction tuning, and why long contexts are not read evenly.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>FlashAttention: exact attention without the N-by-N matrix</title>
+    <link>https://r03922123.github.io/posts/flashattention/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/flashattention/</guid>
+    <description>Standard attention writes an N-by-N score matrix to GPU memory and reads it back, so it is limited by memory traffic, not arithmetic. FlashAttention computes the same output in tiles that stay on chip, using an online softmax, and recomputes the scores in the backward pass. Both passes rebuilt in NumPy and checked against PyTorch, with the traffic counted.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>LLM inference: where the time and memory go</title>
+    <link>https://r03922123.github.io/posts/llm-inference/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/llm-inference/</guid>
+    <description>Why generating text is limited by memory bandwidth rather than arithmetic, and what a serving system does about it: a roofline model of prefill and decode, the memory budget of weights and KV cache, paged KV memory, continuous batching, weight quantization with an activation-aware twist, and splitting a model across GPUs. Each idea is a small simulation checked with asserts.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>LoRA explained: why low rank, how it starts, and where it goes</title>
+    <link>https://r03922123.github.io/posts/lora-explained/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/lora-explained/</guid>
+    <description>The ideas behind low-rank adaptation rather than the code: why a fine-tuning update can be squeezed into two thin matrices, what that costs when it cannot, why B starts at zero, what the alpha over r scale really does, which layers to adapt, and the variants that change each of these choices.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Parameter-efficient fine-tuning: LoRA, QLoRA, adapters and prompts compared</title>
+    <link>https://r03922123.github.io/posts/parameter-efficient-fine-tuning/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/parameter-efficient-fine-tuning/</guid>
+    <description>Full fine-tuning against the main ways to train a sliver of a model instead: adapters, prefix and prompt tuning, IA³, LoRA and QLoRA. Where each one sits in the network, how many parameters and gigabytes it costs at 7B scale, a head-to-head on a small transformer, what each does to serving, and how to choose.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>RLHF and alignment: reward models, PPO and DPO</title>
+    <link>https://r03922123.github.io/posts/rlhf-alignment/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/rlhf-alignment/</guid>
+    <description>How a language model is tuned towards answers people prefer: a reward model fit to pairwise comparisons, the KL-regularized objective and its closed-form optimum, PPO as the way classic RLHF optimizes it, DPO as the way to skip the reward model, and a toy world where over-optimizing a good-looking reward model makes answers worse. Every claim is checked with asserts.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>RAG architecture: retrieval in front of a language model</title>
+    <link>https://r03922123.github.io/posts/rag-architecture/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/rag-architecture/</guid>
+    <description>Retrieval-augmented generation built stage by stage and checked with asserts: chunking, BM25 and vector scoring, hybrid retrieval with reciprocal rank fusion, an inverted-file index, prompt assembly under a budget, a grounding check, and telling retrieval failures from generation failures.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Vector databases: nearest-neighbor search at scale</title>
+    <link>https://r03922123.github.io/posts/vector-databases/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/vector-databases/</guid>
+    <description>What a vector database does and how it answers top-k similarity queries without scanning every vector. Exact search as a matrix product, then the three ideas behind approximate search (inverted lists, product quantization and navigable graphs), each built in NumPy and measured by recall against brute force, followed by filtering, hybrid search and how to choose.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>LLM agents: the loop, the graph, and LangChain and LangGraph</title>
+    <link>https://r03922123.github.io/posts/llm-agents-langchain-langgraph/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/llm-agents-langchain-langgraph/</guid>
+    <description>An agent is a language model in a loop that may call tools. This post builds the loop, a safe tool dispatcher and a small state graph with checkpoints and human approval in plain Python, shows how the same pieces look in LangChain and LangGraph, and ends with how to evaluate an agent's trajectory.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Two-tower retrieval: from millions of items to a few hundred candidates</title>
+    <link>https://r03922123.github.io/posts/two-tower-retrieval/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/two-tower-retrieval/</guid>
+    <description>Why the first stage of a recommender cannot score every item with a rich model, and how two encoders that meet only at a dot product get around it. A trained model with in-batch negatives and the logQ correction, an inverted-file index built from scratch, new items served through content features, and hard negatives.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Recommendation ranking: retrieve, score, re-rank</title>
+    <link>https://r03922123.github.io/posts/recommendation-ranking/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/recommendation-ranking/</guid>
+    <description>Why recommenders split the work into a cheap retrieval stage and an expensive ranking stage, what a ranker's features look like, and how pointwise, pairwise and LambdaRank losses differ. A small simulated catalogue runs the whole funnel, with NDCG built from scratch, LambdaRank gradients checked numerically, and a diversity re-ranker at the end.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Features for recommendation: user, item, context and the match between them</title>
+    <link>https://r03922123.github.io/posts/recsys-features/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/recsys-features/</guid>
+    <description>The four kinds of feature a recommender ranks with, built on a simulated click log: counts over time windows, item rates smoothed with a fitted Beta prior, trend features that do not reward size, cross features that make the ranking personal, and the point-in-time rule that keeps the offline numbers honest.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Sequential user modeling: from averaged history to target attention</title>
+    <link>https://r03922123.github.io/posts/sequential-user-modeling/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/sequential-user-modeling/</guid>
+    <description>Why averaging a user's history blurs several interests into one, how target attention (DIN) weights each past behaviour by its relevance to the item being scored, and how SIM, ETA and TWIN stretch the idea to lifelong histories of tens of thousands of events. Each step measured on synthetic data.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Transformers4Rec: session-based recommendation as language modeling</title>
+    <link>https://r03922123.github.io/posts/transformers4rec/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/transformers4rec/</guid>
+    <description>Treat a browsing session as a sentence and its items as tokens, then predict the next one. Turning an event log into sequences, a small session Transformer with tied embeddings trained from scratch, Recall@k and NDCG@k against popularity and last-item baselines, the four training objectives, side features, and how the NVIDIA Merlin libraries package all of it.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Cold start: recommending with no history</title>
+    <link>https://r03922123.github.io/posts/cold-start/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/cold-start/</guid>
+    <description>New items and new users have no interactions, so a recommender trained on interactions has nothing to say about them and, left alone, never collects any. A content-based prior for new items, simulations of greedy ranking, impression budgets and Thompson sampling, fast updates and an onboarding question for new users, graduation to the main model, and the fallback chain that keeps a feed from ever being empty.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>A framework for designing ML systems</title>
+    <link>https://r03922123.github.io/posts/ml-system-design-framework/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/ml-system-design-framework/</guid>
+    <description>Four questions to answer, in order, when designing an ML system: what the business wants and which ML objective stands in for it, what the data and labels are, which model fits the constraints, and how it is evaluated, shipped and watched. Small simulations show a proxy objective going wrong, a rule matching a model, a threshold set by business costs, and a drift alarm.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>The ML system design process, step by step</title>
+    <link>https://r03922123.github.io/posts/ml-system-design-process/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/ml-system-design-process/</guid>
+    <description>How to take a one-line request ("recommend products on the home page") to a design that can be reviewed: clarify and size the problem, write the objective in one sentence, sketch the pipeline around a baseline, specify labels and features, choose a model on explicit axes, plan the evaluation and the serving path, then work through the edge cases and the monitoring. Small calculations size the traffic, check label agreement, size an A/B test, estimate a cache hit rate and compare exploration strategies for new items.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>ML infrastructure: the plumbing around the model</title>
+    <link>https://r03922123.github.io/posts/ml-infrastructure/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/ml-infrastructure/</guid>
+    <description>The data, training and serving systems a production model depends on, each with a runnable check: a point-in-time join that stops a feature from leaking its own label, ring all-reduce, a checkpoint that resumes bit for bit and how often to take one, why fanning out makes the tail the median, caching under skewed traffic, and consistent hashing.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Docker for ML: containers, layer caching and reproducible builds</title>
+    <link>https://r03922123.github.io/posts/docker-for-ml/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/docker-for-ml/</guid>
+    <description>What a container actually is, why a model's behaviour depends on things outside its source code, how Docker's build cache decides what to rebuild, and why a lockfile matters more than the Dockerfile. Small simulations of the build cache and of an unpinned install show each rule.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Is a city crowd heatmap feasible? A design exploration</title>
+    <link>https://r03922123.github.io/posts/crowd-heatmap-feasibility/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/crowd-heatmap-feasibility/</guid>
+    <description>Working through whether one developer on a laptop could build an app that shows, and forecasts, how crowded each part of a city is. Which public data can stand in for crowd counts, how to keep it private, a forecasting baseline ladder that a simulation tests, and a batch-first system sketch that carries over from Taipei to other cities.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Solving algorithm problems under a time limit</title>
+    <link>https://r03922123.github.io/posts/solving-problems-under-time-limits/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/solving-problems-under-time-limits/</guid>
+    <description>A repeatable method for an algorithm problem against the clock: pin the problem down, let the constraints set the target complexity, write the brute force first, find what it repeats, name the pattern, list edge cases before coding, and test with a stress test against the brute force. One problem worked end to end, including a tempting wrong pattern that the stress test catches.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>ML building blocks from scratch, checked against the library</title>
+    <link>https://r03922123.github.io/posts/ml-coding-from-scratch/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/ml-coding-from-scratch/</guid>
+    <description>Softmax, an MLP with hand-written backprop, LayerNorm, BatchNorm, dropout, multi-head attention, a Transformer block, a KV cache, tiled attention, LSTM and GRU cells, convolution, LoRA, beam search, and the classical models, each written in a few lines of NumPy or PyTorch and asserted equal to the library version.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>SQL on one page: evaluation order, NULLs, joins, window functions and the classic patterns</title>
+    <link>https://r03922123.github.io/posts/sql-cheatsheet/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/sql-cheatsheet/</guid>
+    <description>A working SQL reference: the order a query is really evaluated in, how NULLs bend counting and NOT IN, joins and anti-joins, window functions and their frames, then Nth highest, top N per group, gaps and islands and deduplication. Every query runs against SQLite with asserts, and PostgreSQL-only syntax is marked.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>pandas on one page: select, group, join, reshape and regex</title>
+    <link>https://r03922123.github.io/posts/pandas-cheatsheet/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/pandas-cheatsheet/</guid>
+    <description>A working reference for the pandas operations that come up in nearly every data task: building and inspecting a frame, boolean masks, counting and ranking, missing values, groupby with agg versus transform, merges and anti-joins, melt and pivot, vectorising row logic, and string methods with a regex table. Every snippet runs on a tiny DataFrame and proves its claim with an assert.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Evaluating ML systems: classification, ranking, search and generative models</title>
+    <link>https://r03922123.github.io/posts/evaluating-ml-systems/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/evaluating-ml-systems/</guid>
+    <description>A reference that follows business value down to model metrics for four kinds of system, then covers offline tests, online experiments and the ways each step tends to break.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>LoRA from scratch, proven with asserts</title>
+    <link>https://r03922123.github.io/posts/lora-from-scratch/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/lora-from-scratch/</guid>
+    <description>Build a tiny GPT, freeze it, add LoRA adapters, fine-tune only those and fuse them back, checking every claim with an assert. Runs on a laptop CPU in seconds.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Text-to-music in 2026: models, reward models and DPO</title>
+    <link>https://r03922123.github.io/posts/text-to-music-2026/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/text-to-music-2026/</guid>
+    <description>Building text-to-music from parts, with a tensor shape at every step: codec language models from MusicGen to HeartMuLa, scoring from CLAP to the CMI reward model, and DPO derived from its objective.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Position bias: why click logs lie and how to correct them</title>
+    <link>https://r03922123.github.io/posts/position-bias/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/position-bias/</guid>
+    <description>A ranker trained on raw clicks learns position, not relevance. The examination model, a simulation of how far raw CTR misleads, and the corrections: inverse propensity weighting, dual learning, position features and interleaving.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Two pointers: move the side that limits you</title>
+    <link>https://r03922123.github.io/leetcode/two-pointers/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/two-pointers/</guid>
+    <description>Two indices walking toward each other over sorted or bounded data. Three sum, container with most water, and trapping rain water, each reduced to one rule about which pointer moves.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Sliding window: three templates and the exactly-k trick</title>
+    <link>https://r03922123.github.io/leetcode/sliding-window/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/sliding-window/</guid>
+    <description>A window over a contiguous stretch that grows on the right and shrinks on the left. Templates for the shortest valid window, the longest valid window, and counting windows with exactly k of something.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Prefix state map: subarrays as differences of prefixes</title>
+    <link>https://r03922123.github.io/leetcode/prefix-state-map/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/prefix-state-map/</guid>
+    <description>Store each prefix's state in a hash map, and a subarray becomes a pair of prefixes. Counting subarrays with sum k, nice subarrays, and the longest substring with even vowel counts using a bitmask.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Sweep line: turn intervals into events</title>
+    <link>https://r03922123.github.io/leetcode/sweep-line/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/sweep-line/</guid>
+    <description>Replace each interval with a +change at its start and a −change at its end, then sweep in order. Difference arrays, sorted events, and answering point queries with binary search.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Majority vote and the sieve of Eratosthenes</title>
+    <link>https://r03922123.github.io/leetcode/majority-vote-and-sieve/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/majority-vote-and-sieve/</guid>
+    <description>Two small classics. Boyer–Moore voting finds a majority element in one pass and O(1) space, and generalizes to elements above n/3. The sieve finds every prime below n in O(n log log n).</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Binary search on the answer</title>
+    <link>https://r03922123.github.io/leetcode/binary-search/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/binary-search/</guid>
+    <description>What bisect_left and bisect_right count, and two loop templates — the first k where a predicate turns true, the last k where it is still true — applied to problems that never mention sorting.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Merge sort, quicksort and the Dutch flag partition</title>
+    <link>https://r03922123.github.io/leetcode/sorting/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/sorting/</guid>
+    <description>The two comparison sorts worth writing from memory, what each guarantees, and the three-way partition that keeps quicksort fast when values repeat.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Quickselect: the kth element in linear expected time</title>
+    <link>https://r03922123.github.io/leetcode/quick-select/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/quick-select/</guid>
+    <description>Partition like quicksort but recurse into one side only. Why that is O(n) on average, why repeated values break the naive version, and how it compares with a heap.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Bucket sort by frequency</title>
+    <link>https://r03922123.github.io/leetcode/bucket-sort/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/bucket-sort/</guid>
+    <description>When the sort key is a count bounded by n, index buckets by the key instead of comparing. Top k frequent elements and sorting characters by frequency in linear time.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Counting pairs with i &lt; j: merge sort and sorted containers</title>
+    <link>https://r03922123.github.io/leetcode/reverse-pairs/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/reverse-pairs/</guid>
+    <description>Problems that count pairs (i, j) with i &lt; j and some inequality between values. Counting during merge sort, and the sorted-list alternative, applied to reverse pairs and a shifted-difference variant.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Rolling hash (Rabin–Karp)</title>
+    <link>https://r03922123.github.io/leetcode/rolling-hash/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/rolling-hash/</guid>
+    <description>Hash every length-m window of a string in O(1) per step by sliding a polynomial hash. Substring search, then the real use, comparing many substrings at once, with binary search on length.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>String matching with KMP and the Z-function</title>
+    <link>https://r03922123.github.io/leetcode/string-matching/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/string-matching/</guid>
+    <description>Two linear-time tools that reuse what a failed comparison already revealed. The KMP failure table, the Z-array, and how each finds a pattern or scores a string against its own prefixes.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Monotonic stack: next greater, previous smaller</title>
+    <link>https://r03922123.github.io/leetcode/monotonic-stack/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/monotonic-stack/</guid>
+    <description>A stack kept in sorted order answers "nearest larger or smaller element" for every position in one pass. The template, why it is O(n), and its two classic uses, daily temperatures and the largest rectangle.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Monotonic queue: the window maximum in O(1)</title>
+    <link>https://r03922123.github.io/leetcode/monotonic-queue/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/monotonic-queue/</guid>
+    <description>A deque kept in sorted order gives the maximum of a sliding window at every step in amortized O(1). Sliding window maximum, then the harder use, shortest subarray with sum at least k over prefix sums.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Heaps: from an array to four patterns</title>
+    <link>https://r03922123.github.io/leetcode/heap/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/heap/</guid>
+    <description>A binary heap built from scratch on a plain list, then the four ways heaps show up in problems — top k, two heaps for a running median, greedy with a heap of options, and k-way merging.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Hash tables from scratch: chaining, hash functions, resizing</title>
+    <link>https://r03922123.github.io/leetcode/hash-table/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/hash-table/</guid>
+    <description>Build a hash map with separate chaining. The division, multiplication and universal hash functions, an operator-precedence bug that quietly changes which bits you keep, and why doubling keeps operations O(1) on average.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Binary tree traversal without recursion</title>
+    <link>https://r03922123.github.io/leetcode/tree-traversal/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/tree-traversal/</guid>
+    <description>Preorder, inorder and postorder with an explicit stack, one template that does all three, Morris traversal in O(1) space, and the traversals behind validating a BST and vertical order.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Tries: prefix trees for word search and autocomplete</title>
+    <link>https://r03922123.github.io/leetcode/trie/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/trie/</guid>
+    <description>A tree keyed by characters, where every path from the root spells a prefix. Insert and search in O(word length), then the two places tries pay off — searching a grid for many words at once, and top-k autocomplete.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Range queries: Fenwick trees, segment trees, lazy propagation</title>
+    <link>https://r03922123.github.io/leetcode/segment-tree/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/segment-tree/</guid>
+    <description>Three structures for arrays that change while you query them. A Fenwick tree for prefix sums, an iterative segment tree for any associative operation, and lazy propagation for updating whole ranges, each checked against brute force.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Union–find: merging groups in nearly constant time</title>
+    <link>https://r03922123.github.io/leetcode/union-find/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/union-find/</guid>
+    <description>A forest of parent pointers that merges sets and answers "same group?" in amortized near-O(1). Path halving and union by size, then connectivity, cycle detection, and processing events in reverse.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>BFS: shortest paths by layers, and from both ends</title>
+    <link>https://r03922123.github.io/leetcode/bfs/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/bfs/</guid>
+    <description>Breadth-first search finds shortest paths when every step costs the same. The layer-by-layer template, BFS over a state space larger than the grid, 0-1 BFS for two edge costs, and bidirectional search.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>DFS: reachability, components and connectivity</title>
+    <link>https://r03922123.github.io/leetcode/dfs/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/dfs/</guid>
+    <description>Depth-first search as the tool for "what can I reach?". An iterative template, counting components, testing whether a directed graph is strongly connected with one reversed pass, and finding bridges with low-link values.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Dijkstra's algorithm, three ways</title>
+    <link>https://r03922123.github.io/leetcode/dijkstra/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/dijkstra/</guid>
+    <description>Single-source shortest paths with non-negative weights. Why settling the closest node is safe, the heap version with lazy deletion, the O(n²) array version for dense graphs, and variants that change what "distance" means.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Shortest paths beyond Dijkstra: Bellman–Ford, Floyd–Warshall and A*</title>
+    <link>https://r03922123.github.io/leetcode/shortest-paths/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/shortest-paths/</guid>
+    <description>Three shortest-path algorithms for when Dijkstra is the wrong tool. Bellman–Ford as a DP over edge counts (negative edges, negative cycles, at most k stops), Floyd–Warshall as a DP over allowed middle nodes, and A* with a heuristic that never overestimates.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Topological sort: ordering a DAG</title>
+    <link>https://r03922123.github.io/leetcode/topological-sort/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/topological-sort/</guid>
+    <description>Why a directed graph can be lined up so every edge points forward exactly when it has no cycle, then the two standard algorithms (Kahn's queue of ready nodes and DFS finishing order), each detecting cycles for free, and two harder uses: two-level ordering and longest paths in a DAG.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Spanning trees, Euler paths and matchings</title>
+    <link>https://r03922123.github.io/leetcode/graph-algorithms/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/graph-algorithms/</guid>
+    <description>Three classic graph algorithms beyond shortest paths. Minimum spanning trees from the cut and cycle properties (Kruskal, Prim, and the O(n²) dense Prim), Hierholzer's algorithm for Euler paths, and Kuhn's augmenting paths for bipartite matching.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Dynamic programming: SRTBOT, subsequences and stock state machines</title>
+    <link>https://r03922123.github.io/leetcode/dynamic-programming/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/dynamic-programming/</guid>
+    <description>A six-step recipe for writing any DP, then four classics built with it — longest common subsequence, palindromic subsequences, the whole stock-trading family as one state machine, and Kadane's maximum subarray.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Knapsack: choosing items under a budget</title>
+    <link>https://r03922123.github.io/leetcode/knapsack/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/knapsack/</guid>
+    <description>0/1 and unbounded knapsack written three ways (memoized recursion, a full table, one rolling row), why the inner loop runs backwards for one and forwards for the other, how to read the chosen items back out, and four LeetCode problems that are knapsack in disguise.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Bitmask DP: dynamic programming over subsets</title>
+    <link>https://r03922123.github.io/leetcode/bitmask-dp/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/bitmask-dp/</guid>
+    <description>When n is around 20, a subset fits in one integer and "which items are used" becomes a DP index. Three archetypes (ordering, grouping, assignment), Held–Karp for the travelling salesman, BFS over (node, mask), and submask enumeration in O(3^n).</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Bit manipulation: identities, XOR tricks and counting bits</title>
+    <link>https://r03922123.github.io/leetcode/bit-manipulation/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/bit-manipulation/</guid>
+    <description>The handful of two's-complement identities that power most bit tricks (lowest set bit, clearing it, popcount, parity, rounding to powers of two, reversing bits, Gosper's hack), then XOR for the Single Number family and a DP for counting bits.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Game theory: minimax on the score difference</title>
+    <link>https://r03922123.github.io/leetcode/game-theory/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/leetcode/game-theory/</guid>
+    <description>Two players, perfect information, both playing their best. One recurrence on "my score minus yours" solves the stone-game family (877, 486, 1406, 1140), and a win/lose labelling of positions explains Nim, with a short look at Sprague–Grundy numbers.</description>
+    <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Judging text-to-music: CLAP best-of-N, then and now</title>
+    <link>https://r03922123.github.io/musicgen-prune-inference/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/musicgen-prune-inference/</guid>
+    <description>How generated music is judged, from FID and CLIP score to FAD, CLAP and learned music judges; why picking the best of N takes by CLAP is legitimate; and four ways to extend it, including pruning weak takes early.</description>
+    <pubDate>Sat, 24 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Inside MusicGen decoding: tokens, guidance and exact pruning</title>
+    <link>https://r03922123.github.io/musicgen-prune-inference/decoding/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/musicgen-prune-inference/decoding/</guid>
+    <description>RVQ and the delay pattern, classifier-free guidance, where a decoding step's time goes on a T4, pruning a running batch without changing the survivors, and the design of a best-of-N music service.</description>
+    <pubDate>Sat, 24 Oct 2026 00:00:00 +0800</pubDate>
+  </item>
+</channel>
+</rss>
