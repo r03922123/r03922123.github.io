@@ -1,0 +1,376 @@
+# Entropy and information: surprise, cross-entropy and KL divergence
+
+Train a classifier with cross-entropy loss, score a language model by perplexity, or grow a decision tree by information gain, and you are using three quantities from information theory: entropy, cross-entropy and KL divergence. All three come from one idea, how surprised you are when something happens, and one identity ties them together. This post builds them from that idea, checks each claim in code, then shows where they turn up in machine learning.
+
+## Surprise
+Take one outcome \(x\) with probability \(p(x)\). Its surprise, or information content, is
+
+\[ s(x) = \log \frac{1}{p(x)} = -\log p(x). \]
+
+The logarithm is not arbitrary. Surprise should be zero for a sure thing, grow as the outcome gets rarer, and add up over independent events. A pair of independent events has probability \(pq\), so we need \(s(pq) = s(p) + s(q)\), and the continuous functions with that property are exactly the multiples of \(\log p\). The base only sets the unit: base 2 gives **bits**, base \(e\) gives **nats**, and one nat is \(1/\ln 2 \approx 1.44\) bits. A fair coin landing heads is 1 bit of surprise; a fair die showing a six is \(\log_2 6 \approx 2.58\) bits.
+
+## Entropy is average surprise
+Entropy is the surprise you expect before you look:
+
+\[ H(P) = \mathbb{E}_{x \sim P}\big[-\log p(x)\big] = -\sum_x p(x) \log p(x), \]
+
+with the convention \(0 \log 0 = 0\): an outcome that never happens never surprises anyone. Entropy is zero for a point mass and largest, \(\log K\), for the uniform distribution over \(K\) outcomes. For a coin with heads probability \(p\):
+
+| heads probability | 0.5 | 0.9 | 0.99 |
+|---|---|---|---|
+| entropy (bits per flip) | 1.000 | 0.469 | 0.081 |
+
+A coin that lands heads 99 times in 100 carries less than a tenth of a bit per flip.
+
+```python
+import math
+import numpy as np
+from scipy import stats
+
+
+def surprise(p, base=2):
+    return -math.log(p, base)
+
+
+assert surprise(1.0) == 0
+assert math.isclose(surprise(0.5), 1.0)                                   # a fair coin: 1 bit
+assert math.isclose(surprise(0.5 * 0.25), surprise(0.5) + surprise(0.25))  # independent events add
+
+
+def entropy(p, base=2):
+    p = np.asarray(p, dtype=float)
+    nz = p[p > 0]                                    # 0 log 0 = 0
+    return float(-(nz * np.log(nz)).sum() / np.log(base))
+
+
+assert entropy([1, 0, 0]) == 0
+assert math.isclose(entropy(np.ones(6) / 6), math.log2(6))               # a fair die: 2.585 bits
+assert [round(entropy([p, 1 - p]), 3) for p in (0.5, 0.9, 0.99)] == [1.0, 0.469, 0.081]
+
+rng = np.random.default_rng(0)
+for _ in range(1000):
+    p = rng.dirichlet(np.ones(6))
+    assert math.isclose(entropy(p), stats.entropy(p, base=2))            # agrees with scipy
+    assert 0 <= entropy(p) <= math.log2(6)                               # uniform is the maximum
+```
+
+### Entropy is the length of the best code
+Shannon's source coding theorem makes entropy concrete: it is the fewest bits per symbol any lossless code can average. A Huffman code, built by repeatedly merging the two least likely symbols (a [heap](/leetcode/heap/) at work), lands within one bit of that bound, and hits it exactly when every probability is a power of one half.
+
+```python
+import heapq
+from itertools import count
+
+
+def huffman_lengths(p):
+    """Codeword length of each symbol in an optimal prefix code."""
+    tie = count()
+    heap = [(pi, next(tie), [i]) for i, pi in enumerate(p)]
+    heapq.heapify(heap)
+    lengths = [0] * len(p)
+    while len(heap) > 1:
+        pa, _, a = heapq.heappop(heap)
+        pb, _, b = heapq.heappop(heap)
+        for i in a + b:
+            lengths[i] += 1                          # each merge adds one bit to every symbol beneath it
+        heapq.heappush(heap, (pa + pb, next(tie), a + b))
+    return lengths
+
+
+def avg_length(p, lengths):
+    return sum(pi * li for pi, li in zip(p, lengths))
+
+
+dyadic = [0.5, 0.25, 0.125, 0.125]
+assert huffman_lengths(dyadic) == [1, 2, 3, 3]
+assert math.isclose(avg_length(dyadic, huffman_lengths(dyadic)), entropy(dyadic))   # 1.75 bits, exactly
+
+for _ in range(500):
+    p = rng.dirichlet(np.ones(8))
+    L = avg_length(p, huffman_lengths(p))
+    assert entropy(p) - 1e-12 <= L < entropy(p) + 1                      # H <= L < H + 1
+```
+
+## Cross-entropy: the cost of the wrong model
+Now suppose the data come from \(P\) but you believe \(Q\). Each outcome surprises you by \(-\log q(x)\), and averaging over what really happens gives the cross-entropy:
+
+\[ H(P, Q) = -\sum_x p(x) \log q(x). \]
+
+In coding terms, you built your code for \(Q\) and used it on data from \(P\). Take \(Q = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)\), whose Huffman code has lengths 1, 2, 3, 3, and use it on data from the reverse, \(P = (\tfrac18, \tfrac18, \tfrac14, \tfrac12)\). The common symbols now get the long codewords: the average length is \(\tfrac18 \cdot 1 + \tfrac18 \cdot 2 + \tfrac14 \cdot 3 + \tfrac12 \cdot 3 = 2.625\) bits, against 1.75 for a code built for \(P\).
+
+## KL divergence: the gap
+The extra cost of believing the wrong distribution is the Kullback–Leibler divergence:
+
+\[ D_{\mathrm{KL}}(P \,\|\, Q) = H(P, Q) - H(P) = \sum_x p(x) \log \frac{p(x)}{q(x)}. \]
+
+In the example it is \(2.625 - 1.75 = 0.875\) bits per symbol. Read the other way, \(H(P, Q) = H(P) + D_{\mathrm{KL}}(P \,\|\, Q)\): the surprise you suffer is the irreducible uncertainty in the data plus a penalty for the wrong model. Three properties do most of the work.
+
+- **It is never negative**, and zero only when \(Q = P\) (Gibbs' inequality). Jensen's inequality on the concave log gives \(-D_{\mathrm{KL}}(P \,\|\, Q) = \sum_x p(x) \log \frac{q(x)}{p(x)} \le \log \sum_x q(x) \le 0\), where both sums run over the outcomes with \(p(x) > 0\).
+- **It is not symmetric**, so it is not a distance: in general \(D_{\mathrm{KL}}(P \,\|\, Q) \ne D_{\mathrm{KL}}(Q \,\|\, P)\).
+- **It can be infinite.** If \(Q\) rules out something \(P\) allows, a single outcome with \(q(x) = 0 < p(x)\) costs \(-\log 0 = \infty\).
+
+```python
+def cross_entropy(p, q, base=2):
+    p, q = np.asarray(p, dtype=float), np.asarray(q, dtype=float)
+    m = p > 0
+    if np.any(q[m] == 0):
+        return math.inf                              # something the model called impossible happened
+    return float(-(p[m] * np.log(q[m])).sum() / np.log(base))
+
+
+def kl(p, q, base=2):
+    return cross_entropy(p, q, base) - entropy(p, base)
+
+
+P = [0.125, 0.125, 0.25, 0.5]
+Q = [0.5, 0.25, 0.125, 0.125]
+assert math.isclose(avg_length(P, huffman_lengths(Q)), cross_entropy(P, Q))   # 2.625 bits
+assert math.isclose(kl(P, Q), 0.875)
+
+for _ in range(1000):
+    p, q = rng.dirichlet(np.ones(5)), rng.dirichlet(np.ones(5))
+    assert kl(p, q) >= 0                                                  # Gibbs' inequality
+    assert math.isclose(kl(p, q), stats.entropy(p, q, base=2))            # scipy's relative entropy
+assert abs(kl(P, P)) < 1e-12
+
+assert round(kl([0.9, 0.1], [0.5, 0.5]), 3) == 0.531                     # not symmetric ...
+assert round(kl([0.5, 0.5], [0.9, 0.1]), 3) == 0.737
+assert kl([0.5, 0.5], [1, 0]) == math.inf                                 # ... and unbounded
+assert kl([1, 0], [0.5, 0.5]) == 1.0
+```
+
+### Which direction to minimize
+When \(Q\) is a model fitted to \(P\), the asymmetry decides what the fit looks like. Fit one Gaussian to a mixture of two well-separated bumps at \(-3\) and \(3\):
+
+- The **forward** KL, \(D_{\mathrm{KL}}(P \,\|\, Q)\), averages over the data, so it punishes \(Q\) wherever \(P\) has mass and \(Q\) does not. The fit covers both bumps with one wide Gaussian that matches the mean and variance of \(P\): \(\mu = 0\), \(\sigma = \sqrt{10}\).
+- The **reverse** KL, \(D_{\mathrm{KL}}(Q \,\|\, P)\), averages over the model, so it punishes \(Q\) for mass where \(P\) has none. The fit sits on one bump and ignores the other.
+
+```python
+from scipy.special import logsumexp
+
+x = np.linspace(-12, 12, 601)                                             # a fine grid stands in for the real line
+log_p = np.logaddexp(stats.norm.logpdf(x, -3, 1), stats.norm.logpdf(x, 3, 1))
+log_p -= logsumexp(log_p)                                                 # normalize on the grid
+
+mus, sigmas = np.arange(-5, 5.001, 0.1), np.arange(0.5, 5.001, 0.05)
+log_q = stats.norm.logpdf(x, mus[:, None, None], sigmas[None, :, None])
+log_q -= logsumexp(log_q, axis=-1, keepdims=True)
+
+forward = (np.exp(log_p) * (log_p - log_q)).sum(-1)                       # KL(P || Q) for every (mu, sigma)
+reverse = (np.exp(log_q) * (log_q - log_p)).sum(-1)                       # KL(Q || P)
+
+i, j = np.unravel_index(forward.argmin(), forward.shape)
+assert abs(mus[i]) < 0.05 and abs(sigmas[j] - math.sqrt(10)) < 0.1        # one wide bump over both modes
+i, j = np.unravel_index(reverse.argmin(), reverse.shape)
+assert abs(abs(mus[i]) - 3) < 0.05 and abs(sigmas[j] - 1) < 0.05          # locks onto a single mode
+```
+
+Maximum likelihood is the forward direction, as the next section shows. Variational inference minimizes the reverse direction, one reason variational posteriors tend to come out too narrow, and the KL penalty in [RLHF](../rlhf-alignment/) is also taken under the policy being trained.
+
+### Total variation, a true distance
+For a measure that is symmetric and bounded, use the total variation distance:
+
+\[ \mathrm{TV}(P, Q) = \frac12 \sum_x \lvert p(x) - q(x) \rvert = \max_{A} \, \lvert P(A) - Q(A) \rvert, \]
+
+the most any single event's probability can differ between the two. The factor of one half puts it in \([0, 1]\) and makes it equal that largest gap. Pinsker's inequality, \(\mathrm{TV}(P, Q) \le \sqrt{D_{\mathrm{KL}}(P \,\|\, Q) / 2}\) with KL in nats, means a small KL guarantees no event's probability is far off. The converse fails: TV is at most 1 while KL can be infinite.
+
+```python
+from itertools import combinations
+
+
+def tv(p, q):
+    return 0.5 * float(np.abs(np.asarray(p) - np.asarray(q)).sum())
+
+
+for _ in range(200):
+    p, q = rng.dirichlet(np.ones(5)), rng.dirichlet(np.ones(5))
+    largest_gap = max(abs(p[list(A)].sum() - q[list(A)].sum())           # brute force over all 32 events
+                      for r in range(6) for A in combinations(range(5), r))
+    assert math.isclose(tv(p, q), largest_gap)
+    assert tv(p, q) <= math.sqrt(kl(p, q, base=math.e) / 2)               # Pinsker's inequality
+```
+
+## Cross-entropy loss is KL to the labels
+A classifier outputs a distribution \(q\) over classes, and the label is a distribution too, with all its mass on the true class \(y\). The cross-entropy between them is \(-\log q_y\), the usual loss. A one-hot distribution has zero entropy, so per example the loss is exactly the KL divergence from label to prediction.
+
+Over a whole dataset, the average negative log-likelihood is the cross-entropy between the empirical distribution \(\hat P\) and the model:
+
+\[ -\frac{1}{n} \sum_{i=1}^{n} \log q_\theta(x_i) = H(\hat P, Q_\theta) = H(\hat P) + D_{\mathrm{KL}}(\hat P \,\|\, Q_\theta). \]
+
+\(H(\hat P)\) does not depend on \(\theta\), so maximum likelihood, minimum cross-entropy and minimum forward KL from the data are the same fit. For a categorical model the optimum is the empirical frequencies, and the loss left over is \(H(\hat P)\). The same argument gives squared error under Gaussian noise ([regression as maximum likelihood](../regression-as-maximum-likelihood/)), a prior turns it into MAP ([MLE and MAP](../statistical-estimation-mle-map/)), and [cross-entropy vs MSE](../cross-entropy-vs-mse/) covers why this loss trains classifiers better.
+
+Label smoothing makes that floor visible. With smoothing \(\varepsilon\) over \(K\) classes the target puts \(1 - \varepsilon + \varepsilon / K\) on the true class and \(\varepsilon / K\) on each other class. That target has positive entropy, so the loss never reaches zero: its minimum is the target's entropy, reached when the softmax equals the target.
+
+```python
+import torch
+import torch.nn.functional as F
+
+data = rng.choice(4, size=1000, p=[0.4, 0.3, 0.2, 0.1])
+p_hat = np.bincount(data, minlength=4) / len(data)                        # empirical distribution
+
+
+def avg_nll(q):                                                           # average negative log-likelihood, nats
+    return float(-np.log(np.asarray(q)[data]).mean())
+
+
+for _ in range(200):
+    q = rng.dirichlet(np.ones(4))
+    assert math.isclose(avg_nll(q), entropy(p_hat, math.e) + kl(p_hat, q, math.e))   # NLL = H + KL
+    assert avg_nll(q) >= avg_nll(p_hat)                                   # the MLE is the frequencies
+
+torch.manual_seed(0)
+logits, y = torch.randn(8, 5), torch.randint(0, 5, (8,))
+q = logits.softmax(-1)
+loss = F.cross_entropy(logits, y)                                         # mean of -log q[label]
+per_example_kl = [kl(F.one_hot(y, 5)[i].numpy(), q[i].double().numpy(), math.e) for i in range(8)]
+assert torch.isclose(loss, -q[torch.arange(8), y].log().mean())
+assert math.isclose(loss.item(), np.mean(per_example_kl), rel_tol=1e-5)   # one-hot labels: CE = KL
+
+eps = 0.1
+target = (1 - eps) * F.one_hot(y, 5) + eps / 5                            # what label_smoothing=0.1 trains toward
+best = target.log().requires_grad_()                                      # logits whose softmax is the target
+floor = F.cross_entropy(best, y, label_smoothing=eps)
+floor.backward()
+assert math.isclose(floor.item(), entropy(target[0].numpy(), math.e), rel_tol=1e-5)
+assert best.grad.abs().max() < 1e-6                                       # a minimum: the loss stops at H(target)
+```
+
+## Perplexity
+A language model is scored on held-out text by its average cross-entropy per token, and perplexity exponentiates that in the base of its log: \(e^{H}\) for nats, \(2^{H}\) for bits, the same value either way. A model guessing uniformly over \(V\) tokens has perplexity exactly \(V\), so perplexity reads as the number of equally likely choices the model is torn between at each token.
+
+Lower perplexity means less surprised by the text, which is not the same as more confident. Cross-entropy charges heavily for confident mistakes, so a model that claims more certainty than its accuracy supports pays for it. The three models below all rank the true token first 80% of the time and differ only in the probability on their top guess:
+
+| probability on top guess | 0.60 | 0.80 | 0.95 |
+|---|---|---|---|
+| perplexity, \(V = 50\) | 3.94 | 3.59 | 4.13 |
+
+The rest of each model's probability is spread evenly over the other 49 tokens. The one whose stated confidence matches its 80% hit rate has the lowest perplexity, and the overconfident one is worse than the timid one.
+
+```python
+V = 50
+uniform_nats = -np.log(np.full(1000, 1 / V)).mean()
+assert math.isclose(math.exp(uniform_nats), V)                            # uniform guessing: perplexity V
+assert math.isclose(math.exp(uniform_nats), 2 ** (uniform_nats / math.log(2)))   # bits give the same number
+
+
+def perplexity(prob_of_true_token):
+    return math.exp(-np.mean(np.log(prob_of_true_token)))
+
+
+correct = np.arange(10_000) % 5 != 0                                      # top guess right exactly 80% of the time
+ppl = {c: perplexity(np.where(correct, c, (1 - c) / (V - 1))) for c in (0.6, 0.8, 0.95)}
+assert [round(ppl[c], 2) for c in (0.6, 0.8, 0.95)] == [3.94, 3.59, 4.13]  # calibrated (0.8) is lowest
+```
+
+Perplexity is only comparable on the same text with the same tokenizer: splitting text into more, shorter tokens changes the per-token number without the model improving.
+
+## Conditional entropy and mutual information
+Conditional entropy is the uncertainty left in \(X\) once you know \(Y\), averaged over the values of \(Y\):
+
+\[ H(X \mid Y) = \sum_y p(y) \, H(X \mid Y = y). \]
+
+It is the law of total expectation applied to surprise: the expected surprise given each \(y\), weighted by how often \(y\) occurs. Mutual information is how much knowing \(Y\) lowers the uncertainty about \(X\):
+
+\[ I(X; Y) = H(X) - H(X \mid Y) = D_{\mathrm{KL}}\big(P_{XY} \,\|\, P_X P_Y\big). \]
+
+The KL form shows it is symmetric, never negative, and zero exactly when \(X\) and \(Y\) are independent. If \(Y\) determines \(X\), then \(H(X \mid Y) = 0\) and \(I(X; Y) = H(X)\). Most pairs sit in between, and any dependence at all, even one that never lets you name \(X\), gives positive mutual information.
+
+Conditioning lowers entropy on average, not case by case. Below, \(X\) is almost always 0, but in the rare case \(Y = 1\) it becomes a fair coin, so that observation leaves you more uncertain than before.
+
+```python
+def conditional_entropy(joint):                                           # H(X | Y), with joint[x, y]
+    p_y = joint.sum(0)
+    return sum(p_y[k] * entropy(joint[:, k] / p_y[k]) for k in range(len(p_y)) if p_y[k] > 0)
+
+
+def mutual_information(joint):
+    return entropy(joint.sum(1)) - conditional_entropy(joint)
+
+
+joint = np.array([[0.90, 0.05],                                           # rows x = 0, 1; columns y = 0, 1
+                  [0.00, 0.05]])
+p_x, p_y = joint.sum(1), joint.sum(0)
+assert math.isclose(entropy(joint[:, 1] / p_y[1]), 1.0) and entropy(p_x) < 0.3   # y = 1 raises uncertainty
+assert conditional_entropy(joint) < entropy(p_x)                          # but on average it falls
+assert math.isclose(mutual_information(joint), kl(joint.ravel(), np.outer(p_x, p_y).ravel()))
+assert abs(mutual_information(np.outer([0.3, 0.7], [0.6, 0.4]))) < 1e-12  # independent: zero
+assert math.isclose(mutual_information(np.diag([0.2, 0.3, 0.5])), entropy([0.2, 0.3, 0.5]))  # Y fixes X
+```
+
+### Information gain is mutual information
+A decision tree scores a split by its information gain, the label entropy at the parent minus the size-weighted entropy of the children:
+
+\[ \mathrm{IG} = H(\text{parent}) - \sum_{c} \frac{n_c}{n} H(c). \]
+
+That is \(H(Y) - H(Y \mid \text{side})\) on the node's samples: the mutual information between the label and the side of the split. scikit-learn's `mutual_info_score` gives the same number in nats, and a depth-one tree with `criterion="entropy"` splits on the feature with the largest gain. [From decision trees to boosting](../decision-trees-to-boosting/) carries on from there.
+
+```python
+from sklearn.metrics import mutual_info_score
+from sklearn.tree import DecisionTreeClassifier
+
+
+def information_gain(y, split):
+    gain = entropy(np.bincount(y) / len(y))
+    for side in (False, True):
+        child = y[split == side]
+        gain -= len(child) / len(y) * entropy(np.bincount(child) / len(child))
+    return gain
+
+
+n = 2000
+labels = rng.integers(0, 3, n)
+features = np.column_stack([
+    (labels == 2) ^ (rng.random(n) < 0.3),                                # weakly informative
+    (labels >= 1) ^ (rng.random(n) < 0.1),                                # strongly informative
+    rng.random(n) < 0.5,                                                  # pure noise
+])
+gains = [information_gain(labels, features[:, k]) for k in range(3)]
+for k in range(3):
+    assert math.isclose(gains[k], mutual_info_score(labels, features[:, k]) / math.log(2), rel_tol=1e-9)
+stump = DecisionTreeClassifier(criterion="entropy", max_depth=1).fit(features, labels)
+assert stump.tree_.feature[0] == int(np.argmax(gains)) == 1
+assert 0 < gains[2] < 0.01                                                # noise still shows a little gain
+```
+
+## Pitfalls
+- **Mixed units.** `scipy.stats.entropy`, `mutual_info_score` and PyTorch's losses use nats. Say which unit a number is in, and exponentiate in the matching base for perplexity.
+- **Zeros.** One zero in the model's distribution where the data has mass makes cross-entropy and KL infinite. Keep model probabilities off zero, and compute log-probabilities with `log_softmax`, not `log(softmax(...))`, which underflows to minus infinity once the gap between logits is large ([stable softmax and cross-entropy](../stable-softmax-cross-entropy/)).
+- **KL is not a distance.** It is asymmetric and unbounded. For a symmetric score use total variation, or the Jensen–Shannon divergence, the average KL from each distribution to their 50/50 mixture.
+- **Plug-in estimates are biased.** Entropy from sample frequencies runs low and mutual information runs high: the pure-noise feature above still shows a small gain. With 20 draws from 10 equally likely values, the plug-in entropy averages about 2.95 bits instead of 3.32. The Miller–Madow correction adds back \((K - 1)/(2n)\) nats, with \(K\) the number of values actually seen; when ranking features, compare each with the gain of a shuffled copy.
+- **Continuous entropy is different.** Differential entropy, \(-\int f(x) \log f(x) \, dx\), can be negative and moves when you change units: a Gaussian has \(\tfrac12 \log(2 \pi e \sigma^2)\), negative once \(\sigma\) is small. KL between densities stays non-negative and unit-free, which is why KL carries over to continuous models and entropy needs care.
+
+```python
+counts = [np.bincount(rng.integers(0, 10, 20), minlength=10) for _ in range(5000)]
+plug_in = np.array([entropy(c / 20) for c in counts])
+assert abs(plug_in.mean() - 2.95) < 0.02 and math.log2(10) - plug_in.mean() > 0.3   # runs low: 2.95, not 3.32
+miller_madow = plug_in + np.array([(np.count_nonzero(c) - 1) / (2 * 20) for c in counts]) / math.log(2)
+assert abs(miller_madow.mean() - math.log2(10)) < abs(plug_in.mean() - math.log2(10)) / 2   # most of the gap closed
+
+big = torch.tensor([[0.0, 120.0]])
+assert torch.isinf(big.softmax(-1).log()[0, 0])                           # exp(-120) underflows in float32
+assert torch.isfinite(F.log_softmax(big, -1)).all()
+
+assert stats.norm(scale=0.1).entropy() < 0                                # differential entropy can be negative
+metres, centimetres = stats.norm(0, 1).entropy(), stats.norm(0, 100).entropy()
+assert math.isclose(centimetres - metres, math.log(100))                  # and moves when the units change
+
+from scipy.integrate import quad
+
+
+def gaussian_kl(s1, s2, unit=1.0):                                        # KL(N(0, s1^2) || N(0, s2^2)), nats
+    p, q = stats.norm(0, s1 * unit), stats.norm(0, s2 * unit)             # the same two densities in other units
+    integrand = lambda x: p.pdf(x) * (p.logpdf(x) - q.logpdf(x))
+    return quad(integrand, -12 * s1 * unit, 12 * s1 * unit, epsabs=0, epsrel=1e-10)[0]
+
+
+closed_form = math.log(1 / 0.5) + 0.5 ** 2 / 2 - 0.5                      # log(s2/s1) + s1^2/(2 s2^2) - 1/2
+assert math.isclose(gaussian_kl(0.5, 1), closed_form, rel_tol=1e-7)
+assert math.isclose(gaussian_kl(0.5, 1, unit=100), closed_form, rel_tol=1e-7)   # KL ignores units
+```
+
+## Sources and further reading
+The derivation of entropy and KL divergence as expected surprise follows Stanford's CS109 (Probability for Computer Scientists) course notes, rewritten here with new examples and code. The forward-versus-reverse fit is the classic two-bump comparison from Bishop's Pattern Recognition and Machine Learning (2006).
+
+- C. E. Shannon, "A Mathematical Theory of Communication", Bell System Technical Journal, 1948: the original paper.
+- T. M. Cover and J. A. Thomas, Elements of Information Theory, 2nd edition, Wiley, 2006: the standard reference.
+- Chris Olah, [Visual Information Theory](https://colah.github.io/posts/2015-09-Visual-Information/): the same ideas, drawn as pictures.
