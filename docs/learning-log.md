@@ -2,6 +2,26 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: reading-shell layout
+
+Second of the spec's two PRs: the layout itself, on 90 posts, two lists, About and 404.
+
+1. **Let code grow toward the empty side.** The side column holds the right of the text and the left was empty,
+   so code and tables of 5 or more columns grow left only, ending at the text's right edge, and only as far as their
+   longest line needs (up to 1040 px). It is like a wide figure in a book taking the free margin, never the one with
+   the notes. Trade-off: code blocks of different lengths start at different left edges. Risk: the room on the left
+   is computed with a container unit (`100cqw`); a browser without it would let a long block run off the page.
+2. **Switch the layout on by what a page holds, not by a list of pages.** `body:has(.post-body)` widens any page
+   that holds an article, so every post gets the grid and the home, lists, About and 404 keep 760 px with no
+   per-page class. It is like a lab rule for "any sample that contains X" instead of a list of sample ids: a new
+   post is covered without anyone remembering it. Trade-off: it needs `:has`, which Firefox gained only in late 2023.
+   Risk: a future page that reuses `.post-body` for something else gets the wide grid too.
+3. **Check the pages that skip the template.** Two templates regenerate 86 posts, but 4 long-form pages, About and
+   404 are edited by hand and could quietly keep the old markup. The site check now fails on a reading page without
+   the two font preloads, or an article without its side and text columns. It is like an extra checklist line for
+   the samples prepared by hand, outside the automated pipeline. Trade-off: it reads class names as plain strings.
+   Risk: it proves the columns exist, not how they look; that is still the browser check's job.
+
 ## 2026-11-11 · build: reading-shell
 
 First of the spec's two PRs: the fragment-link check alone, before the layout moves any heading.
