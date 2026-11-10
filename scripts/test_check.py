@@ -29,6 +29,15 @@ RSS = '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><titl
 ITEM = f"<item><title>A</title><link>{SITE}/posts/a/</link><pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate></item>"
 SITEMAP = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{}</urlset>\n'
 FIXED = ("/", "/about.html", "/posts/", "/leetcode/")
+TAGGED = PAGE.replace("</head>", "{head}</head>")
+LD = '<script type="application/ld+json">{"@type": "BlogPosting"}</script>\n'
+
+
+def head(path, post=False, md=False):
+    """The head tags required once the feed build exists: canonical and feed link on every page; on posts, JSON-LD,
+    and the Markdown alternate when the post has a source."""
+    tags = f'<link rel="canonical" href="{SITE}{path}">\n<link rel="alternate" type="application/rss+xml" href="{SITE}/rss.xml">\n'
+    return tags + (f'<link rel="alternate" type="text/markdown" href="{SITE}{path}index.md">\n' if md else "") + (LD if post else "")
 
 
 class CheckTest(unittest.TestCase):
@@ -230,19 +239,27 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertIn("posts/a/", out[0])
 
-    def feed_site(self, drop_url=None, item=ITEM, **files):
-        """A small site with every feed file in order: a topic post and a LeetCode post, each with a source and its
-        index.md. A keyword replaces one file, None deletes it."""
-        urls = [u for u in (*FIXED, "/posts/a/", *MUSICGEN_PATHS, "/leetcode/b/") if u != drop_url]
-        site = {"index.html": PAGE.format(body=""), "posts/index.html": PAGE.format(body='<a href="a/">a</a>' + MUSICGEN),
-                "posts/a/index.html": PAGE.format(body=""), "posts/a/index.md": "# A\n\nbody\n",
-                "tools/posts/src/a.md": "---\ntitle: A\n---\nbody\n", "tools/feeds/build.py": "",
-                "leetcode/index.html": PAGE.format(body='<a href="b/">b</a>'), "leetcode/b/index.html": PAGE.format(body=""),
+    def feed_site(self, drop_url=None, item=ITEM, edit=None, **files):
+        """A small site with every feed file and head tag in order: a topic post and a LeetCode post, each with a
+        source and its index.md, and a hand-written post c with no source. A keyword replaces one file, None deletes
+        it; edit=(path, old, new) changes one page."""
+        urls = [u for u in (*FIXED, "/posts/a/", "/posts/c/", *MUSICGEN_PATHS, "/leetcode/b/") if u != drop_url]
+        site = {"index.html": TAGGED.format(head=head("/"), body=""),
+                "posts/index.html": TAGGED.format(head=head("/posts/"), body='<a href="a/">a</a><a href="c/">c</a>' + MUSICGEN),
+                "posts/a/index.html": TAGGED.format(head=head("/posts/a/", post=True, md=True), body=""),
+                "posts/c/index.html": TAGGED.format(head=head("/posts/c/", post=True), body=""),
+                "posts/a/index.md": "# A\n\nbody\n", "tools/posts/src/a.md": "---\ntitle: A\n---\nbody\n", "tools/feeds/build.py": "",
+                "leetcode/index.html": TAGGED.format(head=head("/leetcode/"), body='<a href="b/">b</a>'),
+                "leetcode/b/index.html": TAGGED.format(head=head("/leetcode/b/", post=True, md=True), body=""),
                 "leetcode/b/index.md": "# B\n\nsee [A](../../posts/a/)\n",
                 "tools/leetcode/src/b.md": "---\ntitle: B\n---\nsee [A](../../posts/a/)\n",
                 "rss.xml": RSS.format(item), "sitemap.xml": SITEMAP.format("".join(f"<url><loc>{SITE}{u}</loc></url>" for u in urls)),
                 "robots.txt": f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n", "llms.txt": "# r\n\n> s\n"}
         site.update(files)
+        if edit:
+            path, old, new = edit
+            self.assertIn(old, site[path])
+            site[path] = site[path].replace(old, new)
         return self.findings({path: text for path, text in site.items() if text is not None})
 
     def test_feed_site_passes(self):
@@ -287,6 +304,36 @@ class CheckTest(unittest.TestCase):
     def test_markdown_keeps_front_matter(self):
         out = self.feed_site(**{"posts/a/index.md": "---\ntitle: A\n---\nbody\n"})
         self.assertEqual(out, ["posts/a/index.md: front matter kept"])
+
+    def test_canonical_link_must_match_the_page_url(self):
+        out = self.feed_site(edit=("posts/a/index.html", f'canonical" href="{SITE}/posts/a/"', f'canonical" href="{SITE}/posts/c/"'))
+        self.assertEqual(out, [f"posts/a/index.html: canonical link {SITE}/posts/c/ is not {SITE}/posts/a/"])
+
+    def test_page_without_canonical_link(self):
+        out = self.feed_site(edit=("leetcode/index.html", f'<link rel="canonical" href="{SITE}/leetcode/">\n', ""))
+        self.assertEqual(out, ["leetcode/index.html: no canonical link"])
+
+    def test_page_without_feed_link(self):
+        out = self.feed_site(edit=("index.html", f'<link rel="alternate" type="application/rss+xml" href="{SITE}/rss.xml">\n', ""))
+        self.assertEqual(out, ["index.html: no feed link"])
+
+    def test_post_without_json_ld(self):
+        self.assertEqual(self.feed_site(edit=("posts/c/index.html", LD, "")), ["posts/c/index.html: no JSON-LD"])
+
+    def test_json_ld_that_does_not_parse(self):
+        out = self.feed_site(edit=("leetcode/b/index.html", '"BlogPosting"}', '"BlogPosting",}'))
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith("leetcode/b/index.html: JSON-LD does not parse"), out)
+
+    def test_email_in_json_ld(self):
+        out = self.feed_site(edit=("posts/a/index.html", '"BlogPosting"}', '"BlogPosting", "email": "someone@example.com"}'))
+        self.assertEqual(out, ["posts/a/index.html: email address in JSON-LD"])
+
+    def test_sourced_post_without_markdown_alternate(self):
+        # posts/c has no source, so it passes without one (see test_feed_site_passes).
+        out = self.feed_site(edit=("leetcode/b/index.html", f'type="text/markdown" href="{SITE}/leetcode/b/index.md"',
+                                   f'type="text/markdown" href="{SITE}/leetcode/a/index.md"'))
+        self.assertEqual(out, ["leetcode/b/index.html: no Markdown alternate"])
 
     def test_main_block_comes_last(self):
         # unittest.main() exits, so any test class defined after it would not run when this file is executed
