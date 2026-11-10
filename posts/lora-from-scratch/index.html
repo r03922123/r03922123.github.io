@@ -68,8 +68,8 @@ matrices and leaves \(W_0\) frozen:</p>
   training starts from the pretrained model's behavior. \(A\) cannot also be zero, or the gradients of
   both factors would be zero and nothing would train.</li>
   <li><b>The \(\alpha / r\) scale.</b> This is meant to save retuning the learning rate when you change \(r\), though
-  at higher ranks it shrinks updates too much, which is why rsLoRA scales by \(\alpha / \sqrt{r}\) instead. Setting
-  \(\alpha = r\) gives a scale of 1.</li>
+  at higher ranks it shrinks updates too much, which is why rsLoRA scales by \(\alpha / \sqrt{r}\) instead. Under
+  \(\alpha / r\), setting \(\alpha = r\) gives a scale of 1.</li>
   <li><b>Inference.</b> \(W = W_0 + \frac{\alpha}{r} BA\) can be computed once, after which the adapted model costs
   exactly what the original did.</li>
 </ul>

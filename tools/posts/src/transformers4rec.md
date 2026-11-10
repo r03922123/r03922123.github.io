@@ -244,7 +244,7 @@ Item ids alone ignore what the log knows about each event. Transformers4Rec buil
 Prices are long-tailed, so they are usually log-transformed and standardized, and a price relative to its category's average often carries more signal than the raw number. For regularization on these tables, **stochastic swap noise** replaces a feature value, with a small probability, by the same feature taken from another random row of the batch. Every value it inserts is a real value from the data, so it works for categorical features, and it creates new feature combinations the model has to be robust to. [Dropout](../dropout/) and weight tying do the rest.
 
 ## The same pipeline with Merlin
-In the Merlin stack, NVTabular does the ETL and Transformers4Rec builds the model. NVTabular runs on cuDF and is built for a GPU, with a slower CPU mode. The two blocks below are **not executed** here. They sketch the API as it appears in the project's README and examples, so check them against the release you install.
+In the Merlin stack, NVTabular does the ETL and Transformers4Rec builds the model. NVTabular runs on cuDF on a GPU, with a slower pandas-based CPU mode. The two blocks below are **not executed** here. They sketch the API as it appears in the project's README and examples, so check them against the release you install.
 
 ```plaintext
 # ETL with NVTabular (not executed: needs the Merlin stack, ideally on a GPU)
