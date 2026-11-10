@@ -85,11 +85,30 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .aside { color: var(--muted); margin: 40px 0 0; }
 :target { scroll-margin-top: 24px; }
 
-/* Reading pages: long-form posts and LeetCode posts */
-.post-head { padding: 40px 0 8px; }
+/* Reading shell (SPEC-reading-shell). Every page but the home has a bar of links, name (centred) and GitHub, full
+   width above the .wrap. It sticks from 700 px; on a phone it would take the text's room. */
+body:not(.home) header.site { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 12px max(16px, calc(50% - 660px));
+                              background: var(--bg); border-bottom: 1px solid var(--line); }
+body:not(.home) header.site nav { margin-left: 0; }
+body:not(.home) header.site .home { grid-column: 2; }
+body:not(.home) header.site .gh { grid-column: 3; justify-self: end; color: var(--muted); font-family: var(--font-display); font-weight: 600; letter-spacing: .05em; }
+body:not(.home) header.site .gh:hover { color: var(--fg); }
+@media (max-width: 699px) { body:not(.home) header.site nav { grid-column: 1 / -1; } }   /* links on their own row */
+@media (min-width: 700px) {
+  body:not(.home) header.site { position: sticky; top: 0; z-index: 2; }
+  body:not(.home) [id] { scroll-margin-top: 96px; }   /* below the bar, even when its links wrap to two lines */
+}
+
+/* Reading pages: long-form posts and LeetCode posts. One text column of at most 720 px; from 1200 px a side column
+   at its right and, at its left, room for code and wide tables. Lists, About and 404 keep the 760 px .wrap. */
+body:has(.post-body) .wrap { max-width: 752px; }
+.post-head { padding: 40px 0 8px; text-align: center; }
 .post-head h1 { font-size: 2.25rem; line-height: 1.14; margin: 0 0 .4em; }
 @media (max-width: 480px) { .intro h1, .post-head h1 { font-size: 1.75rem; } }   /* 28 px on phones; after both rules */
-.post-head .meta { font: 600 .8rem/1.6 var(--font-display); letter-spacing: .08em; color: var(--muted); }   /* a game-menu line */
+.crumb { margin: 0 0 .6em; font: 600 .85rem/1.4 var(--font-display); letter-spacing: .04em; color: var(--muted); }
+.details { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 8px; margin: 0; font-size: .9rem; }
+.details dt { font: 600 .72rem/1.5 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.details dd { margin: 0 10px 0 0; }
 .post-body { overflow-wrap: break-word; }
 .post-body h2 { font-size: 1.375rem; margin: 2em 0 .5em; }   /* 22 px */
 .post-body h3 { font-size: 1.125rem; margin: 1.5em 0 .4em; }  /* 18 px */
@@ -98,10 +117,19 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .toc { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin: 24px 0; }
 .toc h2 { font-size: 1rem; margin: 0 0 .4em; }
 .toc ol { margin: 0; padding-left: 1.3em; }
-@media (min-width: 1280px) {   /* rail left of the 760px column: 50% - 364px is the text's left edge */
-  .post-body .toc { position: fixed; top: 96px; left: calc(50% - 616px); width: 220px; max-height: calc(100vh - 128px);
-                    overflow: auto; margin: 0; padding: 0 0 0 14px; background: none; border: 0; border-left: 2px solid var(--line);
-                    border-radius: 0; font-size: .85rem; line-height: 1.45; }
+@media (min-width: 1200px) {   /* columns: room for code, text, gap, side; the wrap holds 1320 px, so the room is 0-320 px */
+  body:has(.post-body) .wrap { max-width: 1352px; }
+  .post-body { display: grid; grid-template-columns: minmax(0, 320px) 720px 40px 240px; container-type: inline-size; }
+  .post-head { grid-column: 2; }
+  .prose { grid-column: 2; grid-row: 2; --hang: clamp(0px, 100cqw - 1000px, 320px); }   /* the room left of the text */
+  .post-side { grid-column: 4; grid-row: 2; align-self: start; position: sticky; top: 88px; max-height: calc(100vh - 104px);
+               overflow: auto; font-size: .85rem; line-height: 1.45; }
+  .details { display: block; margin: 0 0 24px; font-size: inherit; }
+  .details dt { margin-top: .8em; }
+  .details dd { margin: 0; }
+  /* Code and tables of 5+ columns grow left as far as their content needs, ending at the text's right edge. */
+  .prose > pre, .prose > table:has(th:nth-child(5)) { width: max-content; min-width: 100%; max-width: calc(100% + var(--hang)); margin-left: auto; }
+  .post-body .toc { margin: 0; padding: 0 0 0 14px; background: none; border: 0; border-left: 2px solid var(--line); border-radius: 0; }
   .post-body .toc h2 { font: 700 .78rem/1.4 var(--font-display); letter-spacing: .1em; color: var(--muted); }
   .post-body .toc ol { padding-left: 1.1em; }
   .post-body .toc li { margin: .3em 0; }
@@ -130,16 +158,12 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .role { margin: 20px 0; }
 .role-head, .role-sub { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .role-head h3 { font-size: 1.05rem; margin: 0; }
-.portrait .role-head h3 { padding: 4px 14px; border: 3px double var(--gold); outline: 1px solid var(--line); outline-offset: 2px;
-                          background: var(--card); font-family: var(--font-display); font-size: 1rem; }   /* a gilt frame */
-.portrait:target .role-head h3 { border-color: var(--accent); }
 .role-head span, .role-sub { color: var(--muted); font-size: .9em; }
 .role ul, .plain { padding-left: 1.2em; margin: .6em 0 0; }
 .role li, .plain li { margin: .5em 0; }
 .plain { list-style: disc; }
 
-/* LeetCode series: breadcrumb on posts, a compact list on the series page. */
-.crumb { font-size: .85em; color: var(--muted); margin: 32px 0 -24px; }
+/* LeetCode series: a compact list on the series page. */
 .series { list-style: none; padding: 0; margin: 0; }
 .series li { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .series li a { font-weight: 600; }

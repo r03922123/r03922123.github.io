@@ -7,6 +7,8 @@
 <meta name="description" content="Three ways to estimate what a new policy would do before or without a live experiment (replaying logs with off-policy estimators, synthetic control, and simulating the population) each checked in a toy world where the true answer is known, plus how a simulator sizes the live test that should follow.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/simulation-based-evaluation/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/simulation-based-evaluation/index.md">
@@ -20,19 +22,23 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
-<p class="crumb"><a href="/posts/">Posts</a> · Statistics and experimentation</p>
 <header class="post-head">
+  <p class="crumb"><a href="/posts/#statistics-and-experimentation">Statistics and experimentation</a></p>
   <h1>Simulation-based evaluation: testing a change before it meets real users</h1>
-  <div class="meta">November 1, 2026 · 11 min read · off-policy evaluation · synthetic control · simulation · experimentation</div>
 </header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#three-tools-three-assumptions">Three tools, three assumptions</a></li><li><a href="#replaying-the-logs-off-policy-evaluation">Replaying the logs: off-policy evaluation</a></li><li><a href="#synthetic-control-when-you-cannot-randomize">Synthetic control: when you cannot randomize</a></li><li><a href="#simulating-the-population">Simulating the population</a></li><li><a href="#sizing-the-live-test-by-simulation">Sizing the live test by simulation</a></li><li><a href="#when-to-use-it-and-pitfalls">When to use it, and pitfalls</a></li></ol></nav>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>11 min</dd><dt>Topic</dt><dd>Statistics and experimentation</dd><dt>Tags</dt><dd>off-policy evaluation · synthetic control · simulation · experimentation</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#three-tools-three-assumptions">Three tools, three assumptions</a></li><li><a href="#replaying-the-logs-off-policy-evaluation">Replaying the logs: off-policy evaluation</a></li><li><a href="#synthetic-control-when-you-cannot-randomize">Synthetic control: when you cannot randomize</a></li><li><a href="#simulating-the-population">Simulating the population</a></li><li><a href="#sizing-the-live-test-by-simulation">Sizing the live test by simulation</a></li><li><a href="#when-to-use-it-and-pitfalls">When to use it, and pitfalls</a></li></ol></nav>
+</aside>
+<div class="prose">
 <p>An A/B test is the most trustworthy way to learn what a change does, but it is slow, it exposes real people to a change that may be bad, and some changes cannot be randomized at all. Simulation-based evaluation estimates the effect of a change before (or instead of) randomizing it, using a model of how the population behaves. It is a filter in front of live experiments: it narrows the candidates and flags obvious harm, and the survivors still go to a live test.</p>
 <p>Each method below is only as good as one specific assumption. To see which, every estimator here runs inside a toy world where the true answer is known, so we can tell when it is right and when it is quietly wrong.</p>
 <h2 id="three-tools-three-assumptions">Three tools, three assumptions</h2>
@@ -229,6 +235,7 @@ assert abs(power - 0.80) &lt; 0.03 and abs(false_alarm - 0.05) &lt; 0.015</code>
 <h2 id="when-to-use-it-and-pitfalls">When to use it, and pitfalls</h2>
 <ul><li><b>Off-policy evaluation</b> ranks many candidate policies cheaply when logs record action probabilities and candidates stay within logged support. Prefer doubly robust and report the spread.</li><li><b>Synthetic control</b> fits a change that cannot be randomized and has already happened in one unit, with a long, stable history and comparable donors. Always run the placebo test.</li><li><b>Population simulation</b> answers questions about mechanisms (who gains, who loses, what breaks at the extremes) and stress-tests rare segments a live split would barely reach.</li><li><b>Support is not optional.</b> If the old policy never did it, the logs cannot evaluate it.</li><li><b>A low-variance estimate can be the wrong one</b>, like the direct method above.</li><li><b>Validate the simulator on held-out history</b>, stay near its calibration range, and slice before trusting an average.</li><li><b>Confirm live.</b> A simulation raises confidence in a change; a smaller, well-powered experiment confirms it. For the causal groundwork see <a href="../causal-inference/">causal inference</a>, and for how offline and online evaluation fit together see <a href="/posts/evaluating-ml-systems/">evaluating ML systems</a>.</li></ul>
 <p>IPS goes back to Horvitz and Thompson (1952); the doubly robust estimator for policy evaluation follows Dudík, Langford and Li (2011); synthetic control and its placebo test are from Abadie and Gardeazabal (2003) and Abadie, Diamond and Hainmueller (2010). Athey and Imbens (2019), "Machine Learning Methods That Economists Should Know About", is a good bridge between these methods and ML.</p>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>

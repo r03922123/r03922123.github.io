@@ -31,11 +31,12 @@ HEAD = """<!doctype html>
 <link rel="stylesheet" href="/style.css">
 {assets}</head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="{current}">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/" aria-current="{current}">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 """
 # Math and code rendering, only on pattern posts: the series page has neither.
@@ -47,6 +48,9 @@ POST_ASSETS = """<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
 <script defer src="/post.js"></script>
 """
+# The two faces every reading page shows first (SPEC-reading-shell); italic is rare, so it loads on demand.
+FONTS = "".join(f'<link rel="preload" href="/fonts/{font}" as="font" type="font/woff2" crossorigin>\n' for font in
+                ("source-serif-4/source-serif-4-latin-wght-normal.woff2", "inter/inter-latin-wght-normal.woff2"))
 SITE = "https://r03922123.github.io"
 AUTHOR = {"@type": "Person", "name": "Jie-Hong Lin", "url": SITE + "/about.html"}   # no email (SPEC-post-feeds)
 
@@ -73,6 +77,27 @@ FOOT = """</main>
 </div>
 </body>
 </html>
+"""
+
+
+def article(meta, date, minutes, toc, content, topic):
+    """A post in the reading shell (SPEC-reading-shell): title block, side column with the details and contents, text
+    column. topic is the href of the post's group on its listing page."""
+    toc_html = "".join(f'<li><a href="#{h}">{inline(t)}</a></li>' for h, t in toc)
+    group = html.escape(meta["group"])
+    return f"""<article class="post-body">
+<header class="post-head">
+  <p class="crumb"><a href="{topic}">{group}</a></p>
+  <h1>{inline(meta["title"])}</h1>
+</header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>{date}</dd><dt>Reading time</dt><dd>{minutes} min</dd><dt>Topic</dt><dd>{group}</dd><dt>Tags</dt><dd>{html.escape(meta["tags"])}</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>{toc_html}</ol></nav>
+</aside>
+<div class="prose">
+{content}
+</div>
+</article>
 """
 
 
@@ -207,19 +232,10 @@ def build(site, slug):
     content, toc = render(body)
     words = len(re.sub(r"<[^>]+>", " ", content).split())
     minutes = max(1, round(words / 230))
-    toc_html = "".join(f'<li><a href="#{h}">{inline(t)}</a></li>' for h, t in toc)
     page = HEAD.format(title=html.escape(meta["title"]), summary=html.escape(meta["summary"]),
-                       assets=head_tags(f"/leetcode/{slug}/", (meta["title"], meta["summary"], DATE), markdown=True)
-                       + POST_ASSETS, current="true") + f"""<article class="post-body">
-<p class="crumb"><a href="/leetcode/">LeetCode patterns</a> · {html.escape(meta["group"])}</p>
-<header class="post-head">
-  <h1>{inline(meta["title"])}</h1>
-  <div class="meta">{DATE} · {minutes} min read · {html.escape(meta["tags"])}</div>
-</header>
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>{toc_html}</ol></nav>
-{content}
-</article>
-""" + FOOT
+                       assets=FONTS + head_tags(f"/leetcode/{slug}/", (meta["title"], meta["summary"], DATE), markdown=True)
+                       + POST_ASSETS, current="true") + article(meta, DATE, minutes, toc, content,
+                                                                f"/leetcode/#{slugify(meta['group'])}") + FOOT
     out = Path(site) / "leetcode" / slug / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page)
@@ -241,7 +257,7 @@ def series(site):
         lis = "\n".join(f'  <li><a href="{slug}/">{inline(m["title"])}</a><span>{inline(m["summary"])}</span></li>' for m, slug in items)
         sections.append(f'<h2 id="{slugify(group)}">{html.escape(group)}</h2>\n<ul class="series">\n{lis}\n</ul>')
     page = HEAD.format(title="LeetCode patterns", summary="Short posts on the algorithm patterns behind LeetCode problems: the idea, a reusable Python template, worked problems and practice links.",
-                       assets=head_tags("/leetcode/"), current="page") + f"""<section class="intro">
+                       assets=FONTS + head_tags("/leetcode/"), current="page") + f"""<section class="intro">
   <h1>LeetCode patterns</h1>
   <p>{len(posts)} short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
