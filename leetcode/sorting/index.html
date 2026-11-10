@@ -66,7 +66,7 @@ for _ in range(300):
 <p>The early exit when <code>nums[mid] &lt;= nums[mid + 1]</code> makes already-sorted input linear, a refinement from Sedgewick and Wayne's *Algorithms*.</p>
 <h2 id="quicksort">Quicksort</h2>
 <p>Pick a pivot, partition so smaller items come first, recurse on both sides. It sorts in place and is usually fastest in practice, but its \(O(n \log n)\) is only <b>expected</b>: a bad pivot every time gives \(O(n^2)\). A random pivot makes that vanishingly unlikely for any input order.</p>
-<p>There is a second trap. With a two-way partition, items <b>equal</b> to the pivot all land on one side, so an array of identical values still degrades to \(O(n^2)\), whatever the pivot. The fix is to partition three ways.</p>
+<p>There is a second trap. With a two-way partition like Lomuto's, items <b>equal</b> to the pivot all land on one side, so an array of identical values still degrades to \(O(n^2)\), whatever the pivot. The fix is to partition three ways.</p>
 <h2 id="the-dutch-national-flag-partition">The Dutch national flag partition</h2>
 <p>Dijkstra's problem: arrange red, white and blue items in order with one pass and no extra space (<a href="https://leetcode.com/problems/sort-colors/">75. Sort Colors</a>). With a pivot value, it is "less than, equal to, greater than". Keep four regions and shrink the unknown one by one each step:</p>
 <pre><code class="language-plaintext">[ &lt; pivot | == pivot | unknown | &gt; pivot ]
