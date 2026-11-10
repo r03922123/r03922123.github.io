@@ -7,6 +7,8 @@
 <meta name="description" content="Why a ranker trained on raw clicks learns position instead of relevance, and how inverse propensity weighting, dual learning, position features and interleaving correct it.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="https://r03922123.github.io/posts/position-bias/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Position bias: why click logs lie and how to correct them", "datePublished": "2026-10-31T00:00:00+08:00", "description": "Why a ranker trained on raw clicks learns position instead of relevance, and how inverse propensity weighting, dual learning, position features and interleaving correct it.", "author": {"@type": "Person", "name": "Jie-Hong Lin", "url": "https://r03922123.github.io/about.html"}}</script>
@@ -19,25 +21,21 @@
 <script defer src="/post.js"></script>
 </head>
 <body>
-<div class="wrap">
 <header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
   <a class="home" href="/">r03922123</a>
-  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a><a href="https://github.com/r03922123">GitHub</a></nav>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
 </header>
+<div class="wrap">
 <main>
 <article class="post-body">
 <header class="post-head">
+  <p class="crumb"><a href="/posts/">Long-form</a></p>
   <h1>Position bias: why click logs lie and how to correct them</h1>
-  <div class="meta">October 31, 2026 · 6 min read · ranking · recommendation · evaluation</div>
 </header>
-
-<p>Every ranking system that learns from its own clicks has the same blind spot. People click what they
-see, and they see what is on top. Train a model on raw clicks and it learns that the top slot is good,
-not which items are good. This post sets out the problem as a simple model of clicking, shows with a small
-simulation how badly raw click-through rate misleads, then walks through the standard corrections and when
-each one fits.</p>
-
-<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>6 min</dd><dt>Topic</dt><dd>Long-form</dd><dt>Tags</dt><dd>ranking · recommendation · evaluation</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
   <li><a href="#loop">The feedback loop</a></li>
   <li><a href="#examination">A model of a click</a></li>
   <li><a href="#ips">Inverse propensity weighting</a></li>
@@ -49,6 +47,14 @@ each one fits.</p>
   <li><a href="#choose">Which correction to use</a></li>
   <li><a href="#refs">References</a></li>
 </ol></nav>
+</aside>
+<div class="prose">
+
+<p>Every ranking system that learns from its own clicks has the same blind spot. People click what they
+see, and they see what is on top. Train a model on raw clicks and it learns that the top slot is good,
+not which items are good. This post sets out the problem as a simple model of clicking, shows with a small
+simulation how badly raw click-through rate misleads, then walks through the standard corrections and when
+each one fits.</p>
 
 <h2 id="loop">The feedback loop</h2>
 <p>A ranker shows a list. Users click mostly near the top. Those clicks become the next training set, in
@@ -206,6 +212,7 @@ position-aware model or IPS-weighted loss for training, and interleaving to deci
   month   = {Oct},
   url     = {https://r03922123.github.io/posts/position-bias/}
 }</code></pre>
+</div>
 </article>
 </main>
 <footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
