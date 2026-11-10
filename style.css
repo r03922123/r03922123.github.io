@@ -131,7 +131,7 @@ footer.site .glyph { width: 16px; height: 20px; flex: none; color: var(--gold); 
 .role-head, .role-sub { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .role-head h3 { font-size: 1.05rem; margin: 0; }
 .portrait .role-head h3 { padding: 4px 14px; border: 3px double var(--gold); outline: 1px solid var(--line); outline-offset: 2px;
-                          background: var(--card); font-family: var(--font-display); font-size: 1rem; letter-spacing: .06em; }   /* a gilt frame */
+                          background: var(--card); font-family: var(--font-display); font-size: 1rem; }   /* a gilt frame */
 .portrait:target .role-head h3 { border-color: var(--accent); }
 .role-head span, .role-sub { color: var(--muted); font-size: .9em; }
 .role ul, .plain { padding-left: 1.2em; margin: .6em 0 0; }
