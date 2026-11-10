@@ -195,7 +195,7 @@ assert torch.allclose(F.cross_entropy(logits2, target2, label_smoothing=eps),
 ```
 
 ### Dropout and BatchNorm
-BatchNorm also regularizes a little, because each example is normalized with the statistics of whichever batch it lands in, and Ioffe and Szegedy (2015) reported that it reduced, and in some cases removed, the need for dropout. LayerNorm has no such noise, since it uses only the example's own statistics (see [batch norm vs layer norm](../batchnorm-vs-layernorm/)), and Transformers, which use it, rely on explicit dropout and weight decay.
+BatchNorm also regularizes a little, because each example is normalized with the statistics of whichever batch it lands in, and Ioffe and Szegedy (2015) reported that it reduced, and in some cases removed, the need for dropout. LayerNorm has no such noise, since it uses only the example's own statistics (see [batch norm vs layer norm](../batchnorm-vs-layernorm/)), and Transformers, which use it, rely on explicit dropout and weight decay, though large language models pretrained on a single pass over their data usually turn dropout off.
 
 Putting dropout directly before a BatchNorm layer causes a specific bug, described by Li et al. (2019) as variance shift. During training, dropout inflates the variance of what BatchNorm sees, and BatchNorm's running statistics record the inflated value. At evaluation dropout switches off, the variance drops, and BatchNorm now scales every activation by the wrong amount. The usual fix is ordering: put dropout after the last normalization layer, for example just before the classifier head.
 
