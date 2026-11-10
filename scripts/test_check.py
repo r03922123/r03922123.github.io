@@ -1,11 +1,14 @@
 # Tests for check.py: a clean site passes; each planted fault is reported.
 import ast
 import io
+import os
 import re
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
+from urllib.parse import unquote
 
 from check import check, main
 
@@ -293,7 +296,7 @@ class MainTest(unittest.TestCase):
     def assert_fails_without_leak(self, files):
         failed, out = self.run_main(files)
         self.assertTrue(failed, out)
-        self.assertNotRegex(out, LEAK)
+        self.assertNotRegex(unquote(out), LEAK)                         # %-encoded forms count as a leak too
         return out
 
     def test_term_in_a_case_variant_is_found_and_hidden(self):
@@ -310,14 +313,40 @@ class MainTest(unittest.TestCase):
         self.assertIn("private term in file name", out)
 
     def test_term_in_a_binary_file_name_is_found(self):
-        for name in ("img/acme_corp.png", "files/Acme%20Corp.pdf"):
+        for name in ("img/acme_corp.png", "files/Acme%20Corp.pdf", "img/acme.corp.png", "img/%61cme-corp.png"):
             out = check(self.site({name: b"\x89PNG\0"}), ["acme corp"])
             self.assertEqual(out, [f"{name}: private term in file name 'acme corp'"])
 
+    def test_percent_encoded_term_in_a_link_is_found_and_hidden(self):
+        out = self.assert_fails_without_leak({"index.html": PAGE.format(body='<a href="/%61cme%20corp/">x</a>')})
+        self.assertIn("private term", out)
+
+    def test_term_inside_a_longer_term_leaves_no_part_showing(self):
+        failed, out = self.run_main({"notes.md": "Acme Corp"}, "acme\nacme corp\n")
+        self.assertTrue(failed)
+        self.assertNotIn("corp", out.lower())
+
+    def test_traceback_is_scrubbed(self):
+        with mock.patch("check.check", side_effect=OSError("cannot read posts/acme-corp/index.html")):
+            out = self.assert_fails_without_leak({"index.html": PAGE.format(body="")})
+        self.assertIn("OSError", out)
+
+    def test_byte_order_mark_does_not_hide_the_first_term(self):
+        failed, out = self.run_main({"notes.md": "acme corp"}, "\ufeffacme corp\n")
+        self.assertTrue(failed, out)
+
     def test_show_terms_prints_the_term_for_local_debugging(self):
-        failed, out = self.run_main({"notes.md": "acme corp"}, "acme corp\n", "--show-terms")
+        with mock.patch.dict(os.environ):
+            os.environ.pop("CI", None)
+            failed, out = self.run_main({"notes.md": "acme corp"}, "acme corp\n", "--show-terms")
         self.assertTrue(failed)
         self.assertIn("acme corp", out)
+
+    def test_show_terms_is_refused_in_ci(self):
+        with mock.patch.dict(os.environ, {"CI": "true"}):
+            failed, out = self.run_main({"notes.md": "acme corp"}, "acme corp\n", "--show-terms")
+        self.assertTrue(failed)
+        self.assertNotRegex(out, LEAK)
 
     def test_denylist_only_skips_the_site_checks(self):
         failed, out = self.run_main({"index.html": "<a href='missing.html'>x</a>"}, "acme corp\n", "--denylist-only")
