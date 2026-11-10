@@ -44,7 +44,7 @@ HOME_BUDGET = 150_000
 # Hand-written LeetCode post counts on the home page and posts index; build.py only rewrites the series page.
 LEETCODE_COUNT = re.compile(r"LeetCode\s+patterns:\s+(\d+)|LEETCODE\s+(?:·|&middot;)\s+(\d+)|\b(\d+)\s+pattern\b"
                             r"|has\s+(\d+)\s+short\s+posts")
-PHONE_SEP = r"(?:[-. ()\u00a0\u2011]|&#8209;|&#x2011;|&nbsp;)*"
+PHONE_SEP = r"(?:[-. ()_/\u00a0\u2011]|&#8209;|&#x2011;|&nbsp;)*"   # _ and /: names are scanned with them as gaps
 WORD_SEP = r"(?:\s|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)+"     # what a browser shows as a space between two words
 NAME_SEP = re.compile(r"[-_/.]")                  # how a file name separates words; Pages serves names as URLs
 LOOSE_SEP = r"(?:[\W_]|%20|&nbsp;|&#0*160;|&#x0*a0;|<[^>]+>)*"   # scrubbing over-redacts: any gap, or none
@@ -165,7 +165,7 @@ def check(root, denylist, terms_only=False):
         if path.is_file() and ".git" not in path.parts:
             rel = path.relative_to(root).as_posix()
             findings += [f"{rel}: private term in file name {term!r}" for term, rx in deny
-                         if rx.search(NAME_SEP.sub(" ", unquote(rel)))]
+                         if any(rx.search(name) for name in (unquote(rel), NAME_SEP.sub(" ", unquote(rel))))]
     for path, text in text_files(root):
         rel = path.relative_to(root).as_posix()
         decoded = unquote(text)                       # a link such as /%61cme%20corp/ is the term once served
