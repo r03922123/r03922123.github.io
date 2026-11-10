@@ -204,6 +204,10 @@ class CheckTest(unittest.TestCase):
         out = self.findings(self.shell_site(PRELOADS, ARTICLE.replace('<aside class="post-side"></aside>', "")))
         self.assertEqual(out, ["posts/a/index.html: article without post-side"])
 
+    def test_article_without_the_prose_column(self):
+        out = self.findings(self.shell_site(PRELOADS, ARTICLE.replace('class="prose"', 'class="text"')))
+        self.assertEqual(out, ["posts/a/index.html: article without prose"])
+
     def test_missing_head_fields(self):
         out = self.findings({"index.html": "<html><body>x</body></html>"})
         self.assertEqual(len(out), 4)  # lang, viewport, title, description
