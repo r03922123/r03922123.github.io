@@ -47,7 +47,8 @@ Preview:     python3 -m http.server 8000
 
 ## Current state (2026-11-10)
 
-- `site-baseline` is built: gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the learning log.
+- `site-baseline` is merged (PR #3): gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the
+  learning log. `main` is protected: a PR with a green `gates` check, for admins too.
 - Next, in the build order of `CAPABILITY-MAP.md`: `post-feeds`, `blog-theme`, `post-voice`, each in its own session.
   Reading-page PRs open with `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR 0002).
 - Parked branches: none.
