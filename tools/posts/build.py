@@ -79,7 +79,7 @@ def index(site):
     listing, chosen = lc.topic_list(sections)
     leetcode_count = len(list((Path(site) / "leetcode").glob("*/index.html")))
     page = HEAD.format(title="Posts", summary="Technical posts on machine learning, statistics, LLMs, recommender systems and ML systems, each with the code and numbers behind it.",
-                       assets=lc.FONTS + lc.head_tags("/posts/") + chosen, current="page") + f"""<section class="intro">
+                       assets=lc.FONTS + lc.head_tags("/posts/") + chosen + lc.SEARCH, current="page") + f"""<section class="intro">
   <h1>Posts</h1>
   <p>Technical notes on machine learning, each with the code and numbers behind it: {len(LONGFORM)} long-form posts
   first, then {len(posts)} shorter posts by topic.</p>

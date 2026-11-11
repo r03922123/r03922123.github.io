@@ -53,6 +53,8 @@ FONTS = "".join(f'<link rel="preload" href="/fonts/{font}" as="font" type="font/
                 ("source-serif-4/source-serif-4-latin-wght-normal.woff2", "inter/inter-latin-wght-normal.woff2"))
 SITE = "https://r03922123.github.io"
 AUTHOR = {"@type": "Person", "name": "Jie-Hong Lin", "url": SITE + "/about.html"}   # no email (SPEC-post-feeds)
+# The search box (SPEC-site-search), on the two list pages only; the script inserts it and fetches the index lazily.
+SEARCH = '<script type="module" src="/search.mjs"></script>\n'
 
 
 def head_tags(path, post=None, markdown=False):
@@ -276,7 +278,7 @@ def series(site):
             sections.append((group, slugify(group), [row(m["title"], m["summary"], f"{slug}/") for m, slug in items], ""))
     listing, chosen = topic_list(sections)
     page = HEAD.format(title="LeetCode patterns", summary="Short posts on the algorithm patterns behind LeetCode problems: the idea, a reusable Python template, worked problems and practice links.",
-                       assets=FONTS + head_tags("/leetcode/") + chosen, current="page") + f"""<section class="intro">
+                       assets=FONTS + head_tags("/leetcode/") + chosen + SEARCH, current="page") + f"""<section class="intro">
   <h1>LeetCode patterns</h1>
   <p>{len(posts)} short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
