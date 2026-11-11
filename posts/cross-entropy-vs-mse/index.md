@@ -1,8 +1,8 @@
 # Why classifiers use cross-entropy, not squared error
 
-A binary classifier usually ends in a sigmoid: a score \(z\) becomes a probability \(p = \sigma(z)\). Two losses look reasonable for comparing \(p\) with a label \(y \in \{0, 1\}\): squared error, which serves regression well, and cross-entropy, also called log loss. Nearly everyone uses cross-entropy, and the reason is not taste. Squared error behind a sigmoid stops pushing exactly when the model is confidently wrong, while cross-entropy is the negative log-likelihood of the coin-flip model that binary labels actually follow.
+Start a one-feature logistic regression confidently wrong, at \(w_0 = -8\), on 400 points from two slightly overlapping classes. With gradient descent at learning rate 1, cross-entropy reaches 95% accuracy in five steps and squared error takes 2,482. A binary classifier usually ends in a sigmoid: a score \(z\) becomes a probability \(p = \sigma(z)\). Two losses look reasonable for comparing \(p\) with a label \(y \in \{0, 1\}\): squared error, which serves regression well, and cross-entropy, also called log loss. Nearly everyone uses cross-entropy, and the reason is not taste. Squared error behind a sigmoid stops pushing exactly when the model is confidently wrong, while cross-entropy is the negative log-likelihood of the coin-flip model that binary labels actually follow.
 
-This post derives the first claim, watches it stall a training run, sets out the second, and then covers the cases where squared error is still the right choice.
+I derive the first claim and check it against autograd, watch it stall that training run, set out the second, and then cover the cases where squared error is still the right choice.
 
 ## Two losses on one sigmoid
 Write \(z\) for the logit (for logistic regression, \(z = w^\top x + b\)) and \(p = \sigma(z) = 1/(1 + e^{-z})\) for the predicted probability that \(y = 1\). For one example the two candidates are
@@ -251,5 +251,7 @@ assert twice.min() >= 0.5 and twice.max() < 0.732
 floor = F.binary_cross_entropy_with_logits(torch.sigmoid(z), torch.ones_like(z), reduction="none").min()
 assert round(floor.item(), 3) == 0.313
 ```
+
+The step counts come from one synthetic dataset with a single feature and evenly spaced normal quantiles, so they show how the factor \(p(1-p)\) slows training, not how many steps a real model loses. I train no deep network, so the claim that a saturated output unit stalls one rests on the gradient algebra alone. Two choices stay untested here: how much label noise it takes before a bounded loss wins, and whether squared error on the raw logits matches cross-entropy beyond the benchmarks Hui and Belkin used.
 
 The derivations follow the treatment of sigmoid output units in Goodfellow, Bengio and Courville, Deep Learning (MIT Press, 2016), section 6.2.2, and of logistic regression in Bishop, Pattern Recognition and Machine Learning (Springer, 2006), section 4.3.2.
