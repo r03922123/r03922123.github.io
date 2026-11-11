@@ -287,6 +287,13 @@
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
+    <title>Evaluating LLM applications: golden sets, judges, noise and guardrails</title>
+    <link>https://r03922123.github.io/posts/llm-evaluation-and-guardrails/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/llm-evaluation-and-guardrails/</guid>
+    <description>Evaluation loops for RAG and agents, built from a classifier-evaluation background and checked with simulations: separate retrieval and generation metrics, an LLM judge validated with Cohen's kappa and swapped for position bias, bootstrap intervals on small eval sets, guardrails tuned to a recall floor, and a CI gate that blocks only drops outside noise.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
     <title>Two-tower retrieval: from millions of items to a few hundred candidates</title>
     <link>https://r03922123.github.io/posts/two-tower-retrieval/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/two-tower-retrieval/</guid>
@@ -364,6 +371,34 @@
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
+    <title>Kubernetes for ML: requests, probes and autoscaling for model servers</title>
+    <link>https://r03922123.github.io/posts/kubernetes-for-ml/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/kubernetes-for-ml/</guid>
+    <description>What Kubernetes does with a model server's resource requests and limits, why a model pod gets OOMKilled or throttled, how the scheduler packs pods and GPUs, why a new pod can receive traffic before its weights are loaded, and how the Horizontal Pod Autoscaler picks a replica count. Small simulations give each rule a number.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Experiment tracking, model registries and drift monitoring</title>
+    <link>https://r03922123.github.io/posts/experiment-tracking-and-drift/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/experiment-tracking-and-drift/</guid>
+    <description>What a training run must record to be rerun, what a model registry adds on top (versions, aliases, lineage, rollback), and how to watch a deployed model with numbers: PSI and the KS test on features and scores, why a KS test on a million rows flags a shift nobody should care about, how often a fixed PSI threshold false-alarms, and why label delay makes inputs and scores the first things to watch.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Serving a vision model: dynamic batching, int8 quantization and export formats</title>
+    <link>https://r03922123.github.io/posts/model-serving-batching-quantization/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/model-serving-batching-quantization/</guid>
+    <description>What the FastAPI, ONNX, TensorRT, Triton and quantization lines in an ML engineering job ad mean for a CNN or detector under a latency budget. A queue simulation shows where one-at-a-time serving falls over and what a dynamic batcher's two knobs trade; a toy model shows why int8 weights want one scale per channel; and small PyTorch checks show what exporting a model captures and what it refuses.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Terraform and CI/CD for ML: plans, shared state and a model-quality gate</title>
+    <link>https://r03922123.github.io/posts/terraform-and-ci-cd-for-ml/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/terraform-and-ci-cd-for-ml/</guid>
+    <description>Infrastructure as code from the inside: how a plan compares the config, the recorded state and the real world, why the state file must be shared and locked, and how modules give dev, staging and prod one definition. Then what a pipeline checks for ML code beyond unit tests, with a model-quality gate that blocks real drops and not seed noise. Small simulations show each rule.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
     <title>Solving algorithm problems under a time limit</title>
     <link>https://r03922123.github.io/posts/solving-problems-under-time-limits/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/solving-problems-under-time-limits/</guid>
@@ -389,6 +424,13 @@
     <link>https://r03922123.github.io/posts/pandas-cheatsheet/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/pandas-cheatsheet/</guid>
     <description>A working reference for the pandas operations that come up in nearly every data task: building and inspecting a frame, boolean masks, counting and ranking, missing values, groupby with agg versus transform, merges and anti-joins, melt and pivot, vectorising row logic, and string methods with a regex table. Every snippet runs on a tiny DataFrame, and most prove their claim with an assert.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
+    <title>Spark for ML data: partitions, shuffles, skew and joins</title>
+    <link>https://r03922123.github.io/posts/spark-for-ml-data/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/spark-for-ml-data/</guid>
+    <description>What a Spark job does with a feature pipeline, simulated in pandas: partitions and tasks, lazy plans cut into stages at each shuffle, why one hot key makes one task the straggler and how salting and partial aggregation fix it, the bytes a broadcast join saves over a shuffle join, and why collect() or toPandas() on a big table brings down the driver.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>

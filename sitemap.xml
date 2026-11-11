@@ -48,6 +48,7 @@
   <url><loc>https://r03922123.github.io/posts/rag-architecture/</loc></url>
   <url><loc>https://r03922123.github.io/posts/vector-databases/</loc></url>
   <url><loc>https://r03922123.github.io/posts/llm-agents-langchain-langgraph/</loc></url>
+  <url><loc>https://r03922123.github.io/posts/llm-evaluation-and-guardrails/</loc></url>
   <url><loc>https://r03922123.github.io/posts/two-tower-retrieval/</loc></url>
   <url><loc>https://r03922123.github.io/posts/recommendation-ranking/</loc></url>
   <url><loc>https://r03922123.github.io/posts/recsys-features/</loc></url>
@@ -59,10 +60,15 @@
   <url><loc>https://r03922123.github.io/posts/ml-infrastructure/</loc></url>
   <url><loc>https://r03922123.github.io/posts/docker-for-ml/</loc></url>
   <url><loc>https://r03922123.github.io/posts/crowd-heatmap-feasibility/</loc></url>
+  <url><loc>https://r03922123.github.io/posts/kubernetes-for-ml/</loc></url>
+  <url><loc>https://r03922123.github.io/posts/experiment-tracking-and-drift/</loc></url>
+  <url><loc>https://r03922123.github.io/posts/model-serving-batching-quantization/</loc></url>
+  <url><loc>https://r03922123.github.io/posts/terraform-and-ci-cd-for-ml/</loc></url>
   <url><loc>https://r03922123.github.io/posts/solving-problems-under-time-limits/</loc></url>
   <url><loc>https://r03922123.github.io/posts/ml-coding-from-scratch/</loc></url>
   <url><loc>https://r03922123.github.io/posts/sql-cheatsheet/</loc></url>
   <url><loc>https://r03922123.github.io/posts/pandas-cheatsheet/</loc></url>
+  <url><loc>https://r03922123.github.io/posts/spark-for-ml-data/</loc></url>
   <url><loc>https://r03922123.github.io/musicgen-prune-inference/</loc></url>
   <url><loc>https://r03922123.github.io/musicgen-prune-inference/decoding/</loc></url>
   <url><loc>https://r03922123.github.io/leetcode/two-pointers/</loc></url>
