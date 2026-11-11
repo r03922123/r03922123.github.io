@@ -10,7 +10,7 @@ The three most important whys of each change, newest first. Each heading reads `
    fourth kind of post (a cheat sheet) needs something different, the pilot can't show it; the spec gives those
    only the opening and limits moves.
 2. **Lead with a number the post already proves.** Each new opening gives a result from the post's own table,
-   simulation or caption, such as training MSE 0.03 against test MSE 0.17 for `dropout`. The definition comes
+   simulation or caption, such as `dropout`'s training MSE of 0.03 on noisy points against 0.17 on the true curve. The definition comes
    second. Trade-off: the opening is denser. Risk: a number lifted from its table can lose its conditions, so each
    one gets its limit nearby ("one sine-wave task averaged over four seeds").
 3. **Name the limits from what the code does.** Each closing paragraph lists what the post's code assumes (the
