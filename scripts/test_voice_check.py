@@ -1,4 +1,5 @@
 # Tests for voice_check.py: one failing case per rule in SPEC-post-voice.md, plus the cases its own choices add.
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -45,6 +46,7 @@ PAGE = """<html><body><header class="site"><nav><a href="/">Home</a></nav></head
 class VoiceCheckTest(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root)
         (self.root / "scripts").mkdir()
         self.src = self.root / "tools/posts/src/dropout.md"
         self.page = self.root / "posts/position-bias/index.html"
@@ -104,10 +106,11 @@ class VoiceCheckTest(unittest.TestCase):
         self.assertFails("posts/position-bias/index.html: numbers dropped from prose: 3")
 
     def test_number_from_code_or_table_may_appear_in_prose(self):
+        numeric = lambda: [e for e in self.errors() if "numbers" in e]   # the tiny fixture also trips "prose grew"
         self.edit(self.src, "over two runs", "over two runs and 4 seeds, test error 0.12 at p 0.5")
-        self.assertEqual(self.errors(), [])
+        self.assertEqual(numeric(), [])
         self.edit(self.page, "over 3 seeds", "over 3 seeds and 10,000 sessions, IPS 0.93")
-        self.assertEqual(self.errors(), [])
+        self.assertEqual(numeric(), [])
 
     def test_prose_growth_over_ten_percent_fails(self):
         words = snapshot(self.root)["tools/posts/src/dropout.md"]["words"]
