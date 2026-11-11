@@ -5,11 +5,11 @@ group: Probability
 order: 8
 tags: binomial · normal approximation · central limit theorem · continuity correction
 ---
-Here is a question that looks like it needs a computer. A fair coin is flipped 900 times. What is the probability of getting **480 or more heads**?
+A fair coin is flipped 900 times. What is the probability of getting **480 or more heads**? It looks like a question for a computer, yet the quick answer of 2.5% is close to the exact 2.46%.
 
 The exact answer is a sum of 421 binomial terms, each with a coefficient like \(\binom{900}{480}\), a number with more than 250 digits. Nobody sums that by hand. But 900 flips is a lot of flips, and the count of heads from many independent flips is very close to normally distributed. Once the problem is a normal one, it takes a square root, one subtraction and a fact you already know about bell curves.
 
-This post solves the question that way, then checks the answer against the exact binomial and asks the more useful questions: how far off is the quick answer, why, and when does the shortcut stop working?
+I solve the question that way, then check the answer against the exact binomial and ask the more useful questions: how far off is the quick answer, why, and when does the shortcut stop working? The quick answer turns out to be close partly by luck, since two errors cancel.
 
 ## Why a bell curve shows up
 The number of heads is \(X \sim \text{Binomial}(n, p)\), the sum of \(n\) independent coin flips that are each 1 (heads) with probability \(p\) and 0 otherwise. Its mean and variance follow from adding up the flips (see [Bernoulli and binomial](../bernoulli-binomial/) for the derivation):
@@ -35,7 +35,7 @@ For a fair coin \(\sigma = \sqrt{n}/2\), so when \(n\) is a perfect square the s
 
 standard deviations.
 
-**Step 3: read the tail.** The 68-95-99.7 rule says about 95% of a normal distribution lies within two standard deviations of the mean. The remaining 5% is split evenly between the two tails by symmetry, and we only want the upper one: roughly **2.5%**.
+**Step 3: read the tail.** The 68-95-99.7 rule says about 95% of a normal distribution lies within two standard deviations of the mean. The remaining 5% is split evenly between the two tails by symmetry, and you only want the upper one: roughly **2.5%**.
 
 That is a fine answer to give quickly. It is also not quite the number the normal distribution gives, and the normal distribution is not quite the binomial. Both gaps are worth understanding.
 
@@ -186,7 +186,7 @@ The normal approximation is an estimate with no guarantee attached. When you nee
 
 \[ P(\hat p - p \ge t) \le e^{-2nt^2}. \]
 
-For our question \(t = 30/900 = 1/30\), so the bound is \(e^{-2} \approx 13.5\%\). That is true, but more than five times larger than the real 2.46%. Bounds like this are what learning theory uses, because they hold for every \(n\) and every distribution of bounded variables; for a numerical answer to a specific question, the corrected normal or the exact sum is far sharper.
+For this question \(t = 30/900 = 1/30\), so the bound is \(e^{-2} \approx 13.5\%\). That is true, but more than five times larger than the real 2.46%. Bounds like this are what learning theory uses, because they hold for every \(n\) and every distribution of bounded variables; for a numerical answer to a specific question, the corrected normal or the exact sum is far sharper.
 
 ```python
 t = 30 / 900
@@ -206,5 +206,7 @@ for flips in (10, 30, 100, 900):
 - **Tails to remember:** \(P(Z \ge 1) \approx 16\%\), \(P(Z \ge 2) \approx 2.3\%\), \(P(Z \ge 3) \approx 0.13\%\). The "95" in 68-95-99.7 is really 95.45%.
 - **Continuity correction:** cut at 479.5, not 480, when approximating "at least 480". It matters most when \(\sigma\) is small.
 - **Know when to stop:** use the exact binomial for far tails and the Poisson when \(p\) is small; use Hoeffding when you need a bound that cannot fail.
+
+The approximation checks cover fair coins at 100, 900 and 2,500 flips and one skewed case, 500 trials at 2%, so they show where the approximation fails, not an error rate for every \(n\) and \(p\). The rule of thumb is the open part: the skewed case meets it and the normal is still off by a factor of more than two, so for a new case the exact tail, or the Poisson when \(p\) is small, is the check to run.
 
 The [normal distribution](../normal-distribution/) post covers the bell curve itself, and the [probability cheatsheet](../probability-cheatsheet/) has these tail values on one page. The question at the top of this post was inspired by a coin-flipping probability problem on InterviewQuery, rewritten here with different numbers.

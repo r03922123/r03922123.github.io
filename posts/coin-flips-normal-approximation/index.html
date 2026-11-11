@@ -39,9 +39,9 @@
   <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#why-a-bell-curve-shows-up">Why a bell curve shows up</a></li><li><a href="#solving-it-in-three-lines">Solving it in three lines</a></li><li><a href="#two-errors-that-cancel">Two errors that cancel</a></li><li><a href="#simulating-it">Simulating it</a></li><li><a href="#working-the-other-way-how-many-heads-is-surprising">Working the other way: how many heads is surprising?</a></li><li><a href="#where-the-approximation-breaks">Where the approximation breaks</a></li><li><a href="#a-bound-that-always-holds">A bound that always holds</a></li><li><a href="#summary">Summary</a></li></ol></nav>
 </aside>
 <div class="prose">
-<p>Here is a question that looks like it needs a computer. A fair coin is flipped 900 times. What is the probability of getting <b>480 or more heads</b>?</p>
+<p>A fair coin is flipped 900 times. What is the probability of getting <b>480 or more heads</b>? It looks like a question for a computer, yet the quick answer of 2.5% is close to the exact 2.46%.</p>
 <p>The exact answer is a sum of 421 binomial terms, each with a coefficient like \(\binom{900}{480}\), a number with more than 250 digits. Nobody sums that by hand. But 900 flips is a lot of flips, and the count of heads from many independent flips is very close to normally distributed. Once the problem is a normal one, it takes a square root, one subtraction and a fact you already know about bell curves.</p>
-<p>This post solves the question that way, then checks the answer against the exact binomial and asks the more useful questions: how far off is the quick answer, why, and when does the shortcut stop working?</p>
+<p>I solve the question that way, then check the answer against the exact binomial and ask the more useful questions: how far off is the quick answer, why, and when does the shortcut stop working? The quick answer turns out to be close partly by luck, since two errors cancel.</p>
 <h2 id="why-a-bell-curve-shows-up">Why a bell curve shows up</h2>
 <p>The number of heads is \(X \sim \text{Binomial}(n, p)\), the sum of \(n\) independent coin flips that are each 1 (heads) with probability \(p\) and 0 otherwise. Its mean and variance follow from adding up the flips (see <a href="../bernoulli-binomial/">Bernoulli and binomial</a> for the derivation):</p>
 \[ \mathbb{E}[X] = np, \qquad \text{Var}(X) = np(1 - p). \]
@@ -55,7 +55,7 @@
 <p><b>Step 2: standardize.</b> 480 heads is 30 above the mean, which is</p>
 \[ z = \frac{480 - 450}{15} = 2 \]
 <p>standard deviations.</p>
-<p><b>Step 3: read the tail.</b> The 68-95-99.7 rule says about 95% of a normal distribution lies within two standard deviations of the mean. The remaining 5% is split evenly between the two tails by symmetry, and we only want the upper one: roughly <b>2.5%</b>.</p>
+<p><b>Step 3: read the tail.</b> The 68-95-99.7 rule says about 95% of a normal distribution lies within two standard deviations of the mean. The remaining 5% is split evenly between the two tails by symmetry, and you only want the upper one: roughly <b>2.5%</b>.</p>
 <p>That is a fine answer to give quickly. It is also not quite the number the normal distribution gives, and the normal distribution is not quite the binomial. Both gaps are worth understanding.</p>
 <pre><code class="language-python">import math
 import numpy as np
@@ -163,7 +163,7 @@ assert round(ex_left, 3) == 0.028 and round(normal_left, 3) == 0.039   # and ove
 <h2 id="a-bound-that-always-holds">A bound that always holds</h2>
 <p>The normal approximation is an estimate with no guarantee attached. When you need a guarantee, Hoeffding's inequality (Wassily Hoeffding, 1963) gives one for any number of flips: for the share of heads \(\hat p = X/n\) and any \(t &gt; 0\),</p>
 \[ P(\hat p - p \ge t) \le e^{-2nt^2}. \]
-<p>For our question \(t = 30/900 = 1/30\), so the bound is \(e^{-2} \approx 13.5\%\). That is true, but more than five times larger than the real 2.46%. Bounds like this are what learning theory uses, because they hold for every \(n\) and every distribution of bounded variables; for a numerical answer to a specific question, the corrected normal or the exact sum is far sharper.</p>
+<p>For this question \(t = 30/900 = 1/30\), so the bound is \(e^{-2} \approx 13.5\%\). That is true, but more than five times larger than the real 2.46%. Bounds like this are what learning theory uses, because they hold for every \(n\) and every distribution of bounded variables; for a numerical answer to a specific question, the corrected normal or the exact sum is far sharper.</p>
 <pre><code class="language-python">t = 30 / 900
 hoeffding = math.exp(-2 * n * t ** 2)
 assert math.isclose(hoeffding, math.exp(-2))
@@ -176,6 +176,7 @@ for flips in (10, 30, 100, 900):
         assert stats.binom.sf(heads_needed - 1, flips, 0.5) &lt;= math.exp(-2 * flips * tt ** 2) + 1e-12</code></pre>
 <h2 id="summary">Summary</h2>
 <ul><li><b>The recipe:</b> for \(X \sim \text{Binomial}(n, p)\), use \(\mu = np\) and \(\sigma = \sqrt{np(1-p)}\), standardize, and read the tail of a standard normal. For a fair coin \(\sigma = \sqrt{n}/2\).</li><li><b>Tails to remember:</b> \(P(Z \ge 1) \approx 16\%\), \(P(Z \ge 2) \approx 2.3\%\), \(P(Z \ge 3) \approx 0.13\%\). The "95" in 68-95-99.7 is really 95.45%.</li><li><b>Continuity correction:</b> cut at 479.5, not 480, when approximating "at least 480". It matters most when \(\sigma\) is small.</li><li><b>Know when to stop:</b> use the exact binomial for far tails and the Poisson when \(p\) is small; use Hoeffding when you need a bound that cannot fail.</li></ul>
+<p>The approximation checks cover fair coins at 100, 900 and 2,500 flips and one skewed case, 500 trials at 2%, so they show where the approximation fails, not an error rate for every \(n\) and \(p\). The rule of thumb is the open part: the skewed case meets it and the normal is still off by a factor of more than two, so for a new case the exact tail, or the Poisson when \(p\) is small, is the check to run.</p>
 <p>The <a href="../normal-distribution/">normal distribution</a> post covers the bell curve itself, and the <a href="../probability-cheatsheet/">probability cheatsheet</a> has these tail values on one page. The question at the top of this post was inspired by a coin-flipping probability problem on InterviewQuery, rewritten here with different numbers.</p>
 </div>
 </article>
