@@ -1,8 +1,8 @@
 # Vector databases: nearest-neighbor search at scale
 
-A vector database stores embeddings, one vector per document, image, product or user, and answers one question quickly: given a query vector, which stored vectors are most similar to it? That question sits under semantic search, the retrieval step of [retrieval-augmented generation](../rag-architecture/), and the candidate stage of [two-tower recommenders](../two-tower-retrieval/).
+Exact search over 10 million 768-dimensional float32 vectors reads 30.72 GB for every batch of queries. On 10,000 synthetic vectors, scoring about 4% of them returns about 90% of each query's true top 10, with inverted lists or with a graph walk. A vector database stores embeddings, one vector per document, image, product or user, and answers one question quickly: given a query vector, which stored vectors are most similar to it? That question sits under semantic search, the retrieval step of [retrieval-augmented generation](../rag-architecture/), and the candidate stage of [two-tower recommenders](../two-tower-retrieval/).
 
-Answering it exactly means comparing the query with every stored vector. That is fine for thousands of vectors and too slow or too expensive for hundreds of millions, so vector databases use **approximate nearest-neighbor (ANN)** search: return most of the true top-k while looking at a small fraction of the data. This post builds the three main ANN ideas in NumPy on the same synthetic data, measures each one against brute force, and then covers what a database adds on top of an index.
+Answering it exactly means comparing the query with every stored vector. That is fine for thousands of vectors and too slow or too expensive for hundreds of millions, so vector databases use **approximate nearest-neighbor (ANN)** search: return most of the true top-k while looking at a small fraction of the data. I build the three main ANN ideas in NumPy on the same synthetic data, measure each one against brute force, and then cover what a database adds on top of an index.
 
 ## Exact search is one matrix product
 Many embedding models are trained with cosine similarity, so the usual first step is to scale every vector to unit length. Then cosine similarity is a plain dot product, and Euclidean distance gives the same ranking, because for unit vectors
@@ -239,6 +239,8 @@ assert np.mean([len(p) for p in post]) < 2             # usually one or no resul
 assert all(len(p) == k and allowed[p].all() for p in pre)
 ```
 
+With a filter that 2% of items pass, post-filtering the IVF top 50 leaves fewer than two results per query on average, while pre-filtering returns all 10 every time.
+
 Several vector databases therefore plan filtered queries: they estimate how selective the filter is, scan the passing items exactly when few pass, and otherwise search the index with the filter applied during traversal and a wider beam.
 
 The second common addition is **hybrid search**. Embeddings are good at paraphrase and weak at exact tokens such as part numbers, error codes, names and rare terms, which keyword search with BM25 handles well. Hybrid search runs both and merges the two ranked lists. Their scores are on different scales, so the simplest robust merge uses only ranks. Reciprocal rank fusion (Gordon Cormack, Charles Clarke and Stefan Büttcher, 2009) scores each document by
@@ -264,6 +266,8 @@ fused = rrf(dense, keyword)
 assert fused[:2] == ["startup-crash", "e1043-fix"]     # in both lists, so both rise to the top
 assert fused.index("e1043-fix") < dense.index("e1043-fix")
 ```
+
+Fusion moves the document with the error code from fifth in the dense list to second overall, behind the startup-crash document, which ranks high in both lists.
 
 The fused top results usually go to a cross-encoder reranker, which reads the query and each candidate together and is too slow to run over the whole collection.
 
@@ -293,5 +297,7 @@ A rough guide to the index itself:
 - **Mixing embedding models.** Vectors from different models, or different versions of one model, live in different spaces. Changing the model means re-embedding and re-indexing everything.
 - **Inconsistent normalization.** Normalize stored vectors and queries the same way and match the index metric to how the model was trained.
 - **Benchmarking on someone else's data.** Recall and speed depend on the structure of the vectors; uniform random data makes every index look bad, and public benchmark numbers do not transfer. Measure on your own embeddings.
+
+Every recall figure here comes from 10,000 synthetic vectors around 100 centers, searched by 200 queries, and the graph is an exact 12-nearest-neighbor graph instead of a full HNSW build. So the figures show how each knob trades recall for work, and say little about recall on real embeddings. Two things stay untested here: the graph's lead over IVF at much larger \(n\), and how often a graph walk restricted to passing nodes loses its path under a filter.
 
 For the retrieval pipeline around the index, see [RAG architecture](../rag-architecture/); for how the embeddings are trained, [contrastive losses](../contrastive-loss/) and [two-tower retrieval](../two-tower-retrieval/). Eugene Yan's essays on [patterns for LLM systems](https://eugeneyan.com/writing/llm-patterns/) and [real-time recommendations](https://eugeneyan.com/writing/real-time-recommendations/) are good further reading on putting these indexes into production.
