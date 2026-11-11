@@ -425,6 +425,16 @@ function build(THREE, context) {
     return g;
   });
 
+  // A worn purple book on the mantel, leaning on the chimney with its cover to the room (SPEC-resume-book): a
+  // discreet door to the unlisted /book/. Standing, because the still camera sees a book lying flat edge-on.
+  const oldBook = new THREE.Group(); oldBook.position.set(-.42, 1.72, -3.57); oldBook.rotation.set(-.16, .12, 0);
+  scene.add(oldBook);
+  const plumM = lam({ color: 0x5b2f80 }), bandM = lam({ color: 0x8a7440 });
+  box(.22, .3, .05, plumM, 0, .15, 0, oldBook);
+  box(.2, .29, .052, lam({ color: 0xbfae84 }), .016, .15, 0, oldBook);     // the page block, a sliver at the fore-edge
+  box(.222, .016, .052, bandM, 0, .235, 0, oldBook);                        // one faded band, rubbed thin
+  doorObjects.oldbook = { group: oldBook, mats: [plumM, bandM], hot: 0xc8a0ff, k: .35 };
+
   // Gramophone on a side table: decoration only, not a door.
   const table = new THREE.Group(); table.position.set(1.75, 0, .35); scene.add(table);
   cyl(.4, .4, .05, 8, woodM, 0, .78, 0, table);
