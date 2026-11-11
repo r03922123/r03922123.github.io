@@ -2,7 +2,7 @@
 
 The agent I build here answers "What does order A17 cost with tax?" in three model calls, two that request tools and one that writes the answer, and when asked for a refund it pauses before the refund runs until a reviewer approves. A chat model on its own can only produce text. Give it a list of functions it may ask for, run the ones it asks for, feed the results back, and repeat until it answers: that loop is what people call an agent. Libraries such as LangChain and LangGraph package the loop, but the loop itself is short, and most of the engineering is in what surrounds it: validating tool calls, bounding the number of steps, saving state, and pausing for a person before anything irreversible.
 
-This post builds each of those pieces in plain Python with a scripted stand-in for the model, so every claim can be checked with an assert. Then it shows the same structure in the two libraries, which are not installed here, so those snippets are marked as not executed.
+This post builds each of those pieces in plain Python with a scripted stand-in for the model, so most claims can be checked with an assert. Then it shows the same structure in the two libraries, which are not installed here, so those snippets are marked as not executed.
 
 ## Chains and agents: who picks the next step
 A **chain** is a fixed sequence: retrieve documents, fill a prompt, call the model, parse the output. The programmer wrote the control flow and it is the same on every input. Retrieval-augmented generation is usually a chain; see [RAG architecture](../rag-architecture/).

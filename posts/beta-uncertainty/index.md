@@ -93,7 +93,7 @@ So a \(\text{Beta}(a, b)\) prior behaves like \(a + b\) imaginary observations a
 
 Where does a good prior come from? Often from the population itself. If established items have click-through rates with mean \(m\) and variance \(v\), choose \(a\) and \(b\) so the Beta has the same mean and variance: from the variance formula, \(a + b = m(1 - m)/v - 1\). Fitting the prior from data this way is called **empirical Bayes**.
 
-**Worked example: ranking new items.** Take 3,000 items with true rates drawn from a population averaging about 5%, each shown between 5 and 500 times. Ranking by raw click-through rate fills the top 20 with items that got lucky on a handful of impressions. Ranking by posterior mean, with a prior fitted from 500 established items, picks items whose true rates are clearly higher.
+**Worked example: ranking new items.** Take 3,000 items with true rates drawn from a population averaging about 5%, each shown between 5 and 500 times. Ranking by raw click-through rate fills the top 20 with items that got lucky on small samples, shown less than half as often on average as the posterior-mean picks. Ranking by posterior mean, with a prior fitted from 500 established items, picks items whose true rates are clearly higher.
 
 ```python
 rng = np.random.default_rng(1)
