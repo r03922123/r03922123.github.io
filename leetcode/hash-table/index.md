@@ -37,7 +37,7 @@ Each slot holds a small list of `(key, value)` pairs. With \(n\) items in \(m\) 
 ```python
 import random
 
-random.seed(0)                                  # unseeded, the chain-length assert fails in about 1.4% of runs
+random.seed(0)                                  # unseeded, the chain-length assert fails in about 1% of runs
 
 
 class MyHashMap:
@@ -93,7 +93,7 @@ assert hm.n == len(ref) and hm.n <= 0.75 * hm.m
 assert max(len(s) for s in hm.slots) <= 10     # chains stay short
 ```
 
-The final asserts are the point: after twenty thousand random operations the map agrees with `dict` on every lookup, the load factor is bounded, and no chain grew long.
+The final asserts are the point: after twenty thousand random operations the map agrees with `dict` on every lookup, the load factor is bounded, and no chain grew long. The seed fixes \(a\), \(b\) and the operations so the build is reproducible; a real table draws \(a\) and \(b\) fresh on each run, which is what the \(1/m\) bound is about.
 
 ## Chaining versus open addressing
 Python's own `dict` uses **open addressing**: no lists, collisions probe other slots in the same array. It is more cache-friendly, but deletion needs tombstones and performance falls off sharply as the table fills, so it resizes earlier. Chaining degrades gracefully and is the easier one to implement correctly.
