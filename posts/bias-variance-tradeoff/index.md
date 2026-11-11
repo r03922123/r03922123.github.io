@@ -1,8 +1,8 @@
 # The bias-variance tradeoff, measured
 
-A model can be wrong in two different ways. It can be wrong on average: however many times you retrain it on fresh data, its predictions centre on the wrong value, because its form cannot express the truth. That is **bias**. Or it can be right on average but jumpy: each new training set gives quite different predictions, because the model reacts to the particular noise it happened to see. That is **variance**. Under squared error, the expected test error is exactly the squared bias plus the variance plus a noise floor that no model can remove.
+Fit polynomials to 300 training sets of 30 noisy points from a sine wave, and test error falls from 0.628 at degree 0 to 0.108 at degree 3, then climbs to 4.60 at degree 9, while training error falls at every degree. Almost all of that climb is variance: at degree 9 the squared bias is 0.004 and the variance 4.51. A model can be wrong in two different ways. It can be wrong on average: however many times you retrain it on fresh data, its predictions centre on the wrong value, because its form cannot express the truth. That is **bias**. Or it can be right on average but jumpy: each new training set gives quite different predictions, because the model reacts to the particular noise it happened to see. That is **variance**. Under squared error, the expected test error is exactly the squared bias plus the variance plus a noise floor that no model can remove.
 
-The useful part is that the two errors respond to different fixes. More data cures variance and does little for bias; more capacity cures bias and usually adds variance. This post derives the split, then measures every term by brute force: train the same model on hundreds of simulated training sets and look at how its predictions scatter.
+The useful part is that the two errors respond to different fixes. More data cures variance and does little for bias; more capacity cures bias and usually adds variance. I derive the split, then measure every term by brute force: train the same model on hundreds of simulated training sets and look at how its predictions scatter.
 
 ## The decomposition
 Assume the data come from \(y = f(x) + \varepsilon\), where \(f\) is the true regression function and the noise \(\varepsilon\) has mean 0 and variance \(\sigma^2\). A training set \(D\) is random, so the fitted model \(\hat f_D\) is random too. Write \(\bar f(x) = \mathbb{E}_D[\hat f_D(x)]\) for the average prediction over all training sets you might have drawn. At a fixed test point \(x\), with a fresh label \(y\) whose noise is independent of \(D\):
@@ -18,7 +18,7 @@ Three details are easy to get wrong:
 - The clean additive split holds for squared error. For 0-1 classification loss there is no unique decomposition, and several competing definitions exist; the intuition carries over, the algebra does not.
 
 ## Measuring it by simulation
-Because we choose \(f\), we can do what is impossible with real data: draw 300 independent training sets of 30 points each, fit the same model to every one, and compute \(\bar f\) and the spread directly. The truth is \(f(x) = \sin(2\pi x)\) on \([0, 1]\) with noise \(\sigma = 0.3\), and the model is a polynomial whose degree sets the capacity.
+Because I choose \(f\), I can do what is impossible with real data: draw 300 independent training sets of 30 points each, fit the same model to every one, and compute \(\bar f\) and the spread directly. The truth is \(f(x) = \sin(2\pi x)\) on \([0, 1]\) with noise \(\sigma = 0.3\), and the model is a polynomial whose degree sets the capacity.
 
 ```python
 import numpy as np
@@ -272,6 +272,8 @@ Three things are worth taking from this. The decomposition itself still holds ev
 - **Using training error to choose capacity.** It only falls as capacity grows: asserted for the polynomial sweep above, and equally true for a weaker ridge penalty, more boosting rounds or more features. Only held-out error shows the trade.
 - **Expecting bagging to fix bias, or more trees to fix everything.** Bagging leaves bias alone, and its variance reduction stops at \(\rho s^2\).
 - **Forgetting the noise floor.** When train and validation error meet at a level you are unhappy with, and that level is the noise in the labels, no model change helps. Spend the effort on the data.
+
+These numbers come from synthetic problems whose truth I chose: a sine wave with noise \(\sigma = 0.3\) for the sweeps, and Gaussian features with \(n = 40\) rows for double descent. They show how each term moves, not how large it is on real data, where \(\bar f\) cannot be computed and learning curves read against an estimated noise floor are the working tool. Whether a model past the interpolation threshold beats the right-sized one stays open: it did not here, and it did in Belkin et al.'s experiments.
 
 For where this fits among the other basics, see the [ML fundamentals quick reference](../ml-fundamentals-quick-reference/); for why squared error is the natural loss here, see [regression as maximum likelihood](../regression-as-maximum-likelihood/).
 
