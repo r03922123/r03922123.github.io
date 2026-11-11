@@ -2,6 +2,24 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-claims, posts say what their code checks (PRs #22 to #24)
+
+1. **Fact-check apart from the copy-edit.** `post-voice` left about 40 sentences that claim more than their code
+   shows word for word, and listed them, so each correction could be judged on its own. A newspaper runs the
+   copy desk and the fact-check as two passes for the same reason: a changed fact hides easily inside a style
+   change. Trade-off: a second round of three PRs. Risk: a list made during another task can miss sentences;
+   this round found three more of the same kind (`attention-scaling`'s "Most queries", `recsys-features`'s
+   "most expensive", `lora-from-scratch`'s meta description) and fixed them in the same PRs.
+2. **Narrow the sentence, do not grow the evidence.** The fix was always prose: "every claim" became "most
+   claims", or the sentence names what is checked against what. Adding an assert would have been code, which the
+   spec keeps behind the owner's OK. Trade-off: some sentences now claim less than the post could prove with one
+   more line of code. Risk: "most" is a judgment, so each reviewer listed the unchecked claims behind it.
+3. **An assert is a bound, not a value.** `p-values` asserts only `p_unpaired > 0.15`, so "about 0.2" passed
+   every build while the code gives 0.254. A passing test says the number is inside the fence, not where in the
+   fence it sits, so each number in a sentence was re-run from the post's own code. Trade-off: a helper run per
+   number. Risk: a seeded number can drift with a library upgrade and no assert notices. The LoRA page's printed
+   \(6 \times 10^{-6}\) already reads \(9.5 \times 10^{-6}\) on torch 2.11, inside its `1e-4` assert.
+
 ## 2026-11-11 · build: post-voice PR 8, the last posts and the gate removed
 
 1. **Take the scaffolding down once the wall stands.** The voice check guarded one migration, not a permanent rule.
