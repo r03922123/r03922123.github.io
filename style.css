@@ -108,7 +108,9 @@ body:not(.home) header.site nav { margin-left: 0; }
 body:not(.home) header.site .home { grid-column: 2; }
 body:not(.home) header.site .gh { grid-column: 3; justify-self: end; color: var(--muted); font-family: var(--font-display); font-weight: 600; letter-spacing: .05em; }
 body:not(.home) header.site .gh:hover { color: var(--fg); }
-@media (max-width: 699px) { body:not(.home) header.site nav { grid-column: 1 / -1; } }   /* links on their own row */
+/* Links on their own row until they fit their cell on one line: measured in Chrome, they need a 376 px cell, which
+   a 940 px page gives; 960 px leaves room for a 15 px scrollbar, which the media width counts. */
+@media (max-width: 959px) { body:not(.home) header.site nav { grid-column: 1 / -1; } }
 @media (min-width: 700px) {
   body:not(.home) header.site { position: sticky; top: 0; z-index: 2; }
   body:not(.home) [id] { scroll-margin-top: 96px; }   /* below the bar, even when its links wrap to two lines */
@@ -136,9 +138,10 @@ body:has(.post-body) .wrap { max-width: 752px; }
 @supports selector(:has(a)) and (width: 1cqw) {
 @media (min-width: 1200px) {   /* columns: room for code, text, gap, side; the wrap holds 1320 px, so the room is 0-320 px */
   body:has(.post-body) .wrap { max-width: 1352px; }
-  .post-body { display: grid; grid-template-columns: minmax(0, 320px) 720px 40px 240px; container-type: inline-size; }
+  .post-body { --room: 320px; --text: 720px; --gap: 40px; --side: 240px; container-type: inline-size;
+               display: grid; grid-template-columns: minmax(0, var(--room)) var(--text) var(--gap) var(--side); }
   .post-head { grid-column: 2; }
-  .prose { grid-column: 2; grid-row: 2; --hang: clamp(0px, 100cqw - 1000px, 320px); }   /* the room left of the text */
+  .prose { grid-column: 2; grid-row: 2; --hang: clamp(0px, 100cqw - var(--text) - var(--gap) - var(--side), var(--room)); }   /* the room left of the text */
   .post-side { grid-column: 4; grid-row: 2; align-self: start; position: sticky; top: 88px; max-height: calc(100vh - 104px);
                overflow: auto; font-size: .85rem; line-height: 1.45; }
   .details { display: block; margin: 0 0 24px; font-size: inherit; }
@@ -153,7 +156,7 @@ body:has(.post-body) .wrap { max-width: 752px; }
   .prose > * { direction: ltr; }
   .prose > pre, .prose > table:has(th:nth-child(5)) { width: max-content; min-width: 100%; max-width: calc(100% + var(--hang)); }
   .post-body .toc { margin: 0; padding: 0 0 0 14px; background: none; border: 0; border-left: 2px solid var(--line); border-radius: 0; }
-  .post-body .toc h2 { font: 700 .78rem/1.4 var(--font-display); letter-spacing: .1em; color: var(--muted); }
+  .post-body .toc h2 { font: 700 .78rem/1.4 var(--font-display); color: var(--muted); }
   .post-body .toc ol { padding-left: 1.1em; }
   .post-body .toc li { margin: .3em 0; }
 }
@@ -181,7 +184,7 @@ body:has(.post-body) .wrap { max-width: 752px; }
 .about .intro p + p { margin-top: .8em; }
 .role { margin: 20px 0; }
 .role-head, .role-sub { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.role-head h3 { font-size: 1.05rem; margin: 0; }
+.role-head h3 { font-size: 1.05rem; margin: 0; }   /* 16.8 px on purpose: a row label beside its dates; the 18 px h3 is for posts */
 .role-head span, .role-sub { color: var(--muted); font-size: .9em; }
 .role ul, .plain { padding-left: 1.2em; margin: .6em 0 0; }
 .role li, .plain li { margin: .5em 0; }
