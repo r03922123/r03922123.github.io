@@ -1,6 +1,6 @@
 ---
 title: pandas on one page: select, group, join, reshape and regex
-summary: A working reference for the pandas operations that come up in nearly every data task: building and inspecting a frame, boolean masks, counting and ranking, missing values, groupby with agg versus transform, merges and anti-joins, melt and pivot, vectorising row logic, and string methods with a regex table. Every snippet runs on a tiny DataFrame and proves its claim with an assert.
+summary: A working reference for the pandas operations that come up in nearly every data task: building and inspecting a frame, boolean masks, counting and ranking, missing values, groupby with agg versus transform, merges and anti-joins, melt and pivot, vectorising row logic, and string methods with a regex table. Every snippet runs on a tiny DataFrame, and most prove their claim with an assert.
 group: Coding and data
 order: 4
 tags: pandas · python · data wrangling · regex · reference
