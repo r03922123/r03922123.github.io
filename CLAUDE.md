@@ -11,6 +11,7 @@ this one included. A Python build turns Markdown into HTML, and the generated HT
 All gates:   sh scripts/gates.sh          # run before every push; about 4 min, mostly the post build
 Check tests: (cd scripts && python3 -m unittest test_check)
 Search tests: node --test scripts/test_search.mjs
+Voice check: python3 scripts/voice_check.py      # --final in PR 8 only; tests: (cd scripts && python3 -m unittest test_voice_check)
 Site check:  python3 scripts/check.py     # --denylist-only for terms only; --show-terms only when debugging locally
 Builds:      python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py . && python3 -I tools/search/build.py .
 Lock CI:     uv pip compile requirements-ci.in --generate-hashes --python-version 3.12 \
@@ -58,10 +59,11 @@ Preview:     python3 -m http.server 8000
   each card's count to its section's rows.
 - Reading pages: the bar sits outside `.wrap`; the home keeps its own header inside it. After a layout change, run
   `python3 tools/dev/same_articles.py origin/main` to show no article text moved.
-- `site-search` on its branch: `search.mjs` inserts a box on the two list pages and ranks with `search-core.mjs`
+- `site-search` (merged): `search.mjs` inserts a box on the two list pages and ranks with `search-core.mjs`
   over `search-index.json`, written by `tools/search/build.py` after the post builds (gates.sh runs both, and
   `node --test scripts/test_search.mjs`). `check.py` fails on a listed post missing from the index.
-- Next, in the build order of `CAPABILITY-MAP.md`: `post-voice` (rebases on the 4 long-form pages), each in its own
-  session. Reading-page PRs open with
+- `post-voice` in progress (8 PRs, `SPEC-post-voice.md`): PR 1 adds `scripts/voice_check.py` and
+  `scripts/voice-baseline.json`, written once from `main` at `28b63c9`; never regenerate it to get green. Next is the
+  3-post pilot, which the owner reads before PR 3. Reading-page PRs open with
   `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR 0002).
 - Parked branches: none.
