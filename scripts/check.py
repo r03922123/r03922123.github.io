@@ -49,7 +49,7 @@ FEEDS = ("rss.xml", "sitemap.xml", "robots.txt", "llms.txt")
 FIXED_PAGES = ("/", "/about.html", "/posts/", "/leetcode/")
 SITEMAP_LOC = "{http://www.sitemaps.org/schemas/sitemap/0.9}loc"
 MD_LINK = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")    # the link syntax tools/leetcode/build.py renders
-MD_CODE = re.compile(r"^```.*?^```|`[^`\n]+`", re.S | re.M)   # fences and code spans, which it renders as no link
+MD_CODE = re.compile(r"^```.*?^```|`[^`\n]+`|\\\(.+?\\\)", re.S | re.M)   # fences, code spans, inline maths: no link
 FONTS = ("/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2", "/fonts/inter/inter-latin-wght-normal.woff2")
 EMAIL = re.compile(r"[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")   # not a pinned name@1.2.3
 # Hand-written LeetCode post counts on the home page and posts index; build.py only rewrites the series page.
@@ -186,12 +186,12 @@ class Anchors(HTMLParser):
 
 
 class Topics(HTMLParser):
-    """SPEC-posts-index: the text of each card in nav.topics, by href, and the number of rows (<li>) in each
-    section.group, by id. shortcut: assumes navs and sections are not nested, as the two templates write them."""
+    """SPEC-posts-index: the count text (the <span>) of each card in nav.topics, by href, and the number of rows (<li>)
+    in each section.group, by id. shortcut: assumes navs and sections are not nested, as the two templates write them."""
 
     def __init__(self, text):
         super().__init__()
-        self.cards, self.rows, self.nav, self.card, self.section = {}, {}, False, None, None
+        self.cards, self.rows, self.nav, self.card, self.section, self.count = {}, {}, False, None, None, False
         self.feed(text)
         self.close()
 
@@ -208,6 +208,8 @@ class Topics(HTMLParser):
             self.rows[self.section] = 0
         elif tag == "li" and self.section is not None:
             self.rows[self.section] += 1
+        elif tag == "span" and self.card is not None:
+            self.count = True
 
     def handle_endtag(self, tag):
         if tag == "nav":
@@ -216,9 +218,11 @@ class Topics(HTMLParser):
             self.card = None
         elif tag == "section":
             self.section = None
+        elif tag == "span":
+            self.count = False
 
     def handle_data(self, data):
-        if self.card is not None:
+        if self.card is not None and self.count:
             self.cards[self.card] += data
 
 
@@ -338,9 +342,15 @@ def feed_findings(root, listed):
     if "sitemap.xml" in trees:
         locs = {(loc.text or "").strip() for loc in trees["sitemap.xml"].iter(SITEMAP_LOC)}
         findings += [f"sitemap.xml: missing {SITE}{path}" for path in listed if SITE + path not in locs]
+    posts = [SITE + path for path in listed if path not in FIXED_PAGES]
     if "rss.xml" in trees:
         findings += [f"rss.xml: item {n} has no pubDate" for n, item in enumerate(trees["rss.xml"].iter("item"), 1)
                      if not (item.findtext("pubDate") or "").strip()]
+        links = [(item.findtext("link") or "").strip() for item in trees["rss.xml"].iter("item")]
+        findings += site_links("rss.xml", posts, links, links)
+    if (root / "llms.txt").is_file():                 # a post with a Markdown copy is linked by that copy
+        urls = re.findall(r"\]\((\S+?)\)", (root / "llms.txt").read_text(errors="replace"))
+        findings += site_links("llms.txt", posts, urls, [re.sub(r"index\.md$", "", url) for url in urls])
     for name in FEEDS:                                # RSS author is an email; this site's feeds carry none
         if (root / name).is_file():
             lines = (root / name).read_text(errors="replace").splitlines()
@@ -354,10 +364,20 @@ def feed_findings(root, listed):
             text = md.read_text(errors="replace")
             if text.startswith("---"):
                 findings.append(f"{section}/{src.stem}/index.md: front matter kept")
-            # The page drops a link to an unwritten post (build.py's link()); the Markdown copy keeps it live.
             findings += [f"{section}/{src.stem}/index.md: broken link {url}" for url in MD_LINK.findall(MD_CODE.sub("", text))
                          if not link_ok(root, md, url)]
+        for md in sorted(root.glob(f"{section}/*/index.md")):   # a renamed source leaves its old copy online
+            src = root / "tools" / section / "src" / f"{md.parent.name}.md"
+            if not src.is_file():
+                findings.append(f"{md.relative_to(root).as_posix()}: no source {src.relative_to(root).as_posix()}")
     return findings + head_findings(root)
+
+
+def site_links(name, posts, urls, pages):
+    """A feed's findings: each listed post (a full URL) missing from the pages its urls name, and each url not on
+    this site."""
+    return ([f"{name}: missing {url}" for url in posts if url not in pages]
+            + [f"{name}: link {url} is not on {SITE}" for url in urls if not url.startswith(SITE + "/")])
 
 
 def search_findings(root, listed):
@@ -383,7 +403,9 @@ def check(root, denylist, terms_only=False):
                          if any(rx.search(name) for rx in rxs for name in (unquote(rel), NAME_SEP.sub(" ", unquote(rel))))]
     for path, text in text_files(root):
         rel = path.relative_to(root).as_posix()
-        decoded = unquote(text)                       # a link such as /%61cme%20corp/ is the term once served
+        # A link such as /%61cme%20corp/ is the term once served. Per line, with %0A read as a space, so a decoded
+        # newline cannot shift the line numbers reported below.
+        decoded = "\n".join(unquote(line).replace("\n", " ") for line in text.split("\n"))
         # Each also with file-name gaps (acme-corp quoted in a page); NAME_SEP swaps one char for one, keeping lines.
         bodies = {b for body in (text, decoded) for b in (body, NAME_SEP.sub(" ", body))}
         for term, rxs in deny:                        # whole text, so a term split across lines is still found
