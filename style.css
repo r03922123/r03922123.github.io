@@ -239,6 +239,7 @@ body:has(.post-body) .wrap { max-width: 752px; }
 .rm-ready .rm-doors { visibility: visible; }
 .rm-door { position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer; text-decoration: none;
            -webkit-tap-highlight-color: transparent; }
+.rm-door[data-object="oldbook"] { z-index: -1; }    /* its padded target sits under the portraits' where they meet */
 .rm-door:hover { text-decoration: none; }
 .rm-door:focus-visible { outline: none; }
 .rm-door::before { content: ""; position: absolute; inset: -5px; opacity: 0; --c: #f3cf7a;          /* a gold target, corners only */

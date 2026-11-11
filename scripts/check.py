@@ -365,14 +365,17 @@ def feed_findings(root, listed):
 
 def book_findings(root):
     """The exception to "listings complete" (CONSTRAINTS.md), checked the other way round: each /book/ page carries
-    noindex, no feed or index names the book, no list page or About links it, and the home links it once, from
+    noindex, no feed or index names the book, no other page links it, and the home links it once, from
     the room's door. The book's own index must still list every book page (the listing loop in check)."""
     findings = [f"{p.relative_to(root).as_posix()}: no robots noindex" for p in sorted(root.glob("book/**/*.html"))
                 if not NOINDEX.search(p.read_text(errors="replace"))]
     findings += [f"{name}: names {BOOK}" for name in (*FEEDS, "search-index.json")
                  if (root / name).is_file() and BOOK in (root / name).read_text(errors="replace")]
-    for rel, base, allowed in (("index.html", "/", 1), ("about.html", "/about.html", 0),
-                               ("posts/index.html", "/posts/", 0), ("leetcode/index.html", "/leetcode/", 0)):
+    for page in sorted(root.rglob("*.htm*")):         # every page outside the book; the home holds the one door
+        rel = page.relative_to(root).as_posix()
+        if page.suffix not in PAGES or ".git" in page.parts or rel.startswith("book/"):
+            continue
+        base, allowed = "/" + rel, int(rel == "index.html")
         n = sum(kind == "a" and path.removeprefix(SITE).startswith(BOOK) for kind, path, _ in links(root, rel, base))
         if n > allowed:
             findings.append(f"{rel}: links {BOOK} {n} times (allowed: {allowed})")

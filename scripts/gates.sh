@@ -23,7 +23,8 @@ post_wording() {
 
 # The old book (ADR 0003) may use interview framing, but never names where its notes came from.
 book_wording() {
-  files=$(grep -l -i -E 'obsidian|vault' tools/book/src/*.md)
+  files=$(grep -l -i -E 'obsidian|vault' tools/book/src/*.md); status=$?
+  [ "$status" -le 1 ] || { echo "grep failed ($status)"; return 1; }    # 1 is "no match"; 2 is an error, not a pass
   [ -z "$files" ] || { echo "files with a match: $files"; return 1; }
 }
 
