@@ -1,8 +1,8 @@
 # FlashAttention: exact attention without the N-by-N matrix
 
-FlashAttention, by Tri Dao, Daniel Fu, Stefano Ermon, Atri Rudra and Christopher Ré (2022), is a way of computing ordinary softmax attention. It is not an approximation and it does not change the model: the output is the same up to floating-point rounding. What changes is the order of the work. Standard attention computes the whole \(N \times N\) matrix of scores, writes it to GPU memory, and reads it back for the softmax and again for the product with the values. FlashAttention never builds that matrix. It processes queries and keys in small tiles that fit in fast on-chip memory, and the full matrix exists only one tile at a time.
+At sequence length 65,536, standard attention keeps an 8 GiB score matrix for one half-precision head with \(d = 64\); FlashAttention computes the same output with 256 KiB of extra memory. FlashAttention, by Tri Dao, Daniel Fu, Stefano Ermon, Atri Rudra and Christopher Ré (2022), is a way of computing ordinary softmax attention. It is not an approximation and it does not change the model: the output is the same up to floating-point rounding. What changes is the order of the work. Standard attention computes the whole \(N \times N\) matrix of scores, writes it to GPU memory, and reads it back for the softmax and again for the product with the values. FlashAttention never builds that matrix. It processes queries and keys in small tiles that fit in fast on-chip memory, and the full matrix exists only one tile at a time.
 
-Two ideas make that possible: a softmax computed one block of keys at a time, and a backward pass that recomputes the scores instead of storing them. Below, both are built in NumPy, checked against PyTorch, and the memory traffic is counted.
+Two ideas make that possible: a softmax computed one block of keys at a time, and a backward pass that recomputes the scores instead of storing them. I build both in NumPy, check them against PyTorch and count the memory traffic: it still grows like \(N^2\), with a constant about four times smaller in this simple count, while the extra memory drops to one float per query.
 
 Throughout, \(N\) is the sequence length, \(d\) the head dimension, and for one head
 
@@ -271,6 +271,8 @@ Q32, K32, V32 = (a.astype(np.float32) for a in (Q, K, V))
 a, b = standard_attention(Q32, K32, V32), flash_forward(Q32, K32, V32)[0]
 assert not np.array_equal(a, b) and np.abs(a - b).max() < 1e-6   # same math, different bits
 ```
+
+Everything here runs in NumPy on one head of 256 queries with head dimension 64, so it shows that the tiling is exact and how the traffic scales, not how fast a kernel runs; the speedups quoted above are the paper's own measurements. The reconstruction leaves out where the real kernels get their speed: the split of each tile among warps, the overlap of data movement with matrix products, and the FP8 path, all covered in the FlashAttention-2 and -3 papers.
 
 For where the \(1/\sqrt{d}\) in every block above comes from, see [why attention divides by the square root of d](../attention-scaling/), and for the surrounding architecture, [transformers and LLMs: key ideas](../transformers-and-llms-key-ideas/).
 
