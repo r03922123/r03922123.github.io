@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-Takeover phase: understand (next when: docs/ARCHITECTURE.md is merged)
-
 Personal site, public repo, served by GitHub Pages from `main` with `.nojekyll`: every file here is a public page,
 this one included. A Python build turns Markdown into HTML, and the generated HTML is committed.
 
@@ -25,7 +23,7 @@ Preview:     python3 -m http.server 8000
 
 - `CONSTRAINTS.md`: the workflow rules and the gates. Do not loosen it to make a change pass.
 - `CAPABILITY-MAP.md`: the index of modules and their build order; each module has a `SPEC-<id>.md`.
-- `docs/adr/`: decisions and what they give up. `docs/learning-log.md`: the three whys of each change.
+- `docs/adr/`: decisions and what they give up.
 
 ## Traps
 
@@ -70,6 +68,5 @@ Preview:     python3 -m http.server 8000
 - Waiting for the owner's OK, since each is a code change: `transformers-and-llms-key-ideas`'s comment "the bug
   ~0.15" (runs to 0.118), and the LeetCode `hash-table` note's unseeded chain-length assert (fails about 1.4% of
   runs, 42 of 3,000).
-- Next: every module in `CAPABILITY-MAP.md` is merged, so the understand phase's check, `docs/ARCHITECTURE.md`, comes
-  next.
+- Next: every module in `CAPABILITY-MAP.md` is merged, so `docs/ARCHITECTURE.md` comes next.
 - Parked branches: none.
