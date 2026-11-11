@@ -5,7 +5,7 @@ group: Machine learning fundamentals
 order: 8
 tags: regularization · dropout · ensembles · neural networks
 ---
-Fit a network with about 17,000 weights to 20 noisy points and it memorizes the noise: training MSE 0.03 on noisy points, 0.17 against the true curve. Dropout moves those to 0.13 and 0.12. It is the simplest regularizer in deep learning to write down: on every training step, set each unit's output to zero with probability \(p\), independently, and use a fresh random pattern on the next step. At inference nothing is dropped. A unit can no longer count on any particular neighbour being present, so the network has to spread what it knows across many units instead of building fragile combinations that only work together.
+Fit a network with about 17,000 weights to 20 noisy points and it memorizes the noise: training MSE 0.03 on noisy points, test MSE 0.17 on the true curve. Dropout moves those to 0.13 and 0.12. It is the simplest regularizer in deep learning to write down: on every training step, set each unit's output to zero with probability \(p\), independently, and use a fresh random pattern on the next step. At inference nothing is dropped. A unit can no longer count on any particular neighbour being present, so the network has to spread what it knows across many units instead of building fragile combinations that only work together.
 
 I write dropout from scratch, check it against PyTorch and show what it does to both errors, then make three common one-liners precise. "It trains an ensemble" is exact only in special cases. "It is like weight decay" is exact for a linear model, with a twist. And "never use it with batch norm" is really a rule about placement: the trouble comes from dropout that feeds a batch-norm layer.
 
@@ -259,6 +259,6 @@ assert (Leaky().eval()(ones) == 0).any()              # still dropping in eval m
 assert torch.equal(Fixed().eval()(ones), ones)
 ```
 
-The exact results above hold at any size; the measured ones may not carry to trained, deep networks. The error table comes from one sine-wave task, and the nonlinear ensemble check uses random weights, so it shows the deterministic network can miss the ensemble average, not how far a trained one misses it. A deep network's penalty has no closed form, so "dropout regularizes in activation space" is carried over from the linear case, not proven here. How much dropout buys on a given model is a question for its validation data.
+The exact results above hold at any size; the measured ones may not carry to trained, deep networks. The error table comes from one sine-wave task, and the nonlinear ensemble check uses random weights, so it shows the deterministic network can miss the ensemble average, not how far a trained one does. A deep network's penalty has no closed form, so "dropout regularizes in activation space" is carried over from the linear case, not proven here. How much dropout buys on a given model is a question for its validation data.
 
 The masking scheme, the weight-scaling rule and the ensemble interpretation are from Hinton et al. (2012) and Srivastava et al. (2014). The linear-model penalty follows the analysis in Srivastava et al. and Wager, Wang and Liang (2013), and the batch-norm interaction is from Li et al. (2019).
