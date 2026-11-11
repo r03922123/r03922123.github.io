@@ -1,8 +1,8 @@
 # The normal distribution: the bell curve, checked
 
-Measure anything that is the sum of many small, independent nudges, such as a model's validation accuracy across random seeds, a sensor's measurement error, or the average of a few thousand clicks, and the histogram tends toward the same symmetric hump. That hump is the **normal** (or Gaussian) distribution. It is the default noise model behind least squares, the reference curve for z-scores, p-values and confidence intervals, and the shape that averages settle into.
+If one training configuration gives validation accuracy of roughly \(\mathcal{N}(0.842, 0.004^2)\) across seeds, a single run reaches 0.85 about 2.3% of the time, but the best of 20 seeds reaches it about 37% of the time. That bell is the **normal** (or Gaussian) distribution, the symmetric hump that sums of many small, independent nudges tend toward, such as measurement error or the average of a few thousand clicks. It is the default noise model behind least squares, the reference curve for z-scores, p-values and confidence intervals, and the shape that averages settle into.
 
-This post takes it apart: the density and why its constant is \(\sqrt{2\pi}\), standardizing so that one function answers every question, which combinations of normals stay normal, why averages become normal and how fast, the normal approximation to the binomial, and where the bell curve is the wrong model.
+I take it apart, with code that checks each section: the density and why its constant is \(\sqrt{2\pi}\), standardizing so that one function answers every question, which combinations of normals stay normal, why averages become normal and how fast, the normal approximation to the binomial, and where the bell curve is the wrong model.
 
 ## The density
 A normal variable with mean \(\mu\) and standard deviation \(\sigma > 0\) is written \(X \sim \mathcal{N}(\mu, \sigma^2)\). Note that the second parameter is the **variance**. Its density is
@@ -75,6 +75,8 @@ Symmetry gives \(\Phi(-z) = 1 - \Phi(z)\), so tables only list positive \(z\). \
 | \(\mu \pm 1\sigma\) | 0.683 | 90% | 1.645 |
 | \(\mu \pm 2\sigma\) | 0.954 | 95% | 1.960 |
 | \(\mu \pm 3\sigma\) | 0.997 | 99% | 2.576 |
+
+The left columns give the chance of landing within 1, 2 or 3 standard deviations of the mean; the right columns, the cutoff for a two-sided interval at each confidence level.
 
 ```python
 Phi = lambda z: 0.5 * (1 + math.erf(z / math.sqrt(2)))
@@ -225,5 +227,7 @@ assert math.isclose(stats.norm.sf(10), 7.62e-24, rel_tol=1e-3)
 assert stats.norm.sf(40) == 0.0                                 # underflows even with sf...
 assert abs(stats.norm.logsf(40) - (-800 - math.log(40 * math.sqrt(2 * math.pi)))) < 1e-3   # ...but logsf is fine
 ```
+
+The code checks these claims on chosen cases: exponential data for the central limit theorem, a Student-t with 3 degrees of freedom for the tails, two click-through rates for the binomial. It shows how far the normal can be off, not how far it is off for a given metric. Check a real metric's skew and tails before trusting a normal tail probability, or bootstrap.
 
 For the binomial side see [is this coin fair?](../is-this-coin-fair/), and for the distributions side by side, the [probability cheatsheet](../probability-cheatsheet/). This is standard textbook material; chapter 5 of Blitzstein and Hwang's Introduction to Probability is a good fuller treatment.

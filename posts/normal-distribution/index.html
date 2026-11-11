@@ -35,12 +35,12 @@
   <h1>The normal distribution: the bell curve, checked</h1>
 </header>
 <aside class="post-side">
-  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>11 min</dd><dt>Topic</dt><dd>Probability</dd><dt>Tags</dt><dd>probability · normal · Gaussian · central limit theorem</dd></dl>
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>12 min</dd><dt>Topic</dt><dd>Probability</dd><dt>Tags</dt><dd>probability · normal · Gaussian · central limit theorem</dd></dl>
   <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-density">The density</a></li><li><a href="#one-table-for-every-normal">One table for every normal</a></li><li><a href="#sums-and-averages">Sums and averages</a></li><li><a href="#why-it-is-everywhere-the-central-limit-theorem">Why it is everywhere: the central limit theorem</a></li><li><a href="#the-normal-approximation-to-the-binomial">The normal approximation to the binomial</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
 </aside>
 <div class="prose">
-<p>Measure anything that is the sum of many small, independent nudges, such as a model's validation accuracy across random seeds, a sensor's measurement error, or the average of a few thousand clicks, and the histogram tends toward the same symmetric hump. That hump is the <b>normal</b> (or Gaussian) distribution. It is the default noise model behind least squares, the reference curve for z-scores, p-values and confidence intervals, and the shape that averages settle into.</p>
-<p>This post takes it apart: the density and why its constant is \(\sqrt{2\pi}\), standardizing so that one function answers every question, which combinations of normals stay normal, why averages become normal and how fast, the normal approximation to the binomial, and where the bell curve is the wrong model.</p>
+<p>If one training configuration gives validation accuracy of roughly \(\mathcal{N}(0.842, 0.004^2)\) across seeds, a single run reaches 0.85 about 2.3% of the time, but the best of 20 seeds reaches it about 37% of the time. That bell is the <b>normal</b> (or Gaussian) distribution, the symmetric hump that sums of many small, independent nudges tend toward, such as measurement error or the average of a few thousand clicks. It is the default noise model behind least squares, the reference curve for z-scores, p-values and confidence intervals, and the shape that averages settle into.</p>
+<p>I take it apart, with code that checks each section: the density and why its constant is \(\sqrt{2\pi}\), standardizing so that one function answers every question, which combinations of normals stay normal, why averages become normal and how fast, the normal approximation to the binomial, and where the bell curve is the wrong model.</p>
 <h2 id="the-density">The density</h2>
 <p>A normal variable with mean \(\mu\) and standard deviation \(\sigma &gt; 0\) is written \(X \sim \mathcal{N}(\mu, \sigma^2)\). Note that the second parameter is the <b>variance</b>. Its density is</p>
 \[ f(x) = \frac{1}{\sigma\sqrt{2\pi}} \exp\!\left(-\frac{(x - \mu)^2}{2\sigma^2}\right), \qquad x \in \mathbb{R}. \]
@@ -92,6 +92,7 @@ assert np.allclose(stats.norm.fit(data), (data.mean(), data.std(ddof=0)))</code>
 <p>Symmetry gives \(\Phi(-z) = 1 - \Phi(z)\), so tables only list positive \(z\). \(\Phi\) has no elementary closed form, but it is a rescaled error function, \(\Phi(z) = \tfrac{1}{2}\left(1 + \operatorname{erf}(z/\sqrt{2})\right)\), which is how libraries compute it. The same standardizing step, applied per feature or per activation, is what feature scaling and <a href="../batchnorm-vs-layernorm/">batch and layer normalization</a> do.</p>
 <p><b>Worked example.</b> One training configuration, rerun with different seeds, gives validation accuracy that is roughly \(\mathcal{N}(0.842, 0.004^2)\). How often does a single run reach 0.85? The z-score is \((0.85 - 0.842)/0.004 = 2\), so \(P = 1 - \Phi(2) \approx 2.3\%\). And \(P(0.836 \le \text{acc} \le 0.85) = \Phi(2) - \Phi(-1.5) \approx 0.910\). If someone reports their best of 20 seeds, a 0.85 is no longer surprising: \(1 - (1 - 0.023)^{20} \approx 37\%\).</p>
 <table><thead><tr><th>Within</th><th>Probability</th><th>Two-sided \(z\) for</th><th>\(z\)</th></tr></thead><tbody><tr><td>\(\mu \pm 1\sigma\)</td><td>0.683</td><td>90%</td><td>1.645</td></tr><tr><td>\(\mu \pm 2\sigma\)</td><td>0.954</td><td>95%</td><td>1.960</td></tr><tr><td>\(\mu \pm 3\sigma\)</td><td>0.997</td><td>99%</td><td>2.576</td></tr></tbody></table>
+<p>The left columns give the chance of landing within 1, 2 or 3 standard deviations of the mean; the right columns, the cutoff for a two-sided interval at each confidence level.</p>
 <pre><code class="language-python">Phi = lambda z: 0.5 * (1 + math.erf(z / math.sqrt(2)))
 for z in [-3.0, -1.5, 0.0, 0.7, 2.0]:
     assert math.isclose(Phi(z), stats.norm.cdf(z), abs_tol=1e-15)
@@ -208,6 +209,7 @@ assert 1 - stats.norm.cdf(10) == 0.0
 assert math.isclose(stats.norm.sf(10), 7.62e-24, rel_tol=1e-3)
 assert stats.norm.sf(40) == 0.0                                 # underflows even with sf...
 assert abs(stats.norm.logsf(40) - (-800 - math.log(40 * math.sqrt(2 * math.pi)))) &lt; 1e-3   # ...but logsf is fine</code></pre>
+<p>The code checks these claims on chosen cases: exponential data for the central limit theorem, a Student-t with 3 degrees of freedom for the tails, two click-through rates for the binomial. It shows how far the normal can be off, not how far it is off for a given metric. Check a real metric's skew and tails before trusting a normal tail probability, or bootstrap.</p>
 <p>For the binomial side see <a href="../is-this-coin-fair/">is this coin fair?</a>, and for the distributions side by side, the <a href="../probability-cheatsheet/">probability cheatsheet</a>. This is standard textbook material; chapter 5 of Blitzstein and Hwang's Introduction to Probability is a good fuller treatment.</p>
 </div>
 </article>
