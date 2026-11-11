@@ -1,6 +1,6 @@
 # P-values: what they measure and how they mislead
 
-Model A gets 850 of 1,000 test examples right and model B gets 830. Is A better, or did it get lucky on this particular test set? A p-value answers a narrower question than that: if the two models were really equally good, how often would a gap this large show up anyway? If the answer is "rarely", the gap is hard to put down to luck.
+Model A gets 850 of 1,000 test examples right and model B gets 830. Is A better, or did it get lucky on this particular test set? A p-value answers a narrower question than that: if the two models were really equally good, how often would a gap this large show up anyway? If the answer is "rarely", the gap is hard to put down to luck. Pairing the two models' results on each example, I get p = 0.03; ignoring the pairing gives about 0.2 on the same data.
 
 This post defines the p-value, checks the definition by simulation, uses it to compare two models properly, and then works through the common misreadings, each with a simulation that shows how big the error is.
 
@@ -103,7 +103,7 @@ p_unpaired = (1 + np.sum(np.abs(fake_gap) >= abs(gap) - 1e-12)) / (5_000 + 1)
 assert p_unpaired > 0.15 > 0.05 > p_paired                  # same data, opposite conclusions
 ```
 
-The paired test says 0.03; the unpaired one says about 0.2. Same data, and only the paired test asks the right question.
+The paired test says 0.03; the unpaired one says about 0.2. Same data, and only the paired test asks the right question. The 80 disagreements are made up, so they show how much pairing can matter, not how much it does on a real test set.
 
 ## Power: what happens when the null is false
 A p-value controls one error, the false positive. The other, missing a real effect, is governed by **power**, the probability of rejecting when a given alternative is true. Picture two bell curves for the statistic, one under \(H_0\) and one under the alternative, with the cutoff between them. The area of the null curve past the cutoff is \(\alpha\). The area of the alternative curve before the cutoff is the false negative rate \(\beta\), and the rest of it is the power \(1 - \beta\).
@@ -217,7 +217,7 @@ assert summary["bonferroni"][0] < 0.2                       # Bonferroni: almost
 assert summary["bh"][2] > summary["bonferroni"][2] + 10     # ...but BH finds many more real effects
 ```
 
-Use Bonferroni when a single false alarm is costly, Benjamini–Hochberg when you screen many candidates and follow up on the hits.
+Here no correction gives about 47 false alarms per run, Bonferroni almost never gives one, and controlling the false discovery rate keeps it near 0.05 while finding more than 10 real effects beyond Bonferroni's. Use Bonferroni when a single false alarm is costly, Benjamini–Hochberg when you screen many candidates and follow up on the hits.
 
 ## How to use them
 - **Decide the test before the data:** the hypothesis, the statistic, one or two sided, \(\alpha\), and the sample size. Choosing any of these after looking turns the guarantee into decoration.
@@ -226,5 +226,7 @@ Use Bonferroni when a single false alarm is costly, Benjamini–Hochberg when yo
 - **Treat 0.05 as a convention, not a law.** p = 0.049 and p = 0.051 are the same evidence. Results near the line deserve a replication, not a headline.
 - **Count every test you ran,** including the slices you looked at and dropped, and correct for them.
 - **A large p-value is not evidence of no effect.** With low power it is mostly evidence of too little data.
+
+Each simulation here knows which hypotheses are true, which a real analysis never does. The 36% share of false alarms rests on an assumed base rate of 1 in 10 at 80% power. For real ideas that base rate is unknown, so how likely a significant result is to be real stays open, and results near the line deserve a replication.
 
 The framing of the threshold as a false positive rate follows the hypothesis testing chapter of Berkeley's Data 102 course notes, and the peeking simulation is in the spirit of Evan Miller's "How Not To Run an A/B Test". The false discovery rate procedure is from Benjamini and Hochberg (1995), McNemar's test from McNemar (1947), and the group sequential boundaries from Pocock (1977) and O'Brien and Fleming (1979). The American Statistical Association's 2016 statement on p-values (Wasserstein and Lazar) is a short, readable summary of the misreadings above.
