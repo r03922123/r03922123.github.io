@@ -253,7 +253,7 @@ body:has(.post-body) .wrap { max-width: 752px; }
                    background-repeat: no-repeat; filter: drop-shadow(0 0 2px #000); }
 .rm-tip { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(calc(-50% + var(--tip-dx, 0px))); opacity: 0; white-space: nowrap;
           padding: 5px 14px 6px; text-align: center; background: rgba(20, 12, 7, .92); border: 1px solid #b8862f;
-          box-shadow: 0 0 0 3px rgba(20, 12, 7, .6); }
+          box-shadow: 0 0 0 3px rgba(20, 12, 7, .6); pointer-events: none; }   /* a label, even unseen, must not take a neighbour's click */
 .rm-below .rm-tip { bottom: auto; top: calc(100% + 10px); }
 .rm-mid .rm-tip { bottom: auto; top: 38%; }
 .rm-tip b { display: block; font: 700 .82rem/1.3 var(--font-display); letter-spacing: .12em; text-transform: uppercase; color: #f6dc9a; }
