@@ -29,7 +29,7 @@ LONGFORM = [
      "A reference that follows business value down to model metrics for four kinds of system, then covers offline tests, online experiments and the ways each step tends to break.",
      "October 31, 2026 · 8 min read · evaluation · experimentation · reference"),
     ("lora-from-scratch", "LoRA from scratch, proven with asserts",
-     "Build a tiny GPT, freeze it, add LoRA adapters, fine-tune only those and fuse them back, checking every claim with an assert. Runs on a laptop CPU in seconds.",
+     "Build a tiny GPT, freeze it, add LoRA adapters, fine-tune only those and fuse them back, checking most claims with an assert. Runs on a laptop CPU in seconds.",
      "October 31, 2026 · 7 min read · fine-tuning · LLM · PyTorch"),
     ("text-to-music-2026", "Text-to-music in 2026: models, reward models and DPO",
      "Building text-to-music from parts, with a tensor shape at every step: codec language models from MusicGen to HeartMuLa, scoring from CLAP to the CMI reward model, and DPO derived from its objective.",
