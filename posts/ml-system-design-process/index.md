@@ -1,8 +1,8 @@
 # The ML system design process, step by step
 
-A design request usually arrives as one sentence: "we want personalised recommendations on the home page". Between that sentence and a model in production sit a dozen decisions, and bad designs usually make them in the wrong order or never write them down.
+An online shop with 5 million daily users asks, in one sentence, for personalised recommendations in a "recommended for you" row on its home page. Between that sentence and a model in production sit a dozen decisions, and bad designs usually make them in the wrong order or never write them down.
 
-The [framework post](../ml-system-design-framework/) lists the questions a design has to answer. This one is the working process: the steps for writing or reviewing a design, what each should leave in the design document, and the small calculations that turn opinions into numbers. One running example is used throughout: an online shop with 5 million daily users wants a "recommended for you" row on its home page.
+The [framework post](../ml-system-design-framework/) lists the questions a design has to answer. I lay out the working process: the steps for writing or reviewing a design, what each should leave in the design document, and the small calculations that turn opinions into numbers. That shop is the running example throughout.
 
 ## Step 1: clarify the problem and size it
 Before any modelling, pin down four things.
@@ -201,6 +201,8 @@ print(f"clicks lost over {steps} impressions: greedy {greedy:.0f}, Thompson samp
 assert thompson < 0.6 * greedy
 ```
 
+Over 200 runs of 20 new products and 5,000 impressions each, Thompson sampling loses less than 0.6 times the clicks greedy loses.
+
 **Monitoring and retraining.** Track model metrics (NDCG, calibration), product metrics (click-through, conversion, diversity of what is shown) and drift in the inputs and the scores; the [framework post](../ml-system-design-framework/) computes a population stability index for the inputs. Alert when a metric falls below its floor or a drift score rises above its ceiling. An alert should start a diagnosis, not an automatic retrain: retraining fixes a model that has gone stale, but not a broken upstream pipeline or a label whose meaning has changed.
 
 ## Pitfalls
@@ -209,5 +211,7 @@ assert thompson < 0.6 * greedy
 - **An A/B test with no minimum detectable effect.** Tests that are stopped when they look good produce false wins.
 - **Giving the model the whole latency budget.** Feature fetching, candidate generation and business rules need their share.
 - **Treating a drift alarm as a retraining trigger.** Find out what changed first.
+
+Every calculation here runs on inputs the code assumes for the shop: visits per user, the peak factor, the click rate, Zipf traffic and the click rates of new products. They show how to size and check a design, and each input should be replaced by a measured one before the design is reviewed. What stays open is what the shop's real logs say, starting with how skewed its traffic is and how correlated one user's impressions are.
 
 Sources: the order of the steps broadly tracks Chip Huyen, *Designing Machine Learning Systems* (O'Reilly, 2022), and the split into offline and online paths draws on Eugene Yan's [System Design for Recommendations and Search](https://eugeneyan.com/writing/system-design-for-discovery/) (2021), both rewritten here. Architectures cited: Cheng et al., "Wide & Deep Learning for Recommender Systems" (2016); Wang et al., "DCN V2: Improved Deep & Cross Network and Practical Lessons for Web-scale Learning to Rank Systems" (2021); Ma et al., "Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts" (KDD 2018).
