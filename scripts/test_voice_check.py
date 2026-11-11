@@ -138,9 +138,9 @@ class VoiceCheckTest(unittest.TestCase):
         for old, new, rule in (("`nn.Dropout`", "`torch.nn.Dropout`", "inline code changed"),
                                ("\\(p\\)", "\\(q\\)", "maths changed"),
                                ("\\frac{m", "\\frac{ m", "maths changed"),
-                               ("## Results", "## What we found", "headings, front matter or links changed"),
-                               ("summary: What", "summary: How", "headings, front matter or links changed"),
-                               ("1207.0580", "1207.0581", "headings, front matter or links changed")):
+                               ("## Results", "## What we found", "headings, front matter, references or links changed"),
+                               ("summary: What", "summary: How", "headings, front matter, references or links changed"),
+                               ("1207.0580", "1207.0581", "headings, front matter, references or links changed")):
             self.edit(self.src, old, new)
             self.assertFails(rule)
             self.edit(self.src, new, old)
@@ -159,12 +159,16 @@ class VoiceCheckTest(unittest.TestCase):
     def test_long_form_frozen_spans_headings_links_and_refs(self):
         for old, new, rule in (("<code>0.5</code>", "<code>0.50</code>", "inline code changed"),
                                ("\\(p_k = 1/k\\)", "\\(p_k = 1/k^2\\)", "maths changed"),
-                               ('<h2 id="ips">Inverse', '<h2 id="ips">The inverse', "headings, front matter or links changed"),
-                               ('href="#ref-1"', 'href="#ref-2"', "headings, front matter or links changed"),
-                               ("SIGIR 2005.", "SIGIR 2006.", "headings, front matter or links changed")):
+                               ('<h2 id="ips">Inverse', '<h2 id="ips">The inverse', "headings, front matter, references or links changed"),
+                               ('href="#ref-1"', 'href="#ref-2"', "headings, front matter, references or links changed"),
+                               ("SIGIR 2005.", "SIGIR 2006.", "headings, front matter, references or links changed")):
             self.edit(self.page, old, new)
             self.assertFails("posts/position-bias/index.html: " + rule)
             self.edit(self.page, new, old)
+        self.assertEqual(self.errors(), [])
+
+    def test_number_from_a_heading_or_reference_may_appear_in_prose(self):
+        self.edit(self.page, "Ten items", "2005: ten items")    # 2005 is only in the reference list
         self.assertEqual(self.errors(), [])
 
     def test_repeating_a_span_or_link_passes(self):       # a sentence on a table may reuse a symbol or a citation
