@@ -1,6 +1,6 @@
 # From decision trees to boosting: one tree, then many
 
-A decision tree is a stack of yes/no questions about the features: is `age <= 30`, then is `income <= 50k`, and so on, until you reach a leaf that holds a prediction. Each question cuts the data into two parts, and a good question leaves each part more uniform than the whole.
+When I grow 20 deep regression trees on bootstrap resamples of the same 600 synthetic rows, the root question flips between two features. At a typical test point their predictions have a standard deviation of about 1.0, twice the noise level. Averaging 60 trees cuts test MSE from 2.67 for one tree to 1.29. A decision tree is a stack of yes/no questions about the features: is `age <= 30`, then is `income <= 50k`, and so on, until you reach a leaf that holds a prediction. Each question cuts the data into two parts, and a good question leaves each part more uniform than the whole.
 
 One tree is easy to read but unstable: a small change in the data can change the first question, and then everything below it changes too. **Bagging** and **random forests** grow many deep trees and average them, which cuts variance. **Boosting** grows many shallow trees one after another, each fixing what the sum so far gets wrong, which cuts bias. This post builds each piece and checks it against scikit-learn.
 
@@ -214,7 +214,7 @@ assert results["random forest"][0] < 0.7 * results["bagging"][0]       # feature
 | Bagging, 60 trees | 0.10 | 1.29 | 1.31 |
 | Random forest, a third of the features per split | 0.05 | 1.29 | 1.34 |
 
-Feature subsampling halved \(\rho\), as intended, but test error barely moved: the floor \(\rho\sigma^2\) was already small next to the bias, and each tree got weaker. Six of the ten features are noise, so a split that may only look at three features sees just one or two of the four useful ones most of the time, and none of them one time in six. `max_features` trades correlation between trees against the strength of each one, and it is worth tuning.
+Feature subsampling halved \(\rho\), as intended, but test error barely moved: the floor \(\rho\sigma^2\) was already small next to the bias, and each tree got weaker. Six of the ten features are noise, so a split that may only look at three features sees just one or two of the four useful ones most of the time, and none of them one time in six. `max_features` trades correlation between trees against the strength of each one, and it is worth tuning. These numbers come from one synthetic task with 600 training rows, so they show how averaging and feature subsampling act, not how large the gain will be on other data.
 
 ## Boosting: fit what is still wrong
 Boosting grows weak trees, often stumps (one split) or depth-3 trees, in sequence, each chosen to fix the current ensemble. A stump alone is badly biased; hundreds of small corrections remove the bias.
@@ -362,5 +362,7 @@ assert np.isclose(far[0], far[1]) and abs(far[0] - 30) < 0.5          # flat bey
 ```
 
 In the forest above, the six pure-noise features took about 18% of the impurity importance between them; their permutation importance was zero to two decimal places.
+
+Every result here comes from small synthetic datasets with fixed seeds. No test compares a forest's test error with gradient boosting's, and early stopping and the learning rate are left untested. On real data, which family wins and how to set its knobs are questions for a validation set.
 
 The outline of this post follows the CS229 notes on decision trees and Yann Dubois's machine-learning glossary entry on trees, rewritten with new examples and code; the bagging and boosting material follows chapters 8, 10 and 15 of Hastie, Tibshirani and Friedman's The Elements of Statistical Learning.
