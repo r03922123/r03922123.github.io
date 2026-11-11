@@ -63,9 +63,11 @@ Preview:     python3 -m http.server 8000
   `node --test scripts/test_search.mjs`). `check.py` fails on a listed post missing from the index.
 - `post-voice` (merged, 8 PRs from #14): all 59 posts open on a situation, stake or result, say "I" only for what
   their code or derivation does, and name their limits; topic posts also end on what is open. The voice check's
-  `--final` passed before PR 8 removed the check, its baseline and its gate. PRs #16 onward each list existing
-  sentences that overstate their code, left word for word for their own fix. Edited sources need
-  `tools/posts/build.py . <slug>`, then the feeds and search builds.
+  `--final` passed before PR 8 removed the check, its baseline and its gate. The sentences PRs #16 to
+  #21 listed as overstating their code were fixed, prose only, in `post-claims` (PRs #22 to #24). Edited sources
+  need `tools/posts/build.py . <slug>`, then the feeds and search builds.
+- Waiting for the owner's OK, since each is a code change: `transformers-and-llms-key-ideas`'s comment "the bug
+  ~0.15" (runs to 0.118), and the LeetCode `hash-table` note's unseeded assert (fails about 2 runs in 300).
 - Next: every module in `CAPABILITY-MAP.md` is merged, so the understand phase's check, `docs/ARCHITECTURE.md`, comes
   next.
 - Parked branches: none.
