@@ -41,7 +41,7 @@ The three claims agree, which is worth checking before saying any of them.
 
 ## From training to traffic
 
-The loop ran on the company's internal ML platform: reviewer decisions became training labels; I trained with oversampling and evaluated offline at the recall floor on the real distribution; the new model then scored live traffic in shadow mode, where its output affected nothing, so old and new could be compared on the same ads; then it rolled out gradually to full traffic. Reviewer decisions on the new model's flags fed the next round of hard negatives. I went through this loop first with a weapon classifier, then with the smoking detector.
+Each version went around the same loop on an internal ML platform. Labels came from what reviewers decided. I trained with the oversampled batches and measured offline at the recall floor, on data with its true class balance. Next came shadow mode: the candidate scored real ads without its output being used, which let me compare it with the current model ad by ad. Only then did traffic move to it, in steps, up to all of it. Reviewer decisions on the new model's flags fed the next round of hard negatives. I went through this loop first with a weapon classifier, then with the smoking detector.
 
 What I would watch at each stage, as my own judgment rather than a written internal rule: in shadow mode, the flag volume and whether the new model still catches what the old one caught and reviewers confirmed; during the ramp, reviewer-confirmed precision, flag volume against reviewer capacity, and a breakdown by market so no market quietly regresses.
 

@@ -22,7 +22,7 @@ The result has no accuracy figure, and the story has to own that.
 | The caption display and deployment | the platform team |
 | The table of known errors and correct terms | the client, who kept it up to date |
 
-The correction runs on finalized segments, after the recognizer stops revising them. I can explain how the recognizer's streaming events feed my layer; I did not build that part.
+I can explain how the recognizer's streaming events feed my layer; I did not build that part.
 
 ## Three steps
 
