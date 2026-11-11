@@ -4,11 +4,12 @@ The three most important whys of each change, newest first. Each heading reads `
 
 ## 2026-11-11 · build: post-voice PR 7, recommender systems and ML systems
 
-1. **The spec's list decides which pages are references.** A drafter read the two system-design posts as
-   reference pages and gave them only two moves. The spec names exactly five reference pages, so these two went back
-   for all five moves. A judgment call about scope belongs to the written spec, not to whoever happens to draft,
-   like a style guide that lists its exceptions instead of leaving them to each editor. Trade-off: a closer reading
-   of the spec per PR. Risk: a future post that really is a reference needs the spec updated first.
+1. **The spec's list decides which pages are references.** A drafter read the two system-design posts as reference
+   pages and gave them only two moves. The spec counts exactly five reference pages, the cheat sheets and quick
+   references, so these two went back for all five moves. A judgment call about scope belongs to the written spec,
+   not to whoever happens to draft, like a style guide that lists its exceptions instead of leaving them to each
+   editor. Trade-off: a closer reading of the spec per PR. Risk: a future post that really is a reference needs the
+   spec updated first.
 2. **A simulation's numbers carry its assumptions with them.** Each recommender opening quotes a simulated result
    (0.516 recall from the two-tower model, an AUC of 0.725 from a leaky feature), and each closing names what the
    simulation assumed: one seed, choices that depend only on taste and popularity, true grades instead of logged
