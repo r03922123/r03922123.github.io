@@ -1,8 +1,8 @@
 # Features for recommendation: user, item, context and the match between them
 
-A recommender's ranking model answers one question many times a second: how likely is this user to engage with this item, right now? The model can only be as good as what it is told about the three things in that sentence (the user, the item, the moment) and, above all, about how well the user and the item fit each other.
+Compute an item's click rate over the whole of a simulated 30-day log and a ranker's offline AUC rises to 0.725; served with the rates it could actually have known, it scores 0.690, below the honest model's 0.693. A recommender's ranking model answers one question many times a second: how likely is this user to engage with this item, right now? The model can only be as good as what it is told about the three things in that sentence (the user, the item, the moment) and, above all, about how well the user and the item fit each other.
 
-"Use the user's history" is not a feature. A feature has a definition precise enough to compute twice and get the same answer: what is counted, over which time window, as of which moment, and smoothed how. This post sorts features into four kinds, builds one or two of each on a simulated click log, and then shows the mistake that most often makes a feature look better offline than it is.
+"Use the user's history" is not a feature. A feature has a definition precise enough to compute twice and get the same answer: what is counted, over which time window, as of which moment, and smoothed how. This post sorts features into four kinds, builds one or two of each on a simulated click log, and then shows the mistake that most often makes a feature look better offline than it is. On that log, a logistic regression goes from a test AUC of 0.603 with user features alone to 0.693 with all four kinds.
 
 ## Four kinds of feature
 | kind | question it answers | examples | how fast it changes |
@@ -259,5 +259,7 @@ The rule is to compute every training feature **as of the timestamp of the event
 - **Feedback loops.** Engagement features are measured on what the system chose to show, and at the positions it chose; see [position bias](/posts/position-bias/). An item the system never shows never earns a good CTR.
 - **Leakage.** Any aggregate over a period that overlaps or follows its event. Evaluate on a time-based split, never a random one.
 - **Two code paths.** Where possible, log the features actually served and train on those.
+
+Every number here comes from one simulated log, seven features and a logistic regression, so the ladder shows what each kind of feature can add, not how much it adds on real data. Two questions stay open: how much the cross earns once histories grow longer, and whether crosses learned by trees or a Deep & Cross Network make the hand-made ones redundant.
 
 For how these features fit into a full retrieval and ranking system, see Eugene Yan's "System Design for Recommendations and Search" and Google's Recommendation Systems course for developers; the explanations, simulation and code here are original.
