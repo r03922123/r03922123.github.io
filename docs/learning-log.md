@@ -2,6 +2,23 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-voice PR 5, probability
+
+1. **A test is not a proof, so the limit says which one it is.** The probability posts check each formula at a few
+   parameter values. That catches a wrong formula or a mixed-up convention, but it does not prove the formula for
+   every input, and the cheat sheet's new limit says so. It is like weighing three loaves to check a scale: a broken
+   scale shows, a good one is not certified. Trade-off: one more caveat on a page meant to be quick. Risk: a reader
+   may trust the formulas less than they should; the linked posts carry the derivations.
+2. **An open question names its next tool.** Each closing paragraph says what the post's model cannot answer and
+   what to reach for: the beta-binomial for correlated trials, Weibull or Kaplan-Meier when the hazard is not
+   constant, a zero-inflated model for excess zeros. Each tool comes from the post's own pitfalls. Trade-off: the
+   ending points away from the post. Risk: a named tool can look like an endorsement, so it must already be in the
+   post.
+3. **Some lines are load-bearing.** `coin-flips-normal-approximation` holds the one credit the `post wording` gate
+   allows, so its drafter was told to leave that line exactly as it was. A rewrite has to respect every gate, not
+   only the voice check. Trade-off: one line in one post is off limits. Risk: a gate that greps for a word can be
+   tripped by an innocent sentence, which is why the wording gate runs before every push.
+
 ## 2026-11-11 · build: post-voice PR 4, statistics and experimentation
 
 1. **Change the voice, not the claim.** `causal-inference` had an overstated sentence written in "we". The spec
