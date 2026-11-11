@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Probability on one page: the rules, the distributions and the traps · r03922123</title>
-<meta name="description" content="A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Every formula is checked in code.">
+<meta name="description" content="A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Most formulas are checked in code.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 <link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -12,7 +12,7 @@
 <link rel="canonical" href="https://r03922123.github.io/posts/probability-cheatsheet/">
 <link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
 <link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/probability-cheatsheet/index.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Probability on one page: the rules, the distributions and the traps", "datePublished": "2026-11-01T00:00:00+08:00", "description": "A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Every formula is checked in code.", "author": {"@type": "Person", "name": "Jie-Hong Lin", "url": "https://r03922123.github.io/about.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Probability on one page: the rules, the distributions and the traps", "datePublished": "2026-11-01T00:00:00+08:00", "description": "A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Most formulas are checked in code.", "author": {"@type": "Person", "name": "Jie-Hong Lin", "url": "https://r03922123.github.io/about.html"}}</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
@@ -40,7 +40,7 @@
 </aside>
 <div class="prose">
 <p>A test that catches 99% of cases and clears 99% of healthy people is still wrong half the time it says positive, if the disease affects 1% of people. Results like that come from the probability that keeps coming back when you build and evaluate models. This page collects it in the order you usually need it: how to combine events, how to describe a random quantity, how means and variances behave, which distribution to reach for, and what happens when you average many draws. It is a reference, so each section is short and, where one exists, points to the post that develops the idea properly.</p>
-<p>Nothing here is taken on faith. The formulas on the page are checked below, either exactly or against <code>scipy</code> and a simulation, so the code doubles as a set of worked examples.</p>
+<p>Most formulas on the page are checked below, either exactly or against <code>scipy</code> and a simulation, so the code doubles as a set of worked examples.</p>
 <h2 id="events-the-five-rules">Events: the five rules</h2>
 <p>For events \(A\) and \(B\), with \(A^c\) meaning "not \(A\)":</p>
 <ul><li><b>Complement:</b> \(P(A^c) = 1 - P(A)\). Often the fastest route to "at least one": \(P(\text{at least one}) = 1 - P(\text{none})\).</li><li><b>Addition:</b> \(P(A \cup B) = P(A) + P(B) - P(A \cap B)\). The overlap is counted twice, so subtract it once.</li><li><b>Multiplication:</b> \(P(A \cap B) = P(A \mid B)\,P(B)\). This is the definition of conditional probability, rearranged, and it always holds.</li><li><b>Independence:</b> \(A\) and \(B\) are independent when \(P(A \cap B) = P(A)\,P(B)\), equivalently \(P(A \mid B) = P(A)\) when \(P(B) &gt; 0\).</li><li><b>Total probability:</b> if \(B_1, \dots, B_k\) split the world into disjoint cases, \(P(A) = \sum_i P(A \mid B_i)\,P(B_i)\).</li></ul>
