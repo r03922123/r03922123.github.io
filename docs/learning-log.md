@@ -13,7 +13,7 @@ The three most important whys of each change, newest first. Each heading reads `
    numbers come from the post's own code or arithmetic.
 2. **Arithmetic is evidence, but not measurement.** Several openings lead with a computed number: 14 GB read per
    token, 2 GiB of KV cache, 30.72 GB per exact-search batch. These are exact for the stated shapes, but they are not
-   timings, and the limits say "say nothing about speed on a GPU". Trade-off: no wall-clock numbers. Risk: a cost
+   timings, and the limits say so ("not how fast a kernel runs"). Trade-off: no wall-clock numbers. Risk: a cost
    model hides real overheads, which is why each post calls it a model.
 3. **A toy that reproduces a shape is enough to argue a shape.** The RLHF toy has one prompt and length as the only
    feature, yet it reproduces reward over-optimization: the reward model's score climbs while true reward falls.

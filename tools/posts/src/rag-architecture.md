@@ -353,7 +353,7 @@ They solve different problems and are often combined. RAG suits knowledge that c
 - **Mismatched embeddings.** Queries and chunks must be embedded by the same model version, and changing the model means re-embedding the whole collection.
 - **Evaluating on questions the model already knows.** A general-knowledge test set rewards the model's memory, not the retrieval. Use questions that only the documents can answer.
 
-With no generator here, the grounding check runs on two hand-written answers, and character n-gram vectors stand in for a learned embedding model. Two questions stay open for a real system: how much a learned embedding closes the paraphrase gap on "minimum age to sign up", and how often the model ignores its sources. The labelled questions from the debugging section are the way to measure both, retrieval first.
+With no generator here, the grounding check runs on two hand-written answers, and character n-gram vectors stand in for a learned embedding model. Two questions stay open for a real system: how much a learned embedding closes the paraphrase gap on "minimum age to sign up", and how often the model ignores its sources. The running example's labelled questions are the way to measure both, retrieval first.
 
 Eugene Yan's [Patterns for Building LLM-based Systems & Products](https://eugeneyan.com/writing/llm-patterns/) was a starting point for this post; the example corpus, code and measurements here are my own.
 

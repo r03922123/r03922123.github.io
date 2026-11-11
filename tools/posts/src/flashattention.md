@@ -277,7 +277,7 @@ a, b = standard_attention(Q32, K32, V32), flash_forward(Q32, K32, V32)[0]
 assert not np.array_equal(a, b) and np.abs(a - b).max() < 1e-6   # same math, different bits
 ```
 
-Everything here runs in NumPy on one head of 256 queries with head dimension 64, so it shows that the tiling is exact and how the traffic scales, not how fast a kernel runs; the speedups quoted above are the paper's own measurements. The reconstruction leaves out where the real kernels get their speed: the split of each tile among warps, the overlap of data movement with matrix products, and the FP8 path, all covered in the FlashAttention-2 and -3 papers.
+The code runs in NumPy on one head of 256 queries with head dimension 64, and the larger rows are the same count by formula, so it shows that the tiling is exact and how the traffic scales, not how fast a kernel runs; the speedups quoted above are the paper's own measurements. The reconstruction leaves out where the real kernels get their speed: the split of each tile among warps, the overlap of data movement with matrix products, and the FP8 path, all covered in the FlashAttention-2 and -3 papers.
 
 For where the \(1/\sqrt{d}\) in every block above comes from, see [why attention divides by the square root of d](../attention-scaling/), and for the surrounding architecture, [transformers and LLMs: key ideas](../transformers-and-llms-key-ideas/).
 
