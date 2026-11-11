@@ -2,7 +2,7 @@
 
 Rank 2,000 simulated videos, a tenth of them clickbait, by click probability and a session gets 15.7 clicks and 15.5 minutes of watching; by expected minutes, 8.7 clicks and 79 minutes. When an ML project disappoints, the cause often sits upstream of the model: it optimized the wrong thing, a rule would have done the job, the labels quietly meant something else, or nobody noticed the inputs had changed after launch. The architecture is a late decision in a chain, and every earlier link can break it.
 
-This post lays out that chain as four questions, answered in order, with small simulations of what goes wrong when one is skipped. I simulate a proxy rewarding clickbait, a rule matching boosted trees on one task only, a threshold set by business costs, and a drift alarm. Sibling posts go deeper on each step; this one is the map.
+This post lays out that chain as four questions, answered in order, with small simulations of some of the choices along the way. I simulate a proxy rewarding clickbait, a rule matching boosted trees on one task only, a threshold set by business costs, and a drift alarm. Sibling posts go deeper on each step; this one is the map.
 
 ## Four questions, in order
 

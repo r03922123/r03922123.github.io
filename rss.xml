@@ -311,7 +311,7 @@
     <title>Sequential user modeling: from averaged history to target attention</title>
     <link>https://r03922123.github.io/posts/sequential-user-modeling/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/sequential-user-modeling/</guid>
-    <description>Why averaging a user's history blurs several interests into one, how target attention (DIN) weights each past behaviour by its relevance to the item being scored, and how SIM, ETA and TWIN stretch the idea to lifelong histories of tens of thousands of events. Each step measured on synthetic data.</description>
+    <description>Why averaging a user's history blurs several interests into one, how target attention (DIN) weights each past behaviour by its relevance to the item being scored, and how SIM, ETA and TWIN stretch the idea to lifelong histories of tens of thousands of events. DIN and the lifelong search measured on synthetic data.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
@@ -353,7 +353,7 @@
     <title>Docker for ML: containers, layer caching and reproducible builds</title>
     <link>https://r03922123.github.io/posts/docker-for-ml/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/docker-for-ml/</guid>
-    <description>What a container actually is, why a model's behaviour depends on things outside its source code, how Docker's build cache decides what to rebuild, and why a lockfile matters more than the Dockerfile. Small simulations of the build cache and of an unpinned install show each rule.</description>
+    <description>What a container actually is, why a model's behaviour depends on things outside its source code, how Docker's build cache decides what to rebuild, and what a lockfile pins that a cached build does not. Small simulations of the build cache and of an unpinned install show each rule.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
@@ -374,7 +374,7 @@
     <title>ML building blocks from scratch, checked against the library</title>
     <link>https://r03922123.github.io/posts/ml-coding-from-scratch/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/ml-coding-from-scratch/</guid>
-    <description>Softmax, an MLP with hand-written backprop, LayerNorm, BatchNorm, dropout, multi-head attention, a Transformer block, a KV cache, tiled attention, LSTM and GRU cells, convolution, LoRA, beam search, and the classical models, each written in a few lines of NumPy or PyTorch and asserted equal to the library version.</description>
+    <description>Softmax, an MLP with hand-written backprop, LayerNorm, BatchNorm, dropout, multi-head attention, a Transformer block, a KV cache, tiled attention, LSTM and GRU cells, convolution, LoRA, beam search, and the classical models, each written in a few lines of NumPy or PyTorch, most asserted equal to the library version.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
@@ -388,7 +388,7 @@
     <title>pandas on one page: select, group, join, reshape and regex</title>
     <link>https://r03922123.github.io/posts/pandas-cheatsheet/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/pandas-cheatsheet/</guid>
-    <description>A working reference for the pandas operations that come up in nearly every data task: building and inspecting a frame, boolean masks, counting and ranking, missing values, groupby with agg versus transform, merges and anti-joins, melt and pivot, vectorising row logic, and string methods with a regex table. Every snippet runs on a tiny DataFrame and proves its claim with an assert.</description>
+    <description>A working reference for the pandas operations that come up in nearly every data task: building and inspecting a frame, boolean masks, counting and ranking, missing values, groupby with agg versus transform, merges and anti-joins, melt and pivot, vectorising row logic, and string methods with a regex table. Every snippet runs on a tiny DataFrame, and most prove their claim with an assert.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
@@ -402,7 +402,7 @@
     <title>LoRA from scratch, proven with asserts</title>
     <link>https://r03922123.github.io/posts/lora-from-scratch/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/lora-from-scratch/</guid>
-    <description>Build a tiny GPT, freeze it, add LoRA adapters, fine-tune only those and fuse them back, checking every claim with an assert. Runs on a laptop CPU in seconds.</description>
+    <description>Build a tiny GPT, freeze it, add LoRA adapters, fine-tune only those and fuse them back, checking most claims with an assert. Runs on a laptop CPU in seconds.</description>
     <pubDate>Sat, 31 Oct 2026 00:00:00 +0800</pubDate>
   </item>
   <item>

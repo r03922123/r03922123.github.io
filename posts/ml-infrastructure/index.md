@@ -2,7 +2,7 @@
 
 Join a daily feature to training rows on the calendar day and it leaks the label it predicts: on 20,000 simulated click events, a 7-day click count reaches AUC about 0.75 that way and 0.62 with the point-in-time join I build below. A model is a function. Everything that feeds it the right inputs, trains it without losing a day's work to a dead machine, and answers a request in tens of milliseconds is infrastructure. Designing it is a different job from designing the model: the questions are where data moves, when it is correct, and what happens when a part fails.
 
-This post walks through the three layers (data, training and serving) and the distributed-systems parts they are built from, with a small simulation for each idea. The modeling side of the same problem is in [a framework for designing ML systems](../ml-system-design-framework/).
+This post walks through the three layers (data, training and serving) and the distributed-systems parts they are built from, with small simulations of the main ideas. The modeling side of the same problem is in [a framework for designing ML systems](../ml-system-design-framework/).
 
 ## The building blocks
 Almost every ML platform is assembled from the same handful of parts:
