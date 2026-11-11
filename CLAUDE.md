@@ -64,7 +64,8 @@ Preview:     python3 -m http.server 8000
   `node --test scripts/test_search.mjs`). `check.py` fails on a listed post missing from the index.
 - `post-voice` in progress (8 PRs, `SPEC-post-voice.md`): PR 1 (#14) added `scripts/voice_check.py` and
   `scripts/voice-baseline.json`, written from unedited posts of `main` at `28b63c9`; never regenerate it to get
-  green. PR 2 is the pilot (`dropout`, `ab-testing`, `position-bias`); the owner reads it before PR 3 starts. Edited
-  sources need `tools/posts/build.py . <slug>`, then the feeds and search builds. Reading-page PRs open with
+  green. PR 2 (#15), the pilot, merged after the owner approved its voice. PR 3 is machine learning fundamentals;
+  PRs 4 to 8 follow the spec's rollout table. An existing sentence that overstates its code stays word for word
+  and goes in the PR's findings list. Edited sources need `tools/posts/build.py . <slug>`, then the feeds and search builds. Reading-page PRs open with
   `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR 0002).
 - Parked branches: none.

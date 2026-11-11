@@ -2,6 +2,23 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-voice PR 3, machine learning fundamentals
+
+1. **An overstated sentence stays as it was, and goes on a list.** Three posts claimed their code checks more than
+   it does: "each claim", "against a brute force", "asserts check the claim". Turning those into "I check …" would
+   make the overstatement the author's own, and quietly fixing them would hide a correction in a style diff. So they
+   stay word for word, and the PR lists them for their own fix, like an erratum filed apart from the next edition.
+   Trade-off: known soft spots stay live until that fix. Risk: the list lives in a PR description, so the next
+   session must carry it forward.
+2. **Name the kind of evidence.** The new limits say which claims the code measures and which it only argues or
+   cites: "argued, not measured", "cited, not reproduced", "I train no deep network". A reader can then weigh each
+   claim. Trade-off: more caveats in a post that is already careful. Risk: a limit can undersell a claim the code
+   does check, so the reviewer reads each one against the code.
+3. **Draft in parallel, check in series.** Three drafters each took a few posts in their own scratch copy. Then the
+   author read every new sentence, and a fresh reviewer checked them against the code, like three proofreaders where
+   only the last one signs off. Trade-off: two readings per post. Risk: drafters share one brief, so a blind spot in
+   the brief repeats across 11 posts; the brief now says how to handle an overstated sentence.
+
 ## 2026-11-11 · build: post-voice PR 2, the 3-post pilot
 
 1. **Pilot on three kinds of post first.** `dropout` is a mechanism, `ab-testing` an experiment and `position-bias` a
