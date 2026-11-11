@@ -243,6 +243,26 @@ def build(site, slug):
     return meta, minutes
 
 
+def row(title, summary, href, meta=None):
+    """One list row: the title links, the summary (and the date-and-length line, where a listing has one) follow."""
+    return (f'  <li><a href="{href}">{inline(title)}</a><span>{inline(summary)}</span>'
+            + (f'<span class="meta">{html.escape(meta)}</span>' if meta else "") + "</li>")
+
+
+def topic_list(sections):
+    """SPEC-posts-index: a card per section, the article count, then the sections, from (name, id, rows, intro).
+    The URL's #fragment is the filter (style.css), so the only per-page CSS is the rule that marks the chosen card;
+    it is returned apart, for the page head."""
+    cards = "\n".join(f'  <a href="#{sid}"><b>{html.escape(name)}</b><span>{len(rows)} post{"s" * (len(rows) != 1)}</span></a>'
+                      for name, sid, rows, _ in sections)
+    groups = "\n".join(f'<section class="group" id="{sid}">\n<h2>{html.escape(name)}</h2><a class="all" href="#topics">All topics</a>\n'
+                       f'{intro}<ul class="series">\n' + "\n".join(rows) + "\n</ul>\n</section>" for name, sid, rows, intro in sections)
+    chosen = ", ".join(f':root:has(#{sid}:target) .topics a[href="#{sid}"]' for _, sid, _, _ in sections)
+    return (f'<nav class="topics" id="topics" aria-label="Topics">\n{cards}\n</nav>\n'
+            f'<p class="count">{sum(len(rows) for _, _, rows, _ in sections)} articles</p>\n<div class="groups">\n{groups}\n</div>',
+            f"<style>{chosen} {{ border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }}</style>\n")
+
+
 def series(site):
     posts = []
     for src in sorted((HERE / "src").glob("*.md")):
@@ -252,18 +272,17 @@ def series(site):
     sections = []
     for group in GROUPS:
         items = sorted((p for p in posts if p[0]["group"] == group), key=lambda p: p[0]["order"])
-        if not items:
-            continue
-        lis = "\n".join(f'  <li><a href="{slug}/">{inline(m["title"])}</a><span>{inline(m["summary"])}</span></li>' for m, slug in items)
-        sections.append(f'<h2 id="{slugify(group)}">{html.escape(group)}</h2>\n<ul class="series">\n{lis}\n</ul>')
+        if items:
+            sections.append((group, slugify(group), [row(m["title"], m["summary"], f"{slug}/") for m, slug in items], ""))
+    listing, chosen = topic_list(sections)
     page = HEAD.format(title="LeetCode patterns", summary="Short posts on the algorithm patterns behind LeetCode problems: the idea, a reusable Python template, worked problems and practice links.",
-                       assets=FONTS + head_tags("/leetcode/"), current="page") + f"""<section class="intro">
+                       assets=FONTS + head_tags("/leetcode/") + chosen, current="page") + f"""<section class="intro">
   <h1>LeetCode patterns</h1>
   <p>{len(posts)} short posts, one per pattern: the idea in plain words, a reusable Python template, worked
   problems with their complexity, and problems to practice on. Every code block on these pages runs, and its
   asserts pass.</p>
 </section>
-{chr(10).join(sections)}
+{listing}
 """ + FOOT
     (Path(site) / "leetcode" / "index.html").write_text(page)
     print(f"series page: {len(posts)} posts")

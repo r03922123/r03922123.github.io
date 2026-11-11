@@ -18,6 +18,25 @@ The three most important whys of each change, newest first. Each heading reads `
    "correction" on a public page is worse than a cautious sentence. Trade-off: some soft spots stay live. Risk: those
    doubts live only in the PR description, so nothing reminds anyone to come back to them.
 
+## 2026-11-11 · build: posts-index
+
+Topic cards, an article count and a topic filter on the Posts (9 cards, 61 articles) and LeetCode (6, 31) lists.
+
+1. **Let the URL hold the filter.** A card is a plain link to `#probability`; CSS hides every other section while
+   one is the URL's target. There is no JavaScript and no saved state, so a shared link opens filtered and the back
+   button undoes a filter for free. It is like a bookmark in a binder: the tab you open to is the state. Trade-off:
+   the filter needs `:has`, and only one topic can be chosen at a time. Risk: an id that changes breaks the shared
+   links and the post pages' topic links; the fragment check catches it.
+2. **Fail safe, not blank.** The rule only hides sections when one of them is targeted, so a browser without
+   `:has` drops the rule and shows every section, and each card still jumps to its own. It is like a lab door that
+   unlocks when the power fails. Trade-off: those browsers get a jump, not a filter. Risk: a later rule that hides
+   sections by default would turn the same failure into an empty page.
+3. **Check the numbers the page states.** Each card says how many posts its topic holds, so the site check now
+   counts each section's rows and fails on a section with no card or a card whose count differs. It is like
+   checking that a table's row totals add up before it goes in the paper. Trade-off: it reads the markup the two
+   templates write, not every possible layout. Risk: it proves the count, not that the filter looks right; that is
+   the browser check's job.
+
 ## 2026-11-11 · build: reading-shell layout
 
 Second of the spec's two PRs: the layout itself, on 90 posts, two lists, About and 404.

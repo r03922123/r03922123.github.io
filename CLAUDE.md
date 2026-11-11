@@ -50,8 +50,11 @@ Preview:     python3 -m http.server 8000
 - Merged: `site-baseline` (PR #3: gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the learning
   log; `main` is protected: a PR with a green `gates` check, for admins too), CI hardening (hash-locked wheels-only
   install, base64 denylist secret), `post-feeds` (feed files, `index.md` copies, page head tags), `blog-theme`
-  (reading tokens at `:root`, the room's under `body.home`) `reading-shell` (fragment check, then the layout) and an expert accuracy pass
-  over all 90 posts (PR #9, which lists the doubts left unedited).
+  (reading tokens at `:root`, the room's under `body.home`), `reading-shell` (fragment check, then the layout)
+  and an expert accuracy pass over all 90 posts (PR #9, which lists the doubts left unedited).
+- `posts-index` on its branch: both list pages are topic cards, a count and `section.group`s in `.groups`, built by
+  `topic_list` in `tools/leetcode/build.py`; the `#fragment` is the filter, with no JavaScript. `check.py` matches
+  each card's count to its section's rows.
 - Reading pages: the bar sits outside `.wrap`; the home keeps its own header inside it. After a layout change, run
   `python3 tools/dev/same_articles.py origin/main` to show no article text moved.
 - Next, in the build order of `CAPABILITY-MAP.md`: `post-voice` (rebases on the 4 long-form pages), `posts-index`,
