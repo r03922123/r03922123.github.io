@@ -5,9 +5,9 @@ group: LLMs and generative AI
 order: 7
 tags: LLM · alignment · RLHF · reward model · PPO · DPO
 ---
-A model fine-tuned on demonstrations can only be as good as the demonstrations, and writing excellent answers is slow and expensive. Judging answers is much easier: shown two responses to the same prompt, most people can say which one is better even if they could not have written either. Reinforcement learning from human feedback (RLHF) turns those judgements into a training signal. Its modern form was introduced for Atari games and simulated robot control by Christiano et al. (2017), applied to language models for style and summarization (Ziegler et al., 2019; Stiennon et al., 2020), and became the standard recipe for assistants with InstructGPT (Ouyang et al., 2022), where labelers preferred the outputs of a 1.3B tuned model to those of the 175B GPT-3, a model more than a hundred times larger.
+In a toy world where people like answers of about 25 sentences, a reward model fitted to 5000 labeled pairs learns that longer is better. Optimize it with too weak a KL penalty and mean length reaches 58.3 sentences, while true reward falls from −0.17 to −11.88 and the reward model's own score climbs. A model fine-tuned on demonstrations can only be as good as the demonstrations, and writing excellent answers is slow and expensive. Judging answers is much easier: shown two responses to the same prompt, most people can say which one is better even if they could not have written either. Reinforcement learning from human feedback (RLHF) turns those judgements into a training signal. Its modern form was introduced for Atari games and simulated robot control by Christiano et al. (2017), applied to language models for style and summarization (Ziegler et al., 2019; Stiennon et al., 2020), and became the standard recipe for assistants with InstructGPT (Ouyang et al., 2022), where labelers preferred the outputs of a 1.3B tuned model to those of the 175B GPT-3, a model more than a hundred times larger.
 
-This post builds the pieces in order: the reward model, the objective it is optimized under, PPO, and DPO, which removes the reward model altogether. A small simulated world runs through all of it, with one deliberate flaw in the reward model, because the most important lesson of RLHF is what happens when you optimize a reward that is only approximately right.
+I build the pieces in order: the reward model, the objective it is optimized under, PPO, and DPO, which removes the reward model altogether. A small simulated world runs through all of it, with one deliberate flaw in the reward model, because the most important lesson of RLHF is what happens when you optimize a reward that is only approximately right.
 
 ## Three stages
 The pipeline from a pretrained model (see [foundation models](../foundation-models/)) has three stages, each with its own data:
@@ -174,7 +174,7 @@ assert 0.5 * np.abs(pi_ppo - target).sum() < 0.02       # total variation distan
 assert objective(target) - objective(pi_ppo) < 0.01 < objective(pi_ppo) - objective(ref)
 ```
 
-Why subtracting \(\beta \log(\pi / \pi_{\text{ref}})\) from each sample's reward is enough: the gradient of the objective is \(\mathbb{E}_\pi\big[\nabla \log \pi(y)\,(r - \beta \log \tfrac{\pi}{\pi_{\text{ref}}})\big]\) plus a term \(-\beta\,\mathbb{E}_\pi[\nabla \log \pi(y)]\), and the expectation of a score function is zero. The batch-mean baseline is legitimate for the same reason.
+After 300 iterations on batches of 512 answers, the PPO policy is within a total variation distance of 0.02 of the exact optimum, and its objective is within 0.01 of the best value. Why subtracting \(\beta \log(\pi / \pi_{\text{ref}})\) from each sample's reward is enough: the gradient of the objective is \(\mathbb{E}_\pi\big[\nabla \log \pi(y)\,(r - \beta \log \tfrac{\pi}{\pi_{\text{ref}}})\big]\) plus a term \(-\beta\,\mathbb{E}_\pi[\nabla \log \pi(y)]\), and the expectation of a score function is zero. The batch-mean baseline is legitimate for the same reason.
 
 ## DPO: skip the reward model
 Direct Preference Optimization (Rafailov et al., 2023) starts from the closed-form optimum. Solving it for the reward gives \(r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \beta \log Z(x)\). Substituting that into the Bradley–Terry loss, the intractable \(\log Z(x)\) cancels in the difference, leaving a loss on the policy alone:
@@ -241,7 +241,7 @@ Pitfalls:
 - **Skipping SFT.** Preference tuning sharpens a model that already answers reasonably; it is a poor way to teach the format, and the reference it stays close to should be good.
 - **Forgetting that labels are noisy.** Even the true reward matched the toy labelers only 78% of the time, so held-out accuracy has a ceiling well below 100%. Agreement between labelers gives a rough, somewhat pessimistic idea of where it sits; past that point, chasing more accuracy mostly fits noise.
 
-Measuring a tuned model well is its own subject; see [evaluating ML systems](/posts/evaluating-ml-systems/).
+The toy world has one prompt, answers that differ only in length, and a true reward the code can compute, so it shows the shape of over-optimization, not where the turn comes for a real model. Gao, Schulman and Hilton (2023) found that larger reward models delay it, and without a hidden true reward the turn has to be found with an independent judgement, such as fresh human comparisons. Measuring a tuned model well is its own subject; see [evaluating ML systems](/posts/evaluating-ml-systems/).
 
 ## References
 - Christiano, P. et al. (2017). Deep reinforcement learning from human preferences. NeurIPS.
