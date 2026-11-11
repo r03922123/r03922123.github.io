@@ -50,11 +50,13 @@
 </aside>
 <div class="prose">
 
-<p>Every ranking system that learns from its own clicks has the same blind spot. People click what they
-see, and they see what is on top. Train a model on raw clicks and it learns that the top slot is good,
-not which items are good. This post sets out the problem as a simple model of clicking, shows with a small
-simulation how badly raw click-through rate misleads, then walks through the standard corrections and when
-each one fits.</p>
+<p>Show ten items in a fixed order and count clicks, and raw click-through rate names the item at rank 1
+the best, while the actual best item, at rank 8, gets a seventh of its CTR. Every ranking system that learns
+from its own clicks has this blind spot. People click what they see, and they see what is on top. Train a
+model on raw clicks and it learns that the top slot is good, not which items are good. I set out a simple
+model of clicking, show with that simulation how badly raw CTR misleads and that inverse propensity
+weighting recovers every item's relevance to within 0.008, then walk through the standard corrections and
+when each one fits.</p>
 
 <h2 id="loop">The feedback loop</h2>
 <p>A ranker shows a list. Users click mostly near the top. Those clicks become the next training set, in
@@ -75,14 +77,14 @@ and whether they examine it depends only on its rank \(k\):</p>
 relevance at ranks 1 and 8 can differ in CTR by whatever factor separates \(p_1\) from \(p_8\).</p>
 
 <h2 id="ips">Inverse propensity weighting</h2>
-<p>If we knew \(p_k\), the fix would be one line: divide each click by the probability that its position
+<p>If \(p_k\) were known, the fix would be one line: divide each click by the probability that its position
 was examined <a href="#ref-3">[3]</a>. The weighted click is an unbiased estimate of relevance:</p>
 \[ \mathbb{E}\!\left[\frac{c}{p_k}\right] = \frac{p_k\,\rho_d}{p_k} = \rho_d . \]
 <p>For learning to rank the same weight goes on each clicked item's loss term, so a model trained on logged
 clicks optimizes, in expectation, the loss it would have had with true relevance labels:</p>
 \[ \mathcal{L}_{\text{IPS}} = \sum_{(d,\,k)\,:\,c_d = 1} \frac{\ell(d)}{p_k} . \]
 <p>A small simulation makes the size of the problem concrete. Ten items with known relevance are shown in
-a fixed order, examination falls off as \(p_k = 1/k\), and we compare raw CTR with the IPS estimate:</p>
+a fixed order, examination falls off as \(p_k = 1/k\), and I compare raw CTR with the IPS estimate:</p>
 <pre><code class="language-python">import numpy as np
 
 rng = np.random.default_rng(0)
@@ -187,6 +189,10 @@ you which ranker is better, not by how much on business metrics, and it produces
 </table>
 <p>In practice these combine: a little randomized traffic to estimate and audit propensities, a
 position-aware model or IPS-weighted loss for training, and interleaving to decide which model ships.</p>
+<p>No result here says how well a correction works on a given surface. The one simulation hands IPS the
+true propensities, a fixed ranking and clicks that follow the examination hypothesis exactly, and the
+claims about interleaving and position features come from the cited papers. On a real system the first open
+question is the propensity curve, which a small randomized slice measures directly.</p>
 
 <h2 id="refs">References</h2>
 <ol class="refs">
