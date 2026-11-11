@@ -5,7 +5,7 @@ group: ML systems and design
 order: 3
 tags: ML infrastructure · feature store · distributed training · serving · latency
 ---
-A model is a function. Everything that feeds it the right inputs, trains it without losing a day's work to a dead machine, and answers a request in tens of milliseconds is infrastructure. Designing it is a different job from designing the model: the questions are where data moves, when it is correct, and what happens when a part fails.
+Join a daily feature to training rows on the calendar day and it leaks the label it predicts: on 20,000 simulated click events, a 7-day click count reaches AUC about 0.75 that way and 0.62 with the point-in-time join I build below. A model is a function. Everything that feeds it the right inputs, trains it without losing a day's work to a dead machine, and answers a request in tens of milliseconds is infrastructure. Its questions are where data moves, when it is correct, and what happens when a part fails.
 
 This post walks through the three layers (data, training and serving) and the distributed-systems parts they are built from, with a small simulation for each idea. The modeling side of the same problem is in [a framework for designing ML systems](../ml-system-design-framework/).
 
@@ -332,6 +332,8 @@ assert moved_mod > 0.85 and moved_ring < 0.12
 assert all(owner(ring11, k) == "node10" for k in keys if owner(ring10, k) != owner(ring11, k))  # only to the new node
 ```
 
+Going from 10 to 11 nodes, the modulo rule moves almost every key and the ring about a tenth, all of them to the new node.
+
 ### Batching and the rest
 Accelerators are efficient only on batches, so model servers use **dynamic batching**: wait a few milliseconds to collect requests, then run them together. If a forward pass costs a fixed 2 ms plus 0.05 ms per example, one example at a time gives about 490 predictions a second and batches of 64 about 12,000, at the cost of up to the wait window in added latency.
 
@@ -351,5 +353,7 @@ Three more pieces complete the path. **Real-time features** reach the online sto
 - **Caching without an expiry tied to freshness.** Fast and wrong.
 - **No rollback path.** Keep the previous model version and its feature definitions deployable until the new one has proven itself.
 - **Non-idempotent consumers.** Replays after a crash double-count events, and counts feed straight into features.
+
+The numbers here come from small simulations on rates the code assumes: a 1% stall per shard call, a failure every 10 hours, Zipf traffic over a million items. They show each mechanism, not the sizes a real system will see, and the bitwise resume holds on a CPU, not on GPUs. What stays open is measuring those inputs on a real system: its failure rate and save cost set the checkpoint interval, and how skewed its traffic is sets what a cache can buy.
 
 Sources: the overall structure (data, training and serving infrastructure and the distributed-systems parts beneath them) follows a write-up on [Yuan Meng's blog](https://www.yuan-meng.com/) on what this area of ML engineering covers. Feature stores, batch and streaming features and continual retraining draw on Chip Huyen, Designing Machine Learning Systems (O'Reilly, 2022); queues, replication and partitioning on Martin Kleppmann, Designing Data-Intensive Applications (O'Reilly, 2017); and real-time feature serving on Eugene Yan's [Real-time Machine Learning For Recommendations](https://eugeneyan.com/writing/real-time-recommendations/) (2021). Hedged requests are from Jeffrey Dean and Luiz André Barroso, "The Tail at Scale" (Communications of the ACM, 2013); consistent hashing from Karger et al. (STOC 1997); the checkpoint interval from J. W. Young, "A first order approximation to the optimum checkpoint interval" (Communications of the ACM, 1974); ring all-reduce as brought to deep learning by Baidu (2017) and the Horovod library (Sergeev and Del Balso, 2018). All are rewritten here.
