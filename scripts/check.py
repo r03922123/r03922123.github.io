@@ -17,10 +17,13 @@ from urllib.parse import unquote, urljoin, urlsplit
 from xml.etree import ElementTree
 
 PAGES = {".html", ".htm"}
-SOURCES = "tools/leetcode/src"                    # Markdown that build.py renders into pages
+SOURCES = ("tools/leetcode/src", "tools/book/src")   # Markdown the builds render into pages
 DENYLIST = Path(__file__).with_name("denylist.local.txt")
 EXTERNAL = {"musicgen-prune-inference"}           # project repos GitHub Pages serves beside this one, at /<repo>/
 MUSICGEN = ("/musicgen-prune-inference/", "/musicgen-prune-inference/decoding/")
+# SPEC-resume-book: unlisted on purpose, reached only from the room's old book (ADR 0003).
+BOOK = "/book/"
+NOINDEX = re.compile(r'<meta\s+name="robots"\s+content="[^"]*\bnoindex\b')
 
 # Leak markers that only make sense to look for in rendered pages (and the sources they are rendered from).
 HTML_PATTERNS = {
@@ -381,6 +384,22 @@ def site_links(name, posts, urls, pages):
             + [f"{name}: link {url} is not on {SITE}" for url in urls if not url.startswith(SITE + "/")])
 
 
+def book_findings(root):
+    """The exception to "listings complete" (CONSTRAINTS.md), checked the other way round: each /book/ page carries
+    noindex, no feed or index names the book, no list page or About links it, and the home links it once, from
+    the room's door. The book's own index must still list every book page (the listing loop in check)."""
+    findings = [f"{p.relative_to(root).as_posix()}: no robots noindex" for p in sorted(root.glob("book/**/*.html"))
+                if not NOINDEX.search(p.read_text(errors="replace"))]
+    findings += [f"{name}: names {BOOK}" for name in (*FEEDS, "search-index.json")
+                 if (root / name).is_file() and BOOK in (root / name).read_text(errors="replace")]
+    for rel, base, allowed in (("index.html", "/", 1), ("about.html", "/about.html", 0),
+                               ("posts/index.html", "/posts/", 0), ("leetcode/index.html", "/leetcode/", 0)):
+        n = sum(kind == "a" and path.removeprefix(SITE).startswith(BOOK) for kind, path, _ in links(root, rel, base))
+        if n > allowed:
+            findings.append(f"{rel}: links {BOOK} {n} times (allowed: {allowed})")
+    return findings
+
+
 def search_findings(root, listed):
     """SPEC-site-search. Active once tools/search/build.py exists: every post a listing links is in the index."""
     if not (root / "tools/search/build.py").is_file():
@@ -414,7 +433,7 @@ def check(root, denylist, terms_only=False):
             findings += [f"{rel}:{n}: private term {term!r}" for n in lines]
         if terms_only:
             continue
-        if path.suffix in PAGES or (path.suffix == ".md" and path.parent.relative_to(root).as_posix() == SOURCES):
+        if path.suffix in PAGES or (path.suffix == ".md" and path.parent.relative_to(root).as_posix() in SOURCES):
             for n, line in enumerate(text.splitlines(), 1):
                 findings += [f"{rel}:{n}: {name}" for name, rx in HTML_PATTERNS.items() if rx.search(line)]
         if path.suffix not in PAGES:
@@ -438,8 +457,9 @@ def check(root, denylist, terms_only=False):
         weight = home.stat().st_size + ((root / "style.css").stat().st_size if (root / "style.css").exists() else 0)
         if weight > HOME_BUDGET:
             findings.append(f"index.html: home weighs {weight / 1000:.0f} KB with style.css (budget {HOME_BUDGET // 1000} KB)")
-    # Each post folder must be linked from its listing page: posts/ from the posts index, leetcode/ from its series page.
-    for section in ("posts", "leetcode"):
+    # Each post folder must be linked from its listing page: posts/ from the posts index, leetcode/ from its series page,
+    # book/ from the book's own index (which nothing else lists: book_findings).
+    for section in ("posts", "leetcode", "book"):
         linked = {path for kind, path, _ in links(root, f"{section}/index.html", f"/{section}/") if kind == "a"}
         for post in sorted(root.glob(f"{section}/*/index.html")):
             if f"/{section}/{post.parent.name}/" not in linked:
@@ -460,6 +480,7 @@ def check(root, denylist, terms_only=False):
               if kind == "a" and (re.fullmatch(rf"/{section}/[^/]+/", path) or path in MUSICGEN)]
     findings += feed_findings(root, list(dict.fromkeys([*FIXED_PAGES, *listed])))
     findings += search_findings(root, listed)
+    findings += book_findings(root)
     # The home page's hand-written copies of the listings must keep up with them.
     count = len(list(root.glob("leetcode/*/index.html")))
     for rel in ("index.html", "posts/index.html"):

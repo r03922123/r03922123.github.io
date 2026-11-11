@@ -41,6 +41,7 @@ LD = '<script type="application/ld+json">{"@type": "BlogPosting"}</script>\n'
 SHELL_FONTS = ("source-serif-4/source-serif-4-latin-wght-normal.woff2", "inter/inter-latin-wght-normal.woff2")
 PRELOAD = '<link rel="preload" href="/fonts/{}" as="font" type="font/woff2" crossorigin>\n'
 PRELOADS = "".join(map(PRELOAD.format, SHELL_FONTS))
+UNLISTED = PAGE.replace("</head>", '<meta name="robots" content="noindex"></head>')   # a /book/ page
 ARTICLE = '<article class="post-body"><aside class="post-side"></aside><div class="prose"></div></article>'
 
 
@@ -475,6 +476,46 @@ class CheckTest(unittest.TestCase):
         out = self.feed_site(edit=("leetcode/b/index.html", f'type="text/markdown" href="{SITE}/leetcode/b/index.md"',
                                    f'type="text/markdown" href="{SITE}/leetcode/a/index.md"'))
         self.assertEqual(out, ["leetcode/b/index.html: no Markdown alternate"])
+
+    def book_site(self, **files):
+        """SPEC-resume-book: a home whose room door opens /book/, the book's index and one page, all in order.
+        A keyword replaces one file, None deletes it."""
+        site = {"index.html": PAGE.format(body='<a class="rm-door" href="book/">Old book</a>'),
+                "book/index.html": UNLISTED.format(body='<a href="a/">a</a>'),
+                "book/a/index.html": UNLISTED.format(body='<a href="../">book</a>')}
+        site.update(files)
+        return self.findings({path: text for path, text in site.items() if text is not None})
+
+    def test_book_site_passes(self):
+        self.assertEqual(self.book_site(), [])
+
+    def test_book_page_without_noindex(self):
+        self.assertEqual(self.book_site(**{"book/a/index.html": PAGE.format(body="")}),
+                         ["book/a/index.html: no robots noindex"])
+
+    def test_book_page_must_be_on_the_book_index(self):
+        # The exception covers the site's listings, not the book's own index.
+        self.assertEqual(self.book_site(**{"book/b/index.html": UNLISTED.format(body="")}),
+                         ["book/index.html: book/b/ is not listed"])
+
+    def test_book_named_in_a_feed_or_the_search_index(self):
+        for name in ("sitemap.xml", "rss.xml", "llms.txt", "robots.txt", "search-index.json"):
+            self.assertEqual(self.book_site(**{name: f"{SITE}/book/a/\n"}), [f"{name}: names /book/"], name)
+
+    def test_book_linked_from_a_list_page_or_about(self):
+        for rel, extra in (("posts/index.html", MUSICGEN), ("leetcode/index.html", ""), ("about.html", "")):
+            for href in ("/book/a/", f"{SITE}/book/"):
+                out = self.book_site(**{rel: PAGE.format(body=f'<a href="{href}">b</a>{extra}')})
+                self.assertEqual(out, [f"{rel}: links /book/ 1 times (allowed: 0)"], (rel, href))
+
+    def test_home_links_the_book_only_from_its_door(self):
+        body = '<a class="rm-door" href="book/">Old book</a><ul class="lofi-doors"><li><a href="book/">Book</a></li></ul>'
+        self.assertEqual(self.book_site(**{"index.html": PAGE.format(body=body)}),
+                         ["index.html: links /book/ 2 times (allowed: 1)"])
+
+    def test_book_sources_get_page_patterns(self):
+        self.assertEqual(self.book_site(**{"tools/book/src/a.md": "See [[Heap notes]]\n"}),
+                         ["tools/book/src/a.md:1: vault wikilink"])
 
     def test_main_block_comes_last(self):
         # unittest.main() exits, so any test class defined after it would not run when this file is executed
