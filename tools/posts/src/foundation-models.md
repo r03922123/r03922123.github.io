@@ -5,9 +5,9 @@ group: LLMs and generative AI
 order: 1
 tags: LLM · transformers · pretraining · scaling laws
 ---
-A foundation model is a large network trained once, at great expense, on a broad pile of data with a self-supervised objective, and then reused for many tasks it was never trained on directly. The term comes from a 2021 Stanford report by Bommasani et al. It covers image and multimodal models too, but the best-known examples are the GPT, Llama, Gemini and Qwen families of large language models. Retrieval, fine-tuning and agents are all ways of using one of these, so it pays to know what the thing underneath is.
+Retrieval, fine-tuning and agents are all ways of using a pretrained model, and what it costs follows from its shape: GPT-2 small holds 124M parameters, almost a third of them in the embedding table, and a model shaped like Llama 2 7B needs 2 GiB of key-value cache in half precision for a single 4096-token sequence. A foundation model is a large network trained once, at great expense, on a broad pile of data with a self-supervised objective, and then reused for many tasks it was never trained on directly. The term comes from a 2021 Stanford report by Bommasani et al. It covers image and multimodal models too, but the best-known examples are the GPT, Llama, Gemini and Qwen families of large language models.
 
-The short answer: a decoder-only transformer that, given some text, outputs a probability for every possible next token. This post builds that up piece by piece, from the objective to a chat assistant.
+The short answer: a decoder-only transformer that, given some text, outputs a probability for every possible next token. I build that up piece by piece and check each part in code (the loss, the causal mask, the parameter count, the compute split, the KV cache and sampling), then describe how a base model becomes a chat assistant.
 
 ## The objective: predict the next token
 Text is first cut into tokens (sub-word pieces from a fixed vocabulary of tens of thousands to a few hundred thousand entries). The chain rule of probability then factorizes any sequence exactly, with no approximation:
@@ -253,5 +253,7 @@ Pitfalls worth keeping in mind:
 - **Tokens are not words.** Context limits, pricing and per-token latency are all in tokens, and the same text can take very different numbers of tokens in different languages or tokenizers.
 - **Fine-tuning is a poor way to add facts.** It changes behaviour readily but stores new knowledge unreliably; retrieval is usually the better tool.
 - **Plan memory for the cache.** A model whose weights fit on a GPU can still run out of memory serving long contexts or large batches.
+
+Most checks here run on toy inputs, such as a bigram model of one short text and attention over six tokens, or are arithmetic on published model shapes. They show that the bookkeeping is exact; the scaling results come from Kaplan et al. and Hoffmann et al., and nothing here trains a model large enough to test them. What stays open is how a model trained only to predict the next token infers a task from a few examples in its prompt.
 
 To see these pieces trained end to end, [LoRA from scratch](/posts/lora-from-scratch/) builds a tiny GPT and fine-tunes it. This post draws on Andrej Karpathy's Neural Networks: Zero to Hero course, Lilian Weng's [The Transformer Family Version 2.0](https://lilianweng.github.io/posts/2023-01-27-the-transformer-family-v2/) and Stanford's CME 295, Transformers and Large Language Models, together with the papers named in the text.
