@@ -1,6 +1,6 @@
 # Uncertainty in a rate: the Beta posterior, the standard error and the bootstrap
 
-An item was clicked 3 times in 4 impressions, another 300 times in 400. Both have a click-through rate of 75%, and nobody would trust the two numbers equally: from a uniform prior, their 95% credible intervals run from 0.28 to 0.95 and from 0.71 to 0.79. A single estimate throws away how much evidence stands behind it; I keep that information by putting a distribution on the rate.
+An item was clicked 3 times in 4 impressions, another 300 times in 400. Both have a click-through rate of 75%, and nobody would trust the two numbers equally: from a uniform prior, their 95% credible intervals run from 0.28 to 0.95 and from 0.71 to 0.79. A single estimate throws away how much evidence stands behind it. I keep that information.
 
 There are two standard ways to do it. The Bayesian way describes what you believe about the unknown rate with a whole distribution; for a probability, that is almost always a **Beta**. The frequentist way keeps the rate fixed and asks how much the estimate would move if you collected the data again, which leads to the **standard error** and, when no formula exists, the **bootstrap**. I check the formulas and numbers below in code. On 3,000 simulated new items, ranking by posterior mean instead of the raw rate puts items in the top 20 whose true rates are higher by more than a percentage point on average.
 

@@ -4,11 +4,11 @@ The three most important whys of each change, newest first. Each heading reads `
 
 ## 2026-11-11 · build: post-voice PR 5, probability
 
-1. **A test is not a proof, so the limit says which one it is.** The probability posts check each formula at a few
-   parameter values. That catches a wrong formula or a mixed-up convention, but it does not prove the formula for
-   every input, and the cheat sheet's new limit says so. It is like weighing three loaves to check a scale: a broken
-   scale shows, a good one is not certified. Trade-off: one more caveat on a page meant to be quick. Risk: a reader
-   may trust the formulas less than they should; the linked posts carry the derivations.
+1. **A test is not a proof, so the limit says which one it is.** Where the probability posts check a formula, they do
+   it at a few parameter values. That catches a wrong formula or a mixed-up convention, but it does not prove the
+   formula for every input, and the cheat sheet's new limit says so. It is like weighing three loaves to check a
+   scale: a broken scale shows, a good one is not certified. Trade-off: one more caveat on a page meant to be quick.
+   Risk: a reader may trust the formulas less than they should; the linked posts carry the derivations.
 2. **An open question names its next tool.** Each closing paragraph says what the post's model cannot answer and
    what to reach for: the beta-binomial for correlated trials, Weibull or Kaplan-Meier when the hazard is not
    constant, a zero-inflated model for excess zeros. Each tool comes from the post's own pitfalls. Trade-off: the

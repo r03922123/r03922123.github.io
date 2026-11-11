@@ -268,6 +268,6 @@ revenue = rng.lognormal(0.0, 1.0, 1_000_000)
 assert np.log(revenue).mean() < np.log(revenue.mean()) - 0.4    # gap is sigma^2 / 2 = 0.5 for a lognormal
 ```
 
-The code checks each formula at a few parameter values, exactly or on simulated data, so it catches a wrong formula or a mixed-up convention but does not prove a formula in general. The derivations are in the linked posts.
+Where the code checks a formula, it does so at a few parameter values, exactly or on simulated data, so it catches a wrong formula or a mixed-up convention but does not prove a formula in general; the linked posts derive the ones they cover.
 
 For worked problems that put these tools to use, see [is this coin fair?](../is-this-coin-fair/) and the [ML fundamentals quick reference](../ml-fundamentals-quick-reference/).
