@@ -1,8 +1,8 @@
 # Causal inference without a randomized experiment
 
-Users who turned on a new feature spend 19 more a month than users who did not. Did the feature cause that? Probably not much of it: the users who bother to turn on features are the engaged ones, and engaged users spent more before the feature existed. A **confounder**, something that drives both who gets the treatment and the outcome, can manufacture a gap out of nothing or hide a real one.
+In a simulation of 200,000 users, those who turned on a new feature spend 19 more a month than those who did not, yet the feature adds only 4. The rest is selection: the users who bother to turn on features are the engaged ones, and engaged users spent more before the feature existed. A **confounder**, something that drives both who gets the treatment and the outcome, can manufacture a gap out of nothing or hide a real one.
 
-A randomized experiment removes the problem by design, and when you can run one you should (see [A/B testing](../ab-testing/)). This post is about the cases where you cannot: a policy was already rolled out to some cities, a perk is granted by a score threshold, adoption is voluntary, or there is only one treated region. Each method below trades randomization for an assumption, and each is tested on a simulation where we know the true answer, so we can watch it work and watch it fail.
+A randomized experiment removes the problem by design, and when you can run one you should (see [A/B testing](../ab-testing/)). I cover the cases where you cannot: a policy was already rolled out to some cities, a perk is granted by a score threshold, adoption is voluntary, or there is only one treated region. Each method below trades randomization for an assumption, and each is tested on a simulation where the true answer is known, so it can be watched as it works and as it fails.
 
 ## The missing column
 Write \(Y_i(1)\) for the outcome unit \(i\) would have with the treatment and \(Y_i(0)\) for the outcome without it. These are **potential outcomes**. The effect on unit \(i\) is \(Y_i(1) - Y_i(0)\), and the **average treatment effect** is
@@ -143,6 +143,8 @@ tsls = np.linalg.lstsq(np.column_stack([np.ones(n), t_hat]), y, rcond=None)[0][1
 assert np.isclose(tsls, wald)
 ```
 
+The raw comparison of adopters with the rest exceeds 7, while the Wald ratio lands within 0.15 of the compliers' 2 and two-stage least squares gives the same number.
+
 The exclusion restriction is the weak point, and it is easy to break by accident. To estimate how demand responds to price, weather is tempting as an instrument for price, since bad weather raises prices. But bad weather also makes people want rides more, directly, so it fails exclusion and the estimate mixes the price effect with the weather effect. An instrument for price in a demand equation must shift price through **supply or cost**, without shifting what customers want.
 
 ## Regression discontinuity
@@ -165,6 +167,8 @@ rd = intercept_at_cutoff(perk & (score < 50 + h)) - intercept_at_cutoff(~perk & 
 assert y[perk].mean() - y[~perk].mean() > 12               # above vs below: mostly the score itself
 assert abs(rd - 3) < 0.3
 ```
+
+The plain above-versus-below gap exceeds 12, while the two local lines put the jump within 0.3 of the true 3.
 
 The estimate is local: it is the effect for users near a score of 50, not for everyone. The bandwidth trades bias (curvature inside the window) against variance (fewer points), and results should be shown for several bandwidths. The design also breaks if people can nudge their score across the line, which shows up as a pile of units just above the cutoff.
 
@@ -224,5 +228,7 @@ With one treated unit there is no sampling distribution in the usual sense, so i
 - **Watch for spillovers.** If drivers or buyers move between treated and control cities, the control group is contaminated and DiD understates or distorts the effect.
 - **Get the standard errors right.** Repeated observations of a city are not independent; cluster by the unit that was treated. A weak first stage in IV makes the ratio unstable and biased toward OLS.
 - **Run the falsification checks.** Pre-period placebos for DiD, placebo cutoffs and density checks for RD, placebo units for synthetic control. A method that cannot fail a check has not been checked.
+
+Each simulation here is built so that its method's assumption holds, except the DiD run that breaks it on purpose, and each runs once from one seed. So the asserts show that each estimator recovers a known effect when its assumption is true, not that the assumption holds in real data, and a passed placebo check is evidence, not proof. What stays open in a real study is that assumption: parallel trends, exclusion, smoothness at the cutoff, or no unmeasured confounder.
 
 For deeper treatments, Hernán and Robins' free book Causal Inference: What If covers potential outcomes, adjustment and weighting, and Brady Neal's free Introduction to Causal Inference course covers causal graphs and estimation. The confounder-then-randomization framing of the opening follows the causality chapter of the Berkeley Data 8 textbook Computational and Inferential Thinking (Adhikari, DeNero and Wagner); the example here is new.
