@@ -5,11 +5,11 @@ group: Probability
 order: 3
 tags: Poisson · counts · probability distributions · overdispersion
 ---
-Errors logged per hour, clicks on an ad per day, typos per page, goals per football match. Each is a count of events in a fixed window, where the events are individually unlikely but there are many chances for one to happen. The Poisson distribution is the default model for counts like these. It has one parameter, the average rate \(\lambda\), and a single formula:
+A service that logs 3 errors an hour on average still has a 0.084 chance of 6 or more in any one hour, so an alert at "6 per hour" would fire roughly twice a day while nothing is wrong. Errors per hour, clicks on an ad per day, typos per page: each is a count of events in a fixed window, where the events are individually unlikely but there are many chances for one to happen. The Poisson distribution is the default model for counts like these. It has one parameter, the average rate \(\lambda\), and a single formula:
 
 \[ P(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}, \qquad k = 0, 1, 2, \dots \]
 
-This post derives that formula from the [binomial](../bernoulli-binomial/), works out its mean and variance, shows the properties that make it convenient (rates scale, Poissons add, thinned Poissons stay Poisson), then covers fitting it and the ways real counts fail to be Poisson.
+I derive that formula from the [binomial](../bernoulli-binomial/), work out its mean and variance, show the properties that make it convenient (rates scale, Poissons add, thinned Poissons stay Poisson), then cover fitting it and the ways real counts fail to be Poisson.
 
 ## The limit of many unlikely trials
 Split an hour into \(n\) tiny slots. In each slot an error happens with probability \(p\), independently, and never twice in the same slot. The number of errors is \(\text{Bin}(n, p)\) with mean \(np\). Now make the slots finer while keeping the average fixed at \(\lambda = np\), so \(p = \lambda / n\). For a fixed \(k\):
@@ -181,10 +181,14 @@ assert np.allclose(observed, nb.pmf(np.arange(15)), atol=0.005)
 assert not np.allclose(observed, stats.poisson.pmf(np.arange(15), mu), atol=0.02)
 ```
 
+The mixture's variance is 12, three times its mean of 4, and its histogram matches the negative binomial, not the Poisson.
+
 ## Summary
 - Use the Poisson for counts of independent events in a window at a steady rate, or as an approximation to a binomial with large \(n\) and small \(p\).
 - Its mean and variance are both \(\lambda\); the MLE of \(\lambda\) is the sample mean, or events over exposure.
 - Rates scale with the window, independent Poissons add, and random thinning keeps it Poisson. The gaps between events are exponential.
 - Before relying on it, compare variance to mean. If the variance is clearly larger, reach for the negative binomial or a model of how the rate varies.
+
+The code simulates only Poisson counts and one gamma-Poisson mixture, so it shows what a Poisson fit assumes, not that real counts meet it. Excess zeros, drifting rates and bursts have no code here; for those the next step is a zero-inflated or hurdle model, or a rate modelled over time.
 
 The binomial-limit derivation is the standard textbook argument, laid out in many places including [this Mathematics Stack Exchange answer](https://math.stackexchange.com/a/836585); it is rewritten here with new examples and code. The approximation bound is L. Le Cam, "An approximation theorem for the Poisson binomial distribution", Pacific Journal of Mathematics, 1960.
