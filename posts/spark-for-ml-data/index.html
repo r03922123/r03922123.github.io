@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spark for ML data: partitions, shuffles, skew and joins · r03922123</title>
+<meta name="description" content="What a Spark job does with a feature pipeline, simulated in pandas: partitions and tasks, lazy plans cut into stages at each shuffle, why one hot key makes one task the straggler and how salting and partial aggregation fix it, the bytes a broadcast join saves over a shuffle join, and why collect() or toPandas() on a big table brings down the driver.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="canonical" href="https://r03922123.github.io/posts/spark-for-ml-data/">
+<link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
+<link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/spark-for-ml-data/index.md">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Spark for ML data: partitions, shuffles, skew and joins", "datePublished": "2026-11-01T00:00:00+08:00", "description": "What a Spark job does with a feature pipeline, simulated in pandas: partitions and tasks, lazy plans cut into stages at each shuffle, why one hot key makes one task the straggler and how salting and partial aggregation fix it, the bytes a broadcast join saves over a shuffle join, and why collect() or toPandas() on a big table brings down the driver.", "author": {"@type": "Person", "name": "Jie-Hong Lin", "url": "https://r03922123.github.io/about.html"}}</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
+  <a class="home" href="/">r03922123</a>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
+</header>
+<div class="wrap">
+<main>
+<article class="post-body">
+<header class="post-head">
+  <p class="crumb"><a href="/posts/#coding-and-data">Coding and data</a></p>
+  <h1>Spark for ML data: partitions, shuffles, skew and joins</h1>
+</header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>14 min</dd><dt>Topic</dt><dd>Coding and data</dd><dt>Tags</dt><dd>Spark · PySpark · data pipelines · shuffle · data skew</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-vocabulary">The vocabulary</a></li><li><a href="#lazy-plans-and-the-stages-a-shuffle-cuts">Lazy plans and the stages a shuffle cuts</a></li><li><a href="#why-the-shuffle-is-the-expensive-step">Why the shuffle is the expensive step</a></li><li><a href="#skew-the-stage-waits-for-its-slowest-task">Skew: the stage waits for its slowest task</a></li><li><a href="#salting-and-what-it-costs">Salting, and what it costs</a></li><li><a href="#broadcast-join-against-shuffle-join">Broadcast join against shuffle join</a></li><li><a href="#collect-and-topandas-everything-on-one-machine">collect() and toPandas(): everything on one machine</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+</aside>
+<div class="prose">
+<p>Hash 2,000,000 simulated click events by user id into 200 partitions, with user activity following a Zipf law, and one user owns 165,157 rows. The partition holding that user has 176,441 rows, 17.6 times the mean, and on 50 cores the stage finishes 4.6 times later than the same rows with evenly spread keys. Nothing in pandas or SQL prepares you for that, because on one machine a group is a group, whatever its size. Apache Spark runs a DataFrame program on many machines by splitting the table into <b>partitions</b>, and nearly every slow or failing Spark job comes from how rows move between them.</p>
+<p>This post rebuilds the moving parts in plain pandas and numpy: a tiny lazy engine that cuts a plan into stages, the shuffle, skew and salting, the two join strategies and the bytes each moves, and the size of a table once it lands on the driver. The PySpark next to each piece is shown, not run. The pandas and SQL versions of the same operations are in the <a href="../pandas-cheatsheet/">pandas</a> and <a href="../sql-cheatsheet/">SQL</a> cheat sheets, and joining features without leaking the label is in <a href="../ml-infrastructure/">ML infrastructure</a>.</p>
+<h2 id="the-vocabulary">The vocabulary</h2>
+<table><thead><tr><th>Term</th><th>What it is</th><th>pandas analogue</th></tr></thead><tbody><tr><td>Driver</td><td>The process that runs your Python, builds the plan and collects results</td><td>Your notebook</td></tr><tr><td>Executor</td><td>A worker process on a cluster machine, with a few cores and its own memory</td><td>None: pandas has one</td></tr><tr><td>Partition</td><td>A slice of the rows that one core processes at a time</td><td>A chunk from <code>pd.read_csv(..., chunksize=)</code></td></tr><tr><td>Task</td><td>One partition pushed through one stage's chain of operations</td><td>One loop iteration over chunks</td></tr><tr><td>Stage</td><td>The tasks between two shuffles; all of them can run in parallel</td><td>None</td></tr><tr><td>Job</td><td>All the stages one action needs</td><td>One cell</td></tr></tbody></table>
+<p>Reading a 10 GiB Parquet table with the default <code>spark.sql.files.maxPartitionBytes</code> of 128 MB gives at least 80 partitions, so at least 80 read tasks. The question that decides speed is never "how many rows" but "how many rows in the biggest task".</p>
+<h2 id="lazy-plans-and-the-stages-a-shuffle-cuts">Lazy plans and the stages a shuffle cuts</h2>
+<p>A transformation (<code>filter</code>, <code>withColumn</code>, <code>groupBy().agg</code>, <code>join</code>) returns a new DataFrame at once and reads nothing. It only extends a plan. An <b>action</b> (<code>count</code>, <code>collect</code>, <code>toPandas</code>, <code>write</code>) makes Spark optimise the whole plan, split it into stages and run it. A per-user feature job looks like this:</p>
+<pre><code class="language-plaintext">from pyspark.sql import SparkSession, functions as F
+
+spark = SparkSession.builder.appName("user-features").getOrCreate()
+events = spark.read.parquet("data/events/")              # nothing is read yet
+
+features = (events
+    .withColumn("night", (F.hour("ts") &lt; 6).cast("int"))  # narrow: row by row, inside each partition
+    .groupBy("user_id")                                   # wide: all rows of a user must meet
+    .agg(F.count("*").alias("n"), F.sum("label").alias("clicks"), F.sum("night").alias("night")))
+
+features.explain()   # HashAggregate (partial_count, partial_sum), Exchange hashpartitioning(user_id, 200), HashAggregate
+features.write.mode("overwrite").parquet("data/user_features/")   # the action: only now does the job run</code></pre>
+<p>A <b>narrow</b> transformation needs one input partition per output partition, so a chain of them runs in one pass, one task per partition. A <b>wide</b> one needs rows from every partition: Spark hashes the key, writes each row to a shuffle file for the partition its key belongs to, and the next stage's tasks fetch those files over the network. That <b>shuffle</b> is the stage boundary. Below, a short engine does the same: transformations only append to a plan, and <code>collect</code> cuts it at each shuffle and runs one task per partition per stage.</p>
+<pre><code class="language-python">import heapq
+import sys
+
+import numpy as np
+import pandas as pd
+
+rng = np.random.default_rng(0)
+assert 10 * 1024**3 // (128 * 1024**2) == 80               # read tasks for 10 GiB at 128 MB each
+n_rows, n_users, n_reads, n_parts = 2_000_000, 100_000, 16, 200
+weight = 1 / np.arange(1, n_users + 1)                    # Zipf, exponent 1: the k-th most active user has weight 1/k
+user_of_rank = rng.permutation(n_users)                   # so the hottest user's id is arbitrary
+ev = pd.DataFrame({"user_id": user_of_rank[rng.choice(n_users, n_rows, p=weight / weight.sum())],
+                   "item_id": rng.integers(0, 50_000, n_rows),
+                   "ts": rng.uniform(0, 30 * 86_400, n_rows),
+                   "label": (rng.random(n_rows) &lt; 0.05).astype(np.int8)})
+for j in range(8):
+    ev[f"f{j}"] = rng.normal(size=n_rows).astype(np.float32)
+reads = [ev.iloc[i * n_rows // n_reads:(i + 1) * n_rows // n_reads] for i in range(n_reads)]  # as if 16 files
+
+
+def part_of(keys, n):
+    """Hash partitioning: a key always lands in the same one of n partitions (Spark uses Murmur3; this is a mix)."""
+    x = np.asarray(keys).astype(np.uint64) * np.uint64(0x9E3779B97F4A7C15)
+    return ((x ^ (x &gt;&gt; np.uint64(29))) % np.uint64(n)).astype(np.int64)
+
+
+class Lazy:
+    """A DataFrame as Spark holds it: input partitions plus a plan. Transformations only extend the plan."""
+
+    def __init__(self, parts, plan=()):
+        self.parts, self.plan = parts, plan
+
+    def narrow(self, f):            # filter, select, withColumn: an output partition needs one input partition
+        return Lazy(self.parts, self.plan + (("narrow", f),))
+
+    def shuffle(self, key, n):      # groupBy, join, repartition: each row moves to the partition its key hashes to
+        return Lazy(self.parts, self.plan + (("wide", (key, n)),))
+
+    def collect(self, log):
+        """The action: cut the plan at each shuffle; log the rows going into every task of every stage."""
+        parts, chain = self.parts, []
+        for kind, arg in self.plan + (("wide", None),):
+            if kind == "narrow":
+                chain.append(arg)
+                continue
+            log.append([len(p) for p in parts])
+            out = []
+            for p in parts:                                   # one task: one partition through the stage's chain
+                for f in chain:
+                    p = f(p)
+                out.append(p)
+            whole, chain = pd.concat(out, ignore_index=True), []
+            if arg is None:
+                return whole
+            dest = part_of(whole[arg[0]], arg[1])             # the shuffle: every row is rewritten by destination
+            whole, ends = whole.iloc[np.argsort(dest, kind="stable")], np.cumsum(np.bincount(dest, minlength=arg[1]))
+            parts = [whole.iloc[a:b] for a, b in zip(np.r_[0, ends[:-1]], ends)]
+
+
+calls = []
+
+
+def add_night(p):
+    calls.append(len(p))
+    return p.assign(night=((p.ts // 3600) % 24 &lt; 6).astype(np.int64))
+
+
+def partial(p, by="user_id"):   # aggregate whatever rows this partition holds
+    return p.groupby(by, as_index=False).agg(n=("label", "size"), clicks=("label", "sum"), night=("night", "sum"))
+
+
+def final(p):                   # add up partial results that arrived for the same user
+    return p.groupby("user_id", as_index=False)[["n", "clicks", "night"]].sum()
+
+
+plan = Lazy(reads).narrow(add_night).narrow(partial).shuffle("user_id", n_parts).narrow(final)
+assert calls == []                                            # building the plan touched no row
+log_partial = []
+feats = plan.collect(log_partial)
+assert len(calls) == n_reads and sum(calls) == n_rows        # add_night ran once per read task, inside stage 1
+assert [len(s) for s in log_partial] == [n_reads, n_parts]   # one shuffle, two stages: 16 tasks, then 200
+truth = partial(add_night(ev)).set_index("user_id").sort_index()
+assert feats.set_index("user_id").sort_index().equals(truth)  # same answer as one pandas groupby
+assert sum(log_partial[1]) == 454_278                         # rows that crossed the shuffle, of 2,000,000</code></pre>
+<p>Nothing ran until <code>collect</code>. Then the plan became two stages, 16 tasks and 200 tasks, and the answer matched a single pandas <code>groupby</code>. Only 454,278 rows crossed the shuffle, not 2,000,000, because the plan aggregates inside each read partition before the shuffle. That pre-aggregation is what the <code>partial_count</code> in the PySpark plan above means: for built-in aggregates such as <code>count</code>, <code>sum</code> and <code>avg</code>, Spark does it on its own.</p>
+<h2 id="why-the-shuffle-is-the-expensive-step">Why the shuffle is the expensive step</h2>
+<p>Spark's own guide names the costs: the shuffle involves disk I/O, data serialization and network I/O. Every row entering it is serialized and written to local disk, then read back by a task on, most likely, another machine. A narrow transformation costs one pass over memory. So the useful question about any plan is how many shuffles it has and how many bytes each one moves, and <code>explain()</code> answers the first: count the <code>Exchange</code> lines.</p>
+<table><thead><tr><th>Transformation</th><th>Narrow or wide</th><th>Why</th></tr></thead><tbody><tr><td><code>filter</code>, <code>select</code>, <code>withColumn</code>, <code>union</code></td><td>Narrow</td><td>Each output row depends on rows of one partition</td></tr><tr><td><code>groupBy().agg</code>, <code>distinct</code></td><td>Wide</td><td>Rows with the same key sit in every partition</td></tr><tr><td><code>join</code> of two large tables</td><td>Wide</td><td>Both sides are hashed on the key</td></tr><tr><td><code>join</code> with a broadcast side</td><td>Narrow on the big side</td><td>The small side is copied to each executor instead</td></tr><tr><td><code>orderBy</code></td><td>Wide</td><td>A global order needs range partitioning</td></tr><tr><td><code>repartition(n)</code></td><td>Wide; <code>coalesce(n)</code> to fewer partitions is not</td><td><code>coalesce</code> merges neighbours without moving rows by key</td></tr></tbody></table>
+<h2 id="skew-the-stage-waits-for-its-slowest-task">Skew: the stage waits for its slowest task</h2>
+<p>A stage ends when its last task ends. With enough cores the tasks run side by side, so stage time is set by the <b>largest</b> partition, not the mean. Hash partitioning spreads distinct keys evenly, but it cannot split one key: every row of the hottest user lands in one partition. Below are the partition sizes when raw rows are shuffled by <code>user_id</code>, which is what a shuffle join or a <code>groupBy</code> with no pre-aggregation does, against the same row count with uniform user ids. Stage time is measured as the most rows any of 50 cores processes, with tasks handed to whichever core frees up first.</p>
+<pre><code class="language-python">def stage_time(task_rows, cores=50):
+    free = [0] * cores
+    for r in task_rows:
+        heapq.heappush(free, heapq.heappop(free) + r)
+    return max(free)
+
+
+hot_rows = int(ev.user_id.value_counts().iloc[0])
+zipf_parts = np.bincount(part_of(ev.user_id, n_parts), minlength=n_parts)
+uniform_parts = np.bincount(part_of(rng.integers(0, n_users, n_rows), n_parts), minlength=n_parts)
+more_parts = np.bincount(part_of(ev.user_id, 2_000), minlength=2_000)
+print(f"hottest user {hot_rows} rows; largest partition {zipf_parts.max()} (Zipf), {uniform_parts.max()} (uniform); "
+      f"stage time {stage_time(zipf_parts)} vs {stage_time(uniform_parts)}")
+assert hot_rows == 165_157 and zipf_parts.max() == 176_441 and uniform_parts.max() == 11_057
+assert round(zipf_parts.max() / zipf_parts.mean(), 1) == 17.6
+assert stage_time(zipf_parts) == 193_747 and stage_time(uniform_parts) == 42_227
+assert round(stage_time(zipf_parts) / stage_time(uniform_parts), 1) == 4.6
+assert round(100 * n_rows / (50 * stage_time(zipf_parts))) == 21  # percent of core time spent working
+assert round(100 * hot_rows / n_rows) == 8
+assert more_parts.max() == 165_649 &gt;= hot_rows               # ten times the partitions: the hot key stays whole</code></pre>
+<table><thead><tr><th>Keys</th><th>Partitions</th><th>Largest partition</th><th>Mean</th><th>Stage time on 50 cores (rows)</th></tr></thead><tbody><tr><td>Uniform</td><td>200</td><td>11,057</td><td>10,000</td><td>42,227</td></tr><tr><td>Zipf</td><td>200</td><td>176,441</td><td>10,000</td><td>193,747</td></tr><tr><td>Zipf</td><td>2,000</td><td>165,649</td><td>1,000</td><td>not run</td></tr></tbody></table>
+<p>With the same total work, the skewed stage takes 4.6 times as long, and the 50 cores spend only 21% of it working. Ten times more partitions shrinks the mean tenfold and leaves the largest partition almost as big, because it is one user's 165,157 rows.</p>
+<h2 id="salting-and-what-it-costs">Salting, and what it costs</h2>
+<p><b>Salting</b> splits a hot key by hand. Add a random <code>salt</code> in 0..S−1, aggregate by <code>(user_id, salt)</code>, which spreads the hot user over S partitions, then aggregate the partial results again by <code>user_id</code>. The price is that second aggregation: one more shuffle and one more stage. Below, the raw-row plan, the salted plan with S = 16, and the partial-aggregation plan from earlier.</p>
+<pre><code class="language-python">S = 16
+
+
+def add_salt(p):
+    salt = rng.integers(0, S, len(p))
+    return p.assign(salt=salt, k=p.user_id.to_numpy() * S + salt)
+
+
+log_raw, log_salted = [], []
+raw = Lazy(reads).narrow(add_night).shuffle("user_id", n_parts).narrow(partial).collect(log_raw)
+salted = (Lazy(reads).narrow(add_night).narrow(add_salt).shuffle("k", n_parts)
+          .narrow(lambda p: partial(p, ["user_id", "salt"])).shuffle("user_id", n_parts).narrow(final)
+          .collect(log_salted))
+for result in (raw, salted):
+    assert result.set_index("user_id").sort_index().equals(truth)
+after_shuffles = {name: [(sum(s), max(s), stage_time(s)) for s in log[1:]]
+                  for name, log in (("raw rows", log_raw), ("salted", log_salted), ("partial agg", log_partial))}
+for name, stages in after_shuffles.items():
+    print(name, stages)
+assert after_shuffles["raw rows"] == [(2_000_000, 176_441, 193_747)]
+assert after_shuffles["salted"] == [(2_000_000, 23_782, 52_463), (453_988, 2_647, 9_674)]
+assert round((52_463 + 9_674) / 193_747, 2) == 0.32                   # about a third of the straggler stage
+assert after_shuffles["partial agg"] == [(454_278, 2_636, 9_694)]</code></pre>
+<table><thead><tr><th>Plan</th><th>Shuffles</th><th>Rows shuffled</th><th>Largest task after each shuffle</th><th>Stage time after each shuffle (rows)</th></tr></thead><tbody><tr><td>Raw rows by <code>user_id</code></td><td>1</td><td>2,000,000</td><td>176,441</td><td>193,747</td></tr><tr><td>Salted, S = 16</td><td>2</td><td>2,000,000 + 453,988</td><td>23,782, then 2,647</td><td>52,463, then 9,674</td></tr><tr><td>Partial aggregation</td><td>1</td><td>454,278</td><td>2,636</td><td>9,694</td></tr></tbody></table>
+<p>Salting cuts the straggler's stage from 193,747 to 52,463 rows, and the second aggregation adds a stage of 9,674 on top: about a third of the original time, paid for with a second shuffle. Partial aggregation does better than both, because aggregating before the first shuffle is the same idea applied to every key at once. That is why salting a built-in <code>groupBy().agg(F.sum(...))</code> buys little in Spark: it already pre-aggregates. Salting pays where nothing can be combined before the shuffle: a join, an RDD <code>groupByKey</code>, or a grouped pandas UDF that needs all of a key's rows.</p>
+<p>For a join, salt the large side and copy each row of the small side once per salt value, so every <code>(user_id, salt)</code> pair still meets its user:</p>
+<pre><code class="language-plaintext">S = 16
+events_s = events.withColumn("salt", (F.rand(seed=0) * S).cast("int"))
+users_s = users.withColumn("salt", F.explode(F.sequence(F.lit(0), F.lit(S - 1))))   # each user row S times
+joined = events_s.join(users_s, on=["user_id", "salt"]).drop("salt")
+
+# The same split, done by Spark at run time for sort-merge joins (adaptive query execution, on by default since 3.2):
+spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")   # a partition &gt; 5x the median and &gt; 256 MB is split</code></pre>
+<p>Here the cost is the copies: the users table grows S times, 16 times in this example. Salting only the hottest few keys keeps that small. Adaptive query execution (AQE) applies the same split automatically to a sort-merge join partition larger than both <code>skewedPartitionFactor</code> (5) times the median and <code>skewedPartitionThresholdInBytes</code> (256 MB); the <a href="https://spark.apache.org/docs/latest/sql-performance-tuning.html">performance tuning guide</a> lists both settings and documents this handling for joins, not aggregations.</p>
+<table><thead><tr><th>Problem</th><th>Naive fix</th><th>How it breaks</th><th>Real fix</th><th>How it's measured</th></tr></thead><tbody><tr><td>One task runs far longer than the rest</td><td>Raise <code>spark.sql.shuffle.partitions</code></td><td>The hot key is still one partition: 165,649 rows at 2,000 partitions</td><td>Pre-aggregate; salt the hot keys; let AQE split join partitions; broadcast the small side</td><td>Max against median task input in the stage's task summary in the Spark UI</td></tr><tr><td>A join shuffles a big table</td><td>Add executors</td><td>The bytes moved stay the same; more machines share them</td><td><code>F.broadcast()</code> the side that fits in memory</td><td>Shuffle write bytes per stage</td></tr><tr><td>The driver dies on <code>toPandas()</code></td><td>Raise driver memory</td><td>Memory grows with rows: 57 GB at a billion rows</td><td>Aggregate or filter in Spark first; write Parquet</td><td>Rows times bytes per row before collecting</td></tr></tbody></table>
+<h2 id="broadcast-join-against-shuffle-join">Broadcast join against shuffle join</h2>
+<p>A <b>shuffle join</b> (in Spark, usually a sort-merge join) hashes both tables on the key into the same partitions and joins partition by partition: both sides cross the network, and the big side's skew comes along. A <b>broadcast join</b> sends the whole small table to every executor, and each task of the big table joins its own partition locally: the big side never moves. Spark broadcasts on its own when it estimates a side below <code>spark.sql.autoBroadcastJoinThreshold</code>, 10 MB by default; <code>F.broadcast(users)</code> forces it. Below, both strategies on 20 executors, counting the bytes whose sending and receiving executor differ.</p>
+<pre><code class="language-python">users = pd.DataFrame({"user_id": np.arange(n_users), **{f"u{j}": rng.normal(size=n_users).astype(np.float32)
+                                                       for j in range(4)}})
+user_reads = [users.iloc[i * n_users // 4:(i + 1) * n_users // 4] for i in range(4)]
+n_exec = 20
+
+
+def nbytes(df):
+    return int(df.memory_usage(index=False).sum())
+
+
+def network_bytes(read_parts, first_exec):
+    """Shuffle: read partition i sits on executor first_exec + i, output partition j on executor j % n_exec."""
+    return sum(nbytes(p[part_of(p.user_id, n_parts) % n_exec != (first_exec + i) % n_exec])
+               for i, p in enumerate(read_parts))
+
+
+ev_groups, user_groups = dict(tuple(ev.groupby(part_of(ev.user_id, n_parts)))), dict(tuple(users.groupby(
+    part_of(users.user_id, n_parts))))
+shuffle_join = pd.concat([ev_groups[j].merge(user_groups[j], on="user_id") for j in ev_groups])
+broadcast_join = pd.concat([p.merge(users, on="user_id") for p in reads])
+reference = ev.merge(users, on="user_id")
+for joined in (shuffle_join, broadcast_join):
+    assert len(joined) == n_rows and (pd.util.hash_pandas_object(joined, index=False).sum()
+                                      == pd.util.hash_pandas_object(reference, index=False).sum())
+
+big, small = nbytes(ev), nbytes(users)
+shuffle_net = network_bytes(reads, 0) + network_bytes(user_reads, n_reads)
+broadcast_net = small * (n_exec + 1)                         # collected to the driver, then one copy per executor
+crossover = big * (n_exec - 1) / (n_exec * (n_exec + 1) - (n_exec - 1))   # small-table size where they tie
+print(f"events {big / 1e6:.0f} MB, users {small / 1e6:.1f} MB; network: shuffle join {shuffle_net / 1e6:.0f} MB, "
+      f"broadcast {broadcast_net / 1e6:.1f} MB; tie at a {crossover / 1e6:.1f} MB small table")
+assert big == 114_000_000 and small == 2_400_000
+assert round(shuffle_net / 1e6) == 111 and round(broadcast_net / 1e6, 1) == 50.4
+assert round(crossover / 1e6, 1) == 5.4 and broadcast_net &lt; shuffle_net / 2
+assert {len(p) for p in reads} == {n_rows // n_reads}         # broadcast tasks keep the read sizes: skew never forms</code></pre>
+<table><thead><tr><th>Strategy</th><th>What crosses the network</th><th>Bytes here</th><th>Largest task</th></tr></thead><tbody><tr><td>Shuffle join</td><td>Both tables, about (E−1)/E of each</td><td>111 MB</td><td>The hot user's partition, 176,441 events</td></tr><tr><td>Broadcast join</td><td>The small table, once to the driver and once per executor</td><td>50.4 MB</td><td>A read partition, 125,000 events</td></tr></tbody></table>
+<p>Both strategies return the same 2,000,000 rows, but the broadcast moves less than half the bytes and its tasks keep the even sizes of the read. The saving holds only while the small side is small: with 20 executors and this 114 MB events table, broadcasting a table above 5.4 MB moves more bytes than shuffling, and every executor must also hold the whole copy in memory. That is the reason for a threshold, not a rule that broadcast always wins; the bytes model here ignores the shuffle's disk writes and sorting, which favour broadcasting further.</p>
+<pre><code class="language-plaintext">joined = events.join(F.broadcast(users), on="user_id", how="left")    # users is copied; events never move
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", 50 * 1024 * 1024)   # default 10 MB; -1 turns it off</code></pre>
+<h2 id="collect-and-topandas-everything-on-one-machine">collect() and toPandas(): everything on one machine</h2>
+<p><code>collect()</code> and <code>toPandas()</code> are actions that bring every row to the driver, one process with 1 GiB of memory by default (<code>spark.driver.memory</code>). Spark also aborts an action whose serialized results pass <code>spark.driver.maxResultSize</code>, 1 GiB by default. Below, the size of the events table as pandas columns, and as the Python tuples <code>collect()</code> hands back, one object per row and per value.</p>
+<pre><code class="language-python">col_per_row = nbytes(ev) / n_rows
+py_rows = list(zip(*(ev[c].head(10_000).tolist() for c in ev.columns)))   # like collect(): a tuple per row
+objects = {id(o): sys.getsizeof(o) for row in py_rows for o in (row, *row)}  # each object counted once
+py_per_row = sum(objects.values()) / len(py_rows)
+print(f"{col_per_row:.0f} bytes per row in columns, {py_per_row:.0f} as Python objects")
+assert col_per_row == 57 and round(py_per_row) == 408          # 7.2 times as much</code></pre>
+<p>At 57 bytes a row, a billion-row table needs 57 GB as pandas columns, and about 408 bytes a row, 7.2 times as much, as the Python objects <code>collect()</code> returns: far past a driver sized for orchestration. The data should stay distributed until it is small:</p>
+<pre><code class="language-plaintext">features.write.mode("overwrite").parquet("data/user_features/")       # the result stays on the cluster's storage
+top = features.orderBy(F.desc("clicks")).limit(10_000).toPandas()      # bounded before it reaches the driver
+peek = features.sample(fraction=0.001, seed=0).toPandas()             # a sample for plots and sanity checks</code></pre>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>Calling an action inside a loop.</b> Each <code>count()</code> or <code>toPandas()</code> can rerun the whole plan from the files; <code>cache()</code> a DataFrame that several actions reuse, and <code>unpersist()</code> it after.</li><li>**Reading <code>explain()</code> too late.** Count the <code>Exchange</code> nodes before running a job on the full table, not after it has run for an hour.</li><li><b>Python UDFs for what a built-in does.</b> A row-at-a-time Python UDF calls Python once per row and ships the data between the JVM and Python workers; <code>pyspark.sql.functions</code> usually has the operation.</li><li><b>Too many tiny output files.</b> 200 shuffle partitions written by a daily job can make 200 files a day; <code>coalesce</code> before writing.</li><li><b>Trusting the mean task time.</b> The stage waits for the maximum; look at the slowest tasks first.</li></ul>
+<p>The numbers come from a simulation, not a cluster. Task time is taken as proportional to input rows, cores are interchangeable, and network bytes are counted from pandas column sizes, while Spark serializes and compresses its shuffle files, spills to disk when memory runs short, and uses Murmur3 rather than the hash here. The Zipf exponent of 1 is an assumption; a real event log's hottest key may hold far less or far more than 8% of the rows. The simulation shows which way each effect points and roughly how large it is, not what a given cluster will measure.</p>
+<p>What stays open is measuring these on real jobs: the task-size summary in the Spark UI says whether a slow stage is skewed, and the shuffle read and write bytes say whether a broadcast or a pre-aggregation would pay. How far AQE's automatic skew handling closes the gap to hand salting on a given workload is a question this post cannot answer without a cluster.</p>
+</div>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>
