@@ -5,7 +5,7 @@ group: Machine learning fundamentals
 order: 6
 tags: entropy · KL divergence · cross-entropy · information theory
 ---
-Train a classifier with cross-entropy loss, score a language model by perplexity, or grow a decision tree by information gain, and you are using three quantities from information theory: entropy, cross-entropy and KL divergence. All three come from one idea, how surprised you are when something happens, and one identity ties them together. This post builds them from that idea, checks each claim in code, then shows where they turn up in machine learning.
+Train a classifier with cross-entropy loss, score a language model by perplexity, or grow a decision tree by information gain, and you are using three quantities from information theory: entropy, cross-entropy and KL divergence. All three come from one idea, how surprised you are when something happens, and one identity ties them together. This post builds them from that idea, checks each claim in code, then shows where they turn up in machine learning. For example, three models over a 50-token vocabulary all rank the true token first 80% of the time. The one that puts 0.80 on its top guess has the lowest perplexity, 3.59, and the overconfident one, at 0.95, has the highest.
 
 ## Surprise
 Take one outcome \(x\) with probability \(p(x)\). Its surprise, or information content, is
@@ -372,6 +372,8 @@ closed_form = math.log(1 / 0.5) + 0.5 ** 2 / 2 - 0.5                      # log(
 assert math.isclose(gaussian_kl(0.5, 1), closed_form, rel_tol=1e-7)
 assert math.isclose(gaussian_kl(0.5, 1, unit=100), closed_form, rel_tol=1e-7)   # KL ignores units
 ```
+
+Most checks here use small distributions that I write down or draw at random, so the true probabilities are known. Real data does not give them: entropy and mutual information have to be estimated from samples, where plug-in numbers are biased, and I check the correction above on one case only, 20 draws from 10 equally likely values. The perplexity comparison uses made-up predictions with the leftover probability spread evenly, so it shows which way miscalibration moves perplexity, not by how much for a trained language model.
 
 ## Sources and further reading
 The derivation of entropy and KL divergence as expected surprise follows Stanford's CS109 (Probability for Computer Scientists) course notes, rewritten here with new examples and code. The forward-versus-reverse fit is the classic two-bump comparison from Bishop's Pattern Recognition and Machine Learning (2006).
