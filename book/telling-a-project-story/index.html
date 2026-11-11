@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telling a project story: constraint, decision, number, limit · r03922123</title>
+<meta name="description" content="How I prepare each project on my résumé to be told in thirty seconds or ten minutes: one sentence, five words to keep the order, a number that says where it came from, and the limits said before anyone asks.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<meta name="robots" content="noindex">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
+  <a class="home" href="/">r03922123</a>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
+</header>
+<div class="wrap">
+<main>
+<article class="post-body">
+<header class="post-head">
+  <p class="crumb"><a href="/book/#method">Method</a></p>
+  <h1>Telling a project story: constraint, decision, number, limit</h1>
+</header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 11, 2026</dd><dt>Reading time</dt><dd>5 min</dd><dt>Topic</dt><dd>Method</dd><dt>Tags</dt><dd>résumé · interviews · communication</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#one-sentence-first">One sentence first</a></li><li><a href="#five-words-to-keep-the-order">Five words to keep the order</a></li><li><a href="#the-order-of-the-telling">The order of the telling</a></li><li><a href="#every-number-says-where-it-came-from">Every number says where it came from</a></li><li><a href="#say-who-did-what">Say who did what</a></li><li><a href="#limits-said-first">Limits, said first</a></li><li><a href="#the-two-likeliest-follow-ups">The two likeliest follow-ups</a></li><li><a href="#practice">Practice</a></li><li><a href="#the-thread">The thread</a></li><li><a href="#what-this-does-not-settle">What this does not settle</a></li></ol></nav>
+</aside>
+<div class="prose">
+<p>A project story usually breaks on the second question, not the first. "I cut generation compute by about 42%" survives the opening; it breaks at "how did you measure that?" if the honest answer is "I didn't, it follows from the schedule" and the speaker has not decided to say so. Every story in this book was rebuilt around that moment, so each number carries its origin and each claim carries its limit.</p>
+<p>This page is the method the other pages follow. It is one person's habit, written down; I have no data on whether it changes outcomes.</p>
+<h2 id="one-sentence-first">One sentence first</h2>
+<p>Each project starts as one sentence with three parts: the constraint, what I did about it, and the result with its unit.</p>
+<ul><li>"With only 500 labeled CT volumes, I started from my own hemorrhage model and reached 0.88 AUC."</li><li>"At a recall floor set by policy, I raised precision by about 25 points, mostly with hard negatives."</li></ul>
+<p>If the sentence will not come, the story is not ready, and adding detail will not fix it. The constraint comes first because it explains every later decision: the label budget explains the model size, the recall floor explains the metric.</p>
+<h2 id="five-words-to-keep-the-order">Five words to keep the order</h2>
+<p>Under pressure the order goes before the facts do. So each story gets a chain of five words, one per step, each causing the next:</p>
+<table><thead><tr><th>Story</th><th>Chain</th></tr></thead><tbody><tr><td>Best-of-N pruning</td><td>eight candidates · most discarded · score early · drop half · 14 of 24</td></tr><tr><td>CT triage</td><td>500 labels · 2.5D · own pretraining · cross-slice context · 0.88</td></tr><tr><td>Smoking detector</td><td>human review · small objects · two imbalances · hard negatives · +25 points</td></tr></tbody></table>
+<p>The chain is for recall, not for saying aloud. If I can say why each word leads to the next, I can rebuild the story from it.</p>
+<h2 id="the-order-of-the-telling">The order of the telling</h2>
+<p>Every story here follows the same five beats, and each has a job:</p>
+<ol><li><b>Context.</b> Where, what system, who used the output. One or two sentences.</li><li><b>Constraint.</b> The thing I did not choose: a latency budget, a label budget, a recall floor. This is the beat people skip and the one that makes the decisions make sense.</li><li><b>Decision.</b> Two or three choices, each with its reason and its cost. "I used a detector because the objects were small" is a decision; "I used YOLOX" is a fact.</li><li><b>Result.</b> The number, with its unit, its operating point and how it was obtained.</li><li><b>Reflection.</b> What I would check or change today. This is where the known gaps go, said by me first.</li></ol>
+<p>I keep two lengths. The thirty-second version is context, the core decision and the number. The ninety-second version adds the constraint, all the decisions and the reflection. Anything longer is an answer to a question, not a monologue.</p>
+<h2 id="every-number-says-where-it-came-from">Every number says where it came from</h2>
+<p>Most broken stories are a number that sounds measured and was not. I sort every number into one of three kinds before I use it:</p>
+<table><thead><tr><th>Kind</th><th>Example from this book</th><th>How to say it</th></tr></thead><tbody><tr><td>Measured on a held-out set</td><td>0.88 AUC on the test split</td><td>"on the held-out test set"</td></tr><tr><td>Derived from the design</td><td>42% less compute: 14 candidate segments instead of 24</td><td>"follows from the schedule"</td></tr><tr><td>Measured on a reproduction</td><td>about 1 ms per caption segment, timed on my rebuild</td><td>"on my reproduction, not the client's system"</td></tr></tbody></table>
+<p>A number that fits none of these, such as an impression from a meeting, does not go on the résumé. I removed two that way: an efficiency gain nobody timed, and a speed-up larger than the schedule's own ceiling, which meant the baseline differed in some way I could not isolate.</p>
+<p>A quick check catches many inconsistencies. If precision went from 55% to 80% at a fixed recall, the false positives must fall by about two thirds; the arithmetic is on the <a href="../precision-at-a-recall-floor/">detector's page</a>. If the arithmetic disagrees with the claim, one of them is wrong.</p>
+<h2 id="say-who-did-what">Say who did what</h2>
+<p>"We" hides ownership, and the follow-up questions will find it. For each project I draw the system and mark each part as mine or someone else's: in the captions project, I designed the correction layer; the streaming integration, the caption display and deployment belonged to the platform team. Then I can say "I designed the algorithm; the platform team deployed it" and go as deep as the questions want on my part, and stop cleanly at the edge of theirs.</p>
+<h2 id="limits-said-first">Limits, said first</h2>
+<p>Each story has a short table of what I can say and what I should not:</p>
+<table><thead><tr><th>Can say</th><th>Should not say</th></tr></thead><tbody><tr><td>It stayed a research prototype</td><td>It was deployed clinically</td></tr><tr><td>No noticeable drop in a side-by-side comparison</td><td>No significant drop (no test was run)</td></tr><tr><td>The main gain came from hard negatives</td><td>How much each step contributed (no ablation)</td></tr></tbody></table>
+<p>Saying a limit before it is asked changes the conversation from catching a gap to discussing how to close it. So the reflection beat names the biggest gap and the experiment that would close it: for pruning, logging early and final scores on a few hundred unpruned runs and checking how often the eventual best is dropped.</p>
+<h2 id="the-two-likeliest-follow-ups">The two likeliest follow-ups</h2>
+<p>For each story I write down the two questions most likely to come next and answer them aloud. They are almost always "how do you know?" about the number and "why not the obvious alternative?" about the main decision. The honest answer often starts with "I didn't measure that", followed by how I would.</p>
+<h2 id="practice">Practice</h2>
+<p>Fifteen minutes a session:</p>
+<ol><li>Record the thirty-second version and time it; it should stay under forty seconds.</li><li>Pick three follow-up questions at random and answer each aloud.</li><li>Listen back for three things only: does each number say where it came from, did I state the limit unprompted, and did I say "we" where it was "I"?</li><li>Rewrite the sentence that stuck into words I would actually say.</li></ol>
+<h2 id="the-thread">The thread</h2>
+<p>Across projects I look for one sentence that ties them together, so the stories read as one career rather than a list. Mine is that I get models to work under a hard constraint I did not choose: a recall floor, a tiny label budget, a latency budget. Each project page names its constraint in its first paragraph for that reason.</p>
+<h2 id="what-this-does-not-settle">What this does not settle</h2>
+<p>This method makes a story checkable; it does not make the work better than it was. It also leans on memory: where I could not recall a detail, such as the size of a test set, the page says so instead of guessing. What I have not tested is whether listeners prefer the limits early or late, and whether a shorter chain of three words works as well as five.</p>
+</div>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>
