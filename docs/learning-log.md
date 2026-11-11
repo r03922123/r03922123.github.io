@@ -18,6 +18,25 @@ The three most important whys of each change, newest first. Each heading reads `
    "correction" on a public page is worse than a cautious sentence. Trade-off: some soft spots stay live. Risk: those
    doubts live only in the PR description, so nothing reminds anyone to come back to them.
 
+## 2026-11-11 · build: site-search
+
+A search box on the Posts and LeetCode lists, over all 92 entries, from a 65.5 KB index (21.7 KB gzipped).
+
+1. **Index the labels, not the books.** The index holds titles, summaries, tags, sections and headings, not full
+   text, which would cost 25 times as much. It is like a library catalogue: you find the book by its card, then open
+   it. Trade-off: a word that appears only in a post's body is not found. Risk: a post whose title and headings never
+   name its key term cannot be reached by that term; the 13 golden queries guard the cases we know about.
+2. **Keep the ranking pure and test it like a function.** `rank()` takes entries and a query and touches no page, so
+   `node --test` checks its rules (exact beats prefix, title beats summary, every word required, stable ties) and the
+   golden queries on the real index. It is like validating a model offline on a fixed test set before shipping it.
+   Trade-off: the box itself (focus, URL, failure message) is checked only in a browser. Risk: the golden queries
+   were picked by the designer, so passing them proves no regression, not good quality.
+3. **Add it so that losing it costs nothing.** The script inserts the box, fetches the index only when the box is
+   first used, and removes the box if the index fails, so without JavaScript or the index the lists work as before.
+   It is like a lab's optional add-on instrument: unplug it and the main bench still runs. Trade-off: no box at all
+   without JavaScript. Risk: query and index text reach the page by `textContent` only; one `innerHTML` added later
+   would let a crafted `?q=` link inject markup.
+
 ## 2026-11-11 · build: posts-index
 
 Topic cards, an article count and a topic filter on the Posts (9 cards, 61 articles) and LeetCode (6, 31) lists.

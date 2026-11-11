@@ -1,6 +1,7 @@
 # Tests for check.py: a clean site passes; each planted fault is reported.
 import ast
 import io
+import json
 import os
 import re
 import tempfile
@@ -305,6 +306,17 @@ class CheckTest(unittest.TestCase):
     def test_card_count_must_match_its_rows(self):
         self.assertEqual(self.topics_findings([("a", "3 posts")], [("a", 2)]),
                          ["leetcode/index.html: card #a says 3 posts, its section has 2 rows"])
+
+    def test_listed_post_missing_from_search_index(self):
+        # SPEC-site-search: once the index build exists, every post a listing links must be in the index.
+        files = {"posts/index.html": PAGE.format(body='<a href="a/">a</a><a href="b/">b</a>' + MUSICGEN),
+                 "posts/a/index.html": PAGE.format(body=""), "posts/b/index.html": PAGE.format(body=""),
+                 "tools/search/build.py": ""}
+        entries = [{"u": u} for u in ("/posts/a/", "/posts/b/", *MUSICGEN_PATHS)]
+        self.assertEqual(self.findings({**files, "search-index.json": json.dumps(entries)}), [])
+        self.assertEqual(self.findings({**files, "search-index.json": json.dumps(entries[1:])}),
+                         ["search-index.json: missing /posts/a/"])
+        self.assertEqual(self.findings(files), ["search-index.json: unreadable (FileNotFoundError)"])
 
     def feed_site(self, drop_url=None, item=ITEM, edit=None, **files):
         """A small site with every feed file and head tag in order: a topic post and a LeetCode post, each with a
