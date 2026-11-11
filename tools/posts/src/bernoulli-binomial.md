@@ -5,7 +5,7 @@ group: Probability
 order: 2
 tags: Bernoulli · binomial · distributions · probability
 ---
-An ad gets 40 clicks in 1,000 impressions: a click-through rate of 4%, with a rough 95% interval from 2.8% to 5.2%, wide enough that a 4.5% variant could easily be no better. That interval comes from the binomial. Much of the data an ML system sees is yes-or-no like this: did the user click, did the request fail, is the label positive. One such outcome is a **Bernoulli** random variable. Count how many came out "yes" across a fixed number of independent tries and you have a **binomial** random variable. A click-through rate, an accuracy on a test set and the binary cross-entropy loss are all statements about them.
+An ad gets 40 clicks in 1,000 impressions: a click-through rate of 4%, with a rough 95% interval from 2.8% to 5.2%, wide enough that a 4.5% variant could be no better. I get that interval from the binomial. Much of the data an ML system sees is yes-or-no like this: did the user click, did the request fail, is the label positive. One such outcome is a **Bernoulli** random variable. Count how many came out "yes" across a fixed number of independent tries and you have a **binomial** random variable. A click-through rate, an accuracy on a test set and the binary cross-entropy loss are all statements about them.
 
 This post defines both, derives their mean and variance without grinding through sums, checks every formula in code, then works through examples and the assumptions that fail most often in practice.
 
