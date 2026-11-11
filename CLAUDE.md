@@ -63,11 +63,9 @@ Preview:     python3 -m http.server 8000
   their code or derivation does, and name their limits; topic posts also end on what is open. The voice check's
   `--final` passed before PR 8 removed the check, its baseline and its gate. The sentences PRs #16 to
   #21 listed as overstating their code were fixed (or, once, confirmed), prose only, in `post-claims` (PRs #22
-  to #24). Edited sources
-  need `tools/posts/build.py . <slug>`, then the feeds and search builds.
-- Waiting for the owner's OK, since each is a code change: `transformers-and-llms-key-ideas`'s comment "the bug
-  ~0.15" (runs to 0.118), and the LeetCode `hash-table` note's unseeded chain-length assert (fails about 1.4% of
-  runs, 42 of 3,000).
+  to #24). PR #28 (owner's OK) seeded the `hash-table` note's random operations and corrected a comment in
+  `transformers-and-llms-key-ideas`. Edited sources need `tools/posts/build.py . <slug>`, then the feeds and
+  search builds.
 - `docs/ARCHITECTURE.md` (merged) maps the site; `README.md` points to it. Its Follow-ups list holds the known gaps.
 - Next: one cleanup PR for the review nits deferred from PRs #4 to #11; each is fixed or moved to Follow-ups.
 - Parked branches: none.
