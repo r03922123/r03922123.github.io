@@ -2,6 +2,22 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-voice PR 2, the 3-post pilot
+
+1. **Pilot on three kinds of post first.** `dropout` is a mechanism, `ab-testing` an experiment and `position-bias` a
+   long-form page, so the voice gets tried on each shape before 56 more posts copy it. A tailor makes a toile before
+   cutting the good cloth. Trade-off: the owner reads the pilot before PR 3, which holds up the rollout. Risk: if a
+   fourth kind of post (a cheat sheet) needs something different, the pilot can't show it; the spec gives those
+   only the opening and limits moves.
+2. **Lead with a number the post already proves.** Each new opening gives a result from the post's own table,
+   simulation or caption, such as training MSE 0.03 against test MSE 0.17 for `dropout`. The definition comes
+   second. Trade-off: the opening is denser. Risk: a number lifted from its table can lose its conditions, so each
+   one gets its limit nearby ("one sine-wave task averaged over four seeds").
+3. **Name the limits from what the code does.** Each closing paragraph lists what the post's code assumes (the
+   simulation knows the true propensities; users are independent and the effect stays constant). It doesn't list
+   generic caveats. Trade-off: the 10% growth cap leaves room for about one paragraph. Risk: a limit can
+   still be framed wrong, which only a reader catches, so the reviewer checks each one against the code.
+
 ## 2026-11-11 · build: post-voice PR 1, the voice check and its baseline
 
 1. **Freeze the evidence before touching the words.** `voice_check.py` records each post's code blocks, tables,
