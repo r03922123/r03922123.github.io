@@ -49,7 +49,8 @@ FEEDS = ("rss.xml", "sitemap.xml", "robots.txt", "llms.txt")
 FIXED_PAGES = ("/", "/about.html", "/posts/", "/leetcode/")
 SITEMAP_LOC = "{http://www.sitemaps.org/schemas/sitemap/0.9}loc"
 MD_LINK = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")    # the link syntax tools/leetcode/build.py renders
-MD_CODE = re.compile(r"^```.*?^```|`[^`\n]+`|\\\(.+?\\\)", re.S | re.M)   # fences, code spans, inline maths: no link
+# Fences, code spans and inline maths render as no link; maths stops at a blank line, as inline() sees one paragraph.
+MD_CODE = re.compile(r"^```.*?^```|`[^`\n]+`|\\\((?:(?!\n\n).)+?\\\)", re.S | re.M)
 FONTS = ("/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2", "/fonts/inter/inter-latin-wght-normal.woff2")
 EMAIL = re.compile(r"[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")   # not a pinned name@1.2.3
 # Hand-written LeetCode post counts on the home page and posts index; build.py only rewrites the series page.
@@ -349,7 +350,7 @@ def feed_findings(root, listed):
         links = [(item.findtext("link") or "").strip() for item in trees["rss.xml"].iter("item")]
         findings += site_links("rss.xml", posts, links, links)
     if (root / "llms.txt").is_file():                 # a post with a Markdown copy is linked by that copy
-        urls = re.findall(r"\]\((\S+?)\)", (root / "llms.txt").read_text(errors="replace"))
+        urls = re.findall(r"^- \[.*?\]\((\S+?)\)", (root / "llms.txt").read_text(errors="replace"), re.M)
         findings += site_links("llms.txt", posts, urls, [re.sub(r"index\.md$", "", url) for url in urls])
     for name in FEEDS:                                # RSS author is an email; this site's feeds carry none
         if (root / name).is_file():

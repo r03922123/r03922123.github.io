@@ -425,7 +425,7 @@ class CheckTest(unittest.TestCase):
                          ["leetcode/b/index.md: missing (source tools/leetcode/src/b.md)"])
 
     def test_broken_link_in_markdown_copy(self):
-        # The page drops a link to an unwritten post, but its index.md keeps it live; code is never a link.
+        # A link in the Markdown copy must resolve; code and maths are never a link.
         md = "# A\n\nsee [B](../b/), `f[i](x)`, \\( f[i](x) \\)\n\n```python\nops[op](x)\n```\n"
         self.assertEqual(self.feed_site(**{"posts/a/index.md": md}), ["posts/a/index.md: broken link ../b/"])
 
