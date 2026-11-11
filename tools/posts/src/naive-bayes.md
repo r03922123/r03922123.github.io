@@ -5,9 +5,9 @@ group: Statistics and experimentation
 order: 7
 tags: naive Bayes · generative models · text classification · classification
 ---
-Naive Bayes classifies by asking the question backwards. Instead of learning "given this email, how likely is it spam?" directly, it learns "what do spam emails look like, and what do normal ones look like?", then uses Bayes' rule to turn that around. One simplifying assumption makes the backwards question cheap to answer: once you know the class, each feature is treated as independent of the others. The assumption is almost always false, the model is fitted by counting, and it still makes a strong baseline for text.
+In a simulation with 30 binary features that really are independent given the class, naive Bayes beats logistic regression at 20 and 60 training examples, and the two meet at 3,000. Duplicate five of the features six extra times and logistic regression leads at every size, ending about nine points ahead. Naive Bayes classifies by asking the question backwards. Instead of learning "given this email, how likely is it spam?" directly, it learns "what do spam emails look like, and what do normal ones look like?", then uses Bayes' rule to turn that around. One simplifying assumption makes the backwards question cheap to answer: once you know the class, each feature is treated as independent of the others. The assumption is almost always false, the model is fitted by counting, and it still makes a strong baseline for text.
 
-Below, the text version is built from scratch and checked against scikit-learn, shown to be a linear classifier, extended to Bernoulli and Gaussian features, and then charged for its false assumption: overconfident probabilities, and data sizes where logistic regression wins.
+I build the text version from scratch and check it against scikit-learn, show it is a linear classifier, extend it to Bernoulli and Gaussian features, and then charge it for its false assumption: overconfident probabilities, and data sizes where logistic regression wins.
 
 ## Bayes' rule as a classifier
 For a class \(y\) and features \(x = (x_1, \dots, x_d)\), Bayes' rule says
@@ -205,6 +205,8 @@ one_u, five_u = GaussianNB().fit(xu, yu), GaussianNB().fit(np.repeat(xu, 5, axis
 assert (one_u.predict(xu) != five_u.predict(np.repeat(xu, 5, axis=1))).sum() > 0
 ```
 
+Five copies multiply the log-odds by exactly five and leave every balanced decision unchanged, while the log loss grows to more than 1.5 times its one-copy value. With classes of 800 and 200 examples, some decisions flip.
+
 Real text is full of milder versions: "New" and "York", a unigram and the bigram containing it, a word and its plural. Rank by naive Bayes scores if you like, but do not read them as calibrated probabilities; if you need probabilities, recalibrate on held-out data (Platt scaling or isotonic regression).
 
 ## Naive Bayes vs logistic regression
@@ -261,6 +263,6 @@ Watch out for:
 5. **Small classes in text.** Their word estimates are noisy. Complement naive Bayes (Rennie et al., ICML 2003) estimates each class's weights from all the other classes' documents to help here; scikit-learn has it as `ComplementNB`.
 6. **A shifted base rate.** If the production class mix differs from training, change \(b\) rather than retraining.
 
-For the bigger picture of when a simple model with a strong assumption beats a flexible one, see [the bias-variance tradeoff](../bias-variance-tradeoff/), and for the discriminative side of the story, [regression as maximum likelihood](../regression-as-maximum-likelihood/).
+The spam examples come from a toy corpus of a few short emails and the accuracy race from synthetic binary features, so they show each mechanism, not how naive Bayes will fare on real text. How far real word correlations distort its probabilities, and where its lead over logistic regression ends on a given dataset, are questions for held-out data. For the bigger picture of when a simple model with a strong assumption beats a flexible one, see [the bias-variance tradeoff](../bias-variance-tradeoff/), and for the discriminative side of the story, [regression as maximum likelihood](../regression-as-maximum-likelihood/).
 
 The derivations follow the treatment of generative learning algorithms in Andrew Ng's Stanford CS229 lecture notes, and the variants follow the scikit-learn naive Bayes documentation; both are rewritten here with new examples and code.
