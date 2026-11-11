@@ -7,7 +7,7 @@ tags: system design · forecasting · geospatial · privacy
 ---
 The idea is simple to state: open a map, see which parts of the city are packed right now and which will be in an hour, and go somewhere quieter. Taipei is the starting city, with the hope that the same design carries over to Tokyo or New York.
 
-This post is a feasibility study, not a launch report. Nothing here has been built. The point is to walk the idea through the questions in [A framework for designing ML systems](../ml-system-design-framework/) and find out where it is easy, where it is hard, and where it might quietly not work at all. The constraints are deliberate: one developer, one laptop (an Apple-silicon MacBook Air), public data only, and a model cheap enough to retrain on that laptop.
+This post is a feasibility study, not a launch report. Nothing here has been built. I walk the idea through the questions in [A framework for designing ML systems](../ml-system-design-framework/) to find where it is easy, where it is hard, and where it might quietly not work at all. In a simulation of 30 cells over ten weeks, I find the event calendar matters more than the model: it cuts forecast error on event evenings from about two thirds to about a quarter, while boosting on the clock alone ties a per-cell weekday and hour profile. The constraints are deliberate: one developer, one laptop (an Apple-silicon MacBook Air), public data only, and a model cheap enough to retrain on that laptop.
 
 ## What the product has to answer
 A user asks one of two questions: "is this place busy right now?" and "when should I go?". Both reduce to a number per place per hour, so the ML objective is a **forecast of a crowd index for each map cell, for each of the next few hours**.
@@ -251,4 +251,4 @@ Each piece has a cheap fallback. If a feed is down, features are filled from the
 - **Terms of use.** Read every data source's licence and attribution requirement before building on it.
 
 ## Verdict
-Feasible, with one big if. The data plumbing, the forecasting and the serving all fit comfortably on a laptop, and a profile baseline is already useful for "when should I go?". The open question is whether transit and bike proxies track the crowds people actually feel. That is cheap to check before writing any model code, and it is the first thing to do.
+Feasible, with one big if. The data plumbing, the forecasting and the serving all fit comfortably on a laptop, and a profile baseline is already useful for "when should I go?". The forecasting results come from a simulation in which 40 events are announced in advance and triple a cell's crowd, so they show that an event flag can work, not how much a real calendar will catch. The open question is whether transit and bike proxies track the crowds people actually feel. That is cheap to check before writing any model code, and it is the first thing to do.
