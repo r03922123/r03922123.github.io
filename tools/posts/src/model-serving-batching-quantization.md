@@ -105,14 +105,15 @@ from sklearn.datasets import make_classification
 torch.manual_seed(0)
 X, y = make_classification(n_samples=4000, n_features=20, n_informative=12, n_classes=4,
                            n_clusters_per_class=1, random_state=0)
-X, y = torch.tensor(X, dtype=torch.float32), torch.tensor(y)
+X, y = torch.tensor(X, dtype=torch.float64), torch.tensor(y)   # train in float64 so CPU BLAS differences
 Xtr, ytr, Xte, yte = X[:3000], y[:3000], X[3000:], y[3000:]
-model = torch.nn.Sequential(torch.nn.Linear(20, 64), torch.nn.ReLU(), torch.nn.Linear(64, 4))
+model = torch.nn.Sequential(torch.nn.Linear(20, 64), torch.nn.ReLU(), torch.nn.Linear(64, 4)).double()
 opt = torch.optim.Adam(model.parameters(), lr=1e-2)
 for _ in range(300):
     opt.zero_grad()
     torch.nn.functional.cross_entropy(model(Xtr), ytr).backward()
     opt.step()
+model, Xte = model.float(), Xte.float()   # ...cannot steer 300 steps; serve in float32
 
 
 def quantize(w, per_channel):
@@ -151,8 +152,10 @@ for key, (acc, err) in res.items():
     print(key, f"accuracy {acc:.3f}, output error {err:.3f}")
 
 assert all(abs(res["plain", pc][0] - acc32) < 0.005 for pc in (False, True))   # no outlier: int8 is free
-assert 0.012 < res["plain", False][1] < 0.014 and res["plain", True][1] < 0.01
-assert 0.70 < res["outlier", False][0] < 0.75 and res["outlier", False][1] > 0.7
+# Ranges, not exact values: rounding to int8 is a step function, so the last bits of trained weights (which
+# differ between CPU math libraries) flip a few weights to the next level. Bounds hold on macOS arm and Linux x86.
+assert 0.010 < res["plain", False][1] < 0.012 and res["plain", True][1] < 0.008
+assert 0.70 < res["outlier", False][0] < 0.72 and res["outlier", False][1] > 0.7
 assert acc32 - res["outlier", True][0] < 0.01 and 0.075 < res["outlier", True][1] < 0.095
 coarser = (outlier[0].weight.abs().max() / model[0].weight.abs().max()).item()
 assert 65 < coarser < 72                     # per-tensor scale grows ~70x, not 100x: row 0 was not the widest
@@ -160,10 +163,10 @@ assert 65 < coarser < 72                     # per-tensor scale grows ~70x, not 
 
 | Weights | float32 accuracy | int8 per-tensor: accuracy, output error | int8 per-channel: accuracy, output error |
 |---|---|---|---|
-| As trained | about 97% | about 97%, about 1.3% | about 97%, under 1% |
-| One channel scaled up 100× | about 97% (same function) | about 72%, over 70% | about 97% (under 1 point lower), about 8% |
+| As trained | about 97% | about 97%, about 1.1% | about 97%, under 1% |
+| One channel scaled up 100× | about 97% (same function) | about 71%, over 70% | about 97% (under 1 point lower), about 8% |
 
-Without the outlier, int8 costs nothing measurable on this task: about 1.3% output error per-tensor and under 1% per-channel, with accuracy unchanged. With the outlier, per-tensor quantization drops accuracy from about 97% to about 72%, because the other 63 rows share a scale about 70 times coarser than before (row 0 was not already the widest, so not the full 100) and most of their weights round to a handful of levels. Per-channel brings accuracy back within a point. Its output error is still about 8%, not 1%: the second layer's column for that unit was divided by 100, and per-output-channel scales cannot help a small *input* column. Equalizing the ranges across the two layers (Nagel et al.'s cross-layer equalization) or scaling by activation statistics (AWQ, in [LLM inference](../llm-inference/)) targets exactly that.
+Without the outlier, int8 costs nothing measurable on this task: about 1.1% output error per-tensor and under 1% per-channel, with accuracy unchanged. With the outlier, per-tensor quantization drops accuracy from about 97% to about 71%, because the other 63 rows share a scale about 70 times coarser than before (row 0 was not already the widest, so not the full 100) and most of their weights round to a handful of levels. Per-channel brings accuracy back within a point. Its output error is still about 8%, not 1%: the second layer's column for that unit was divided by 100, and per-output-channel scales cannot help a small *input* column. Equalizing the ranges across the two layers (Nagel et al.'s cross-layer equalization) or scaling by activation statistics (AWQ, in [LLM inference](../llm-inference/)) targets exactly that.
 
 PyTorch's own quantized tensors agree with the hand-written version, and an int8 element is a quarter of the size of a float32 one:
 
@@ -327,7 +330,7 @@ Eight concurrent requests take at least 160 ms when each does 20 ms of CPU work 
 |---|---|---|---|---|
 | p99 grows with traffic | Add GPUs for each rise in load | One-at-a-time serving wastes the fixed cost on every request; past 182 requests a second here the queue never drains | Dynamic batching, then more instances | p50 and p99 against offered load, from a load generator such as Triton's Performance Analyzer |
 | Batcher adds latency at low load | Set a large `max_queue_delay` "for throughput" | +4 ms median at 50 requests a second, nothing gained on one instance | Start with delay 0; add delay only if measured | The delay table above, on real traffic |
-| int8 model loses accuracy | Quantize per tensor, blame int8 | One wide channel coarsens all others: about 97% to 72% here | Per-channel weight scales; calibrate activations on real inputs | Task metric on held-out data, not only output error |
+| int8 model loses accuracy | Quantize per tensor, blame int8 | One wide channel coarsens all others: about 97% to 71% here | Per-channel weight scales; calibrate activations on real inputs | Task metric on held-out data, not only output error |
 | Export gives wrong answers on some inputs | Trust the trace because it ran | Tracing froze one branch | `torch.export`, rewrite branches with `torch.where` or `torch.cond` | Compare exported vs eager outputs on varied inputs |
 | Export rejects larger batches | Export at the batch size used in testing | Shapes were captured as constants | Declare the batch dimension dynamic; a TensorRT profile range | Run the artifact at the smallest and largest batch |
 | Server slow and unresponsive | Load the model in the handler, or run inference in `async def` | Every request pays the load; one forward pass blocks the loop | Lifespan loading; `def` endpoints, worker processes or a model server | Health-check latency under load |
