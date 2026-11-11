@@ -1,13 +1,13 @@
 ---
 title: ML building blocks from scratch, checked against the library
-summary: Softmax, an MLP with hand-written backprop, LayerNorm, BatchNorm, dropout, multi-head attention, a Transformer block, a KV cache, tiled attention, LSTM and GRU cells, convolution, LoRA, beam search, and the classical models, each written in a few lines of NumPy or PyTorch and asserted equal to the library version.
+summary: Softmax, an MLP with hand-written backprop, LayerNorm, BatchNorm, dropout, multi-head attention, a Transformer block, a KV cache, tiled attention, LSTM and GRU cells, convolution, LoRA, beam search, and the classical models, each written in a few lines of NumPy or PyTorch, most asserted equal to the library version.
 group: Coding and data
 order: 2
 tags: PyTorch · NumPy · from scratch · testing
 ---
 Written naively, softmax returns NaN on a logit of 1000, and a softmax over the wrong axis returns a tensor of the right shape that is quietly wrong. Most of deep learning is built from about a dozen small pieces: a linear map, a nonlinearity, a softmax, a normalization, attention, a recurrence, a convolution. Each one is a few lines of tensor code, and writing them yourself is the fastest way to learn what the shapes are, which axis everything reduces over, and where the numerical traps are. I write each piece in float64 and check it against a reference.
 
-Writing them is half the exercise; proving them right is the other half. Every piece below is asserted equal to the PyTorch, scikit-learn or brute-force version, usually to nine decimal places, with the library's weights copied across where needed, which is also the best way to learn its weight layout.
+Writing them is half the exercise; proving them right is the other half. Most pieces below are asserted equal to the PyTorch, scikit-learn or brute-force version, usually to nine decimal places, with the library's weights copied across where needed, which is also the best way to learn its weight layout. Dropout is random, so it is checked by the same statistics as PyTorch's, and LoRA against its frozen base layer.
 
 ## The harness
 Everything runs in float64, so a wrong implementation cannot hide inside a loose tolerance.
