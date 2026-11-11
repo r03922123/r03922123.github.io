@@ -1,6 +1,6 @@
 ---
 title: Sequential user modeling: from averaged history to target attention
-summary: Why averaging a user's history blurs several interests into one, how target attention (DIN) weights each past behaviour by its relevance to the item being scored, and how SIM, ETA and TWIN stretch the idea to lifelong histories of tens of thousands of events. Each step measured on synthetic data.
+summary: Why averaging a user's history blurs several interests into one, how target attention (DIN) weights each past behaviour by its relevance to the item being scored, and how SIM, ETA and TWIN stretch the idea to lifelong histories of tens of thousands of events. DIN and the lifelong search measured on synthetic data.
 group: Recommender systems
 order: 4
 tags: recommendation · ranking · attention · user modeling
