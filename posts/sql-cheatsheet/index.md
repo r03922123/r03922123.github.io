@@ -2,7 +2,7 @@
 
 On a seven-row `employees` table with one missing salary, `AVG` returns 90, not 540 / 7, and a `NOT IN` against a column holding a NULL returns no rows at all. SQL looks like English, which is exactly why it misleads: you write `SELECT` first, but the database runs it almost last. Most SQL bugs come from a handful of places where the written order, NULLs or a default setting do something you did not expect. This page collects them, together with the window functions and query shapes that come up again and again in analytics work.
 
-Nothing here is taken on trust. Each query is shown as plain SQL, then run against an in-memory SQLite database from Python, with asserts on the result. The queries are written in the large subset that PostgreSQL and SQLite share. Where the two differ, the PostgreSQL form is given in a block whose first line says **PostgreSQL only**, and the phrasebook near the end lines up the date, string and cast functions side by side. Those PostgreSQL blocks and the phrasebook's PostgreSQL column are not run here, so no assert backs them.
+Each query is shown as plain SQL, then run against an in-memory SQLite database from Python, with asserts on the result. The queries are written in the large subset that PostgreSQL and SQLite share. Where the two differ, the PostgreSQL form is given in a block whose first line says **PostgreSQL only**, and the phrasebook near the end lines up the date, string and cast functions side by side. Those PostgreSQL blocks and the phrasebook's PostgreSQL column are not run here, so no assert backs them.
 
 ## The tables
 Three small tables carry most of the examples. `employees` has a self-reference (`manager_id`) and one missing salary:

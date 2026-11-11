@@ -224,7 +224,7 @@ assert min(losses) - result["retrieval score only"] > 0.15
 | RankNet | 0.665 |
 | LambdaRank | 0.665 |
 
-Two results. The ranker lifts NDCG@10 from 0.44 to 0.67, and most of that comes from the cross feature: without it the same candidates reach only 0.49. And the three losses tie. With a few well-behaved features and a model that can represent the truth, every reasonable loss finds about the same order. The NDCG weighting earns its keep when the model cannot fit everything and must choose where to be wrong; LambdaRank chooses to be wrong at the bottom of the list. LambdaMART remains a strong baseline on learning-to-rank benchmarks, but the priorities stay the same: candidates and features first, loss second.
+Two results. The ranker lifts NDCG@10 from 0.44 to 0.67, and most of that comes from the cross feature: without it the same candidates reach only 0.49. And the three losses tie. With a few well-behaved features and a linear ranker, every reasonable loss finds about the same order here. The NDCG weighting earns its keep when the model cannot fit everything and must choose where to be wrong; LambdaRank chooses to be wrong at the bottom of the list. LambdaMART remains a strong baseline on learning-to-rank benchmarks, but the priorities stay the same: candidates and features first, loss second.
 
 ## Scores versus probabilities
 Pairwise and lambda losses depend only on score differences. Adding a constant to every score in a list leaves them unchanged, so the scores have no absolute meaning. A pointwise model trained with squared error or log loss and an intercept matches the average label instead.
