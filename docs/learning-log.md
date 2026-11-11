@@ -2,6 +2,20 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · docs: architecture map, README trimmed
+
+1. **Write the map from the code, not from the specs.** Specs say what a module should do on the day it was
+   approved; the code says what the site does now. Each row of `docs/ARCHITECTURE.md` was checked against the file
+   it names, as a surveyor walks the ground instead of copying the old plan. Trade-off: the map has to be kept up
+   by hand. Risk: it drifts like the README did, so it says the code wins and lists only where things are, not how
+   they work, which drifts slower.
+2. **One home for each fact.** The README had grown its own copy of the layout and the steps for adding a post, and
+   both went stale with version 2. It now holds three links and the two commands, and the map holds the layout.
+   Trade-off: a reader clicks once more. Risk: none beyond that click.
+3. **A follow-ups list makes gaps visible.** A known gap written down where the next reader looks gets weighed;
+   one kept in a review comment is forgotten. Trade-off: the list must be pruned as items close. Risk: it turns
+   into a wish list, so each item says why it waits.
+
 ## 2026-11-11 · build: post-claims, posts say what their code checks (PRs #22 to #24)
 
 1. **Fact-check apart from the copy-edit.** `post-voice` left about 45 sentences that claim more than their code

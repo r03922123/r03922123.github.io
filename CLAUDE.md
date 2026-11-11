@@ -21,6 +21,7 @@ Preview:     python3 -m http.server 8000
 
 ## Where things are decided
 
+- `docs/ARCHITECTURE.md`: where each page, build and gate lives, and how a change reaches the live site.
 - `CONSTRAINTS.md`: the workflow rules and the gates. Do not loosen it to make a change pass.
 - `CAPABILITY-MAP.md`: the index of modules and their build order; each module has a `SPEC-<id>.md`.
 - `docs/adr/`: decisions and what they give up.
@@ -42,7 +43,6 @@ Preview:     python3 -m http.server 8000
 - Detection misses two term shapes the list does not hold today: a phone number written in `+886` form (write it
   in national form) and a CJK term inside CJK text, which the scrubber does not hide either. Fix `term_rx` and
   `scrubber` in `check.py` before adding either.
-- `README.md` still describes version 1 (the desk scene); `docs/ARCHITECTURE.md` will replace its layout section.
 
 ## Current state (2026-11-11)
 
@@ -68,5 +68,6 @@ Preview:     python3 -m http.server 8000
 - Waiting for the owner's OK, since each is a code change: `transformers-and-llms-key-ideas`'s comment "the bug
   ~0.15" (runs to 0.118), and the LeetCode `hash-table` note's unseeded chain-length assert (fails about 1.4% of
   runs, 42 of 3,000).
-- Next: every module in `CAPABILITY-MAP.md` is merged, so `docs/ARCHITECTURE.md` comes next.
+- `docs/ARCHITECTURE.md` (merged) maps the site; `README.md` points to it. Its Follow-ups list holds the known gaps.
+- Next: one cleanup PR for the review nits deferred from PRs #4 to #11; each is fixed or moved to Follow-ups.
 - Parked branches: none.
