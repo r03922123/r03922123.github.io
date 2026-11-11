@@ -208,7 +208,7 @@ tv_bad, _ = continuation_tv("target")                              # wrong fix-u
 assert tv &lt; 0.06 &lt; 0.1 &lt; tv_bad                                    # noise ~0.03; the bug ~0.15
 assert per_run &lt; 2                                                 # 3 tokens in under 2 passes
 print(f"TV {tv:.3f} (broken fix-up: {tv_bad:.3f}); 3 tokens in {per_run:.2f} target passes")</code></pre>
-<p>With the leftover fix-up the distance stays under 0.06, about twice the sampling noise; the broken variant lands above 0.1, and three tokens cost fewer than two target passes.</p>
+<p>With the leftover fix-up the distance stays under 0.06, a bound set at twice the sampling noise; the broken variant lands above 0.1, and three tokens cost fewer than two target passes.</p>
 <h2 id="attention-without-the-n-by-n-matrix">Attention without the N-by-N matrix</h2>
 <p>In training and prefill, standard attention writes each head's \(N \times N\) score matrix to GPU memory and reads it back, more than once. FlashAttention (Dao et al., 2022) computes the same output without storing it. It streams blocks of keys and values through fast on-chip memory and keeps, per query, a running maximum, softmax denominator and weighted sum of values, rescaling the old sums by \(e^{m_{\text{old}} - m_{\text{new}}}\) when the maximum grows. That online softmax predates it (Milakov and Gimelshein, 2018); FlashAttention's contribution was organizing the computation around memory traffic, and FlashAttention-2 (Dao, 2023) split the work better across the GPU. The result is exact, with extra memory linear in \(N\). Details in <a href="../flashattention/">FlashAttention</a>.</p>
 <pre><code class="language-python">def blockwise_attention(q, k, v, block=16):
