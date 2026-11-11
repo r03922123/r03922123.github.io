@@ -2,7 +2,7 @@
 
 A simulated coin is flipped 10 times and comes up tails 8 times. Is it broken? I get an exact p-value of about 0.109, too large to reject fairness, yet the 95% interval for the chance of heads runs from about 0.03 to 0.56, so the data cannot call the coin fair either. The question is small, but answering it properly uses most of the machinery behind every A/B test and every "is this metric really different" check: a null hypothesis, a p-value, the difference between "not significant" and "fine", and the number of samples it takes before a test can tell you anything.
 
-This post works the example by hand, checks each number by brute force and against SciPy, then scales it up to large samples and looks at it from the Bayesian side.
+This post works the example by hand, checks the first p-value by brute force and the later numbers in code, many against SciPy, then scales it up to large samples and looks at it from the Bayesian side.
 
 ## The question, made precise
 Let \(p\) be the probability of heads. "Fair" is the **null hypothesis** \(H_0: p = 1/2\). There is no reason to expect bias in one direction, so the alternative is two-sided, \(H_1: p \ne 1/2\). The data are summarized by the number of heads \(X\), which under \(H_0\) follows \(\text{Binomial}(10, 1/2)\) (see [Bernoulli and binomial](../bernoulli-binomial/)). Here \(X = 2\).

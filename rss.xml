@@ -122,7 +122,7 @@
     <title>The normal distribution: the bell curve, checked</title>
     <link>https://r03922123.github.io/posts/normal-distribution/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/normal-distribution/</guid>
-    <description>Where the bell curve's formula comes from, why one table of the standard normal answers every normal question, which sums stay normal and which do not, how fast the central limit theorem kicks in, when the normal approximation to the binomial works, and the tail and skew pitfalls that bite in practice. Every claim checked in code.</description>
+    <description>Where the bell curve's formula comes from, why one table of the standard normal answers every normal question, which sums stay normal and which do not, how fast the central limit theorem kicks in, when the normal approximation to the binomial works, and the tail and skew pitfalls that bite in practice. Most claims checked in code.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
@@ -150,7 +150,7 @@
     <title>Probability on one page: the rules, the distributions and the traps</title>
     <link>https://r03922123.github.io/posts/probability-cheatsheet/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/probability-cheatsheet/</guid>
-    <description>A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Every formula is checked in code.</description>
+    <description>A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Most formulas are checked in code.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
@@ -262,7 +262,7 @@
     <title>RLHF and alignment: reward models, PPO and DPO</title>
     <link>https://r03922123.github.io/posts/rlhf-alignment/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/rlhf-alignment/</guid>
-    <description>How a language model is tuned towards answers people prefer: a reward model fit to pairwise comparisons, the KL-regularized objective and its closed-form optimum, PPO as the way classic RLHF optimizes it, DPO as the way to skip the reward model, and a toy world where over-optimizing a good-looking reward model makes answers worse. Every claim is checked with asserts.</description>
+    <description>How a language model is tuned towards answers people prefer: a reward model fit to pairwise comparisons, the KL-regularized objective and its closed-form optimum, PPO as the way classic RLHF optimizes it, DPO as the way to skip the reward model, and a toy world where over-optimizing a good-looking reward model makes answers worse. Each of these is checked with asserts on that toy world.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
