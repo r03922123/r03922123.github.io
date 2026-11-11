@@ -67,5 +67,7 @@ Preview:     python3 -m http.server 8000
   `transformers-and-llms-key-ideas`. Edited sources need `tools/posts/build.py . <slug>`, then the feeds and
   search builds.
 - `docs/ARCHITECTURE.md` (merged) maps the site; `README.md` points to it. Its Follow-ups list holds the known gaps.
-- Next: one cleanup PR for the review nits deferred from PRs #4 to #11; each is fixed or moved to Follow-ups.
+- Review nits deferred from PRs #4 to #11 (merged, one cleanup PR): all fixed. `check.py` now also requires every
+  listed post in `rss.xml` and `llms.txt` on this host, and reports an `index.md` whose source is gone.
+- Next: nothing queued. Pick from the Follow-ups list in `docs/ARCHITECTURE.md`.
 - Parked branches: none.

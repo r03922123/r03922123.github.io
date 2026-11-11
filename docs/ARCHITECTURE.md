@@ -130,8 +130,9 @@ Common changes:
   `.lofi-latest` match the first three posts of the posts list (`check.py` checks).
 - **Another project repo's posts:** a code change, since `MUSICGEN` serves only the MusicGen repo. Its name goes in
   `EXTERNAL` in `scripts/check.py`, and its posts need a section of their own in `tools/posts/build.py`, a heading in
-  `tools/feeds/build.py` and a label in `tools/search/build.py`, as MusicGen has. Never create a top-level folder with
-  a project repo's name: it would hide that project's site.
+  `tools/feeds/build.py` and a label in `tools/search/build.py`, as MusicGen has, and its URLs a tuple like
+  `MUSICGEN` in `scripts/check.py`, which is how the sitemap and search checks see them. Never create a top-level
+  folder with a project repo's name: it would hide that project's site.
 
 ## Follow-ups
 
