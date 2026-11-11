@@ -2,6 +2,24 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-voice PR 1, the voice check and its baseline
+
+1. **Freeze the evidence before touching the words.** `voice_check.py` records each post's code blocks, tables,
+   inline code, maths, headings, links and prose numbers in `voice-baseline.json`, taken from `main` before any
+   edit. Like photographing a crime scene before anyone walks in: later PRs can reword freely, and the check shows
+   nothing else moved. Trade-off: a 78 KB generated file lives in the repo until PR 8 deletes it. Risk: if someone
+   regenerates the baseline after an edit, the check would bless that edit, so it refuses to overwrite itself.
+2. **Compare numbers as sets, not text.** A rewrite may move "17,000 weights" into another sentence or say "4 seeds"
+   because the code says `seeds = 4`. So a prose number passes if the post already had it in its prose, code,
+   tables or maths, and fails if it is new or gone. Trade-off: repeating a number, or dropping one of two
+   mentions, is not caught. Risk: the check can't tell whether a number still means the same thing, which is why
+   a fresh reviewer reads every new sentence.
+3. **Parse the way the build does.** The check splits a source with the same line rules as
+   `tools/leetcode/build.py` (fences, `|` tables, `\[` blocks, `##` headings), so it sees the post the reader sees.
+   On the 4 long-form pages it leaves out the header, nav and aside, as `reading-shell` owns those. Trade-off: if
+   the Markdown engine gains a new block type, the check must learn it too. Risk: a block it doesn't know counts as
+   prose, so only the numbers in it stay guarded.
+
 ## 2026-11-11 · build: expert accuracy pass over all 90 posts
 
 1. **Fix facts apart from style.** This pass changed only claims that a specialist in each field would mark wrong or
