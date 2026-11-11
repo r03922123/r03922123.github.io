@@ -54,11 +54,13 @@ Shared by every page:
 
 ## The builds (`tools/`)
 
-Run from the repo root, in this order, because each later one reads what the earlier ones wrote or define:
+Run from the repo root. The feeds and search builds read both post lists, so they run last. The posts build counts
+the `leetcode/*/` folders for its "has N short posts" line, so after adding a LeetCode post, run the LeetCode build
+first. `gates.sh` runs posts first, which works because `leetcode/` is committed.
 
 ```
-python3 -I tools/posts/build.py .     [slug ...]   # no slugs = every source
-python3 -I tools/leetcode/build.py .  [slug ...]
+python3 -I tools/leetcode/build.py .  [slug ...]   # no slugs = every source
+python3 -I tools/posts/build.py .     [slug ...]
 python3 -I tools/feeds/build.py .
 python3 -I tools/search/build.py .
 ```
@@ -67,14 +69,17 @@ python3 -I tools/search/build.py .
   Markdown renderer (`render`, `inline`), the head tags (canonical link, feed link, JSON-LD), the list layout
   (`topic_list`, `row`), and `run_code`. The renderer handles only what the sources use: `##`/`###` headings,
   paragraphs, `-` and `1.` lists, fenced code, tables, `**bold**`, `[text](url)`, `` `code` ``, and `\( \)`/`\[ \]` maths.
-- **`run_code` runs every post's Python.** All `python` blocks of one post run as one script, one thread per numeric
-  library, with a 120 s timeout; a failing assert stops the build. So every number a post prints is checked each build.
+- **`run_code` runs every post's Python.** All `python` blocks of one post run as one script, with each numeric
+  library held to one thread and a 120 s timeout. An error or a failing assert stops the build, so every asserted
+  claim is re-checked on each build. A printed number with no assert is not checked.
 - **`tools/posts/build.py` reuses that engine.** It loads its own copy of the LeetCode build and points it at the posts
   sources, and adds `GROUPS`, `LONGFORM` and `MUSICGEN`.
-- **`tools/feeds/build.py` and `tools/search/build.py`** load the two builds as modules and read their lists, so a new
-  post appears in the feeds and the search index with no change to either.
-- A source file is front matter (`title`, `summary`, `group`, `order`, `tags`) between `---` lines, then the body.
-  `group` must be one of its build's `GROUPS`; `order` sorts within the group.
+- **`tools/feeds/build.py` and `tools/search/build.py`** read the builds' lists: the feeds build loads each build on
+  its own, the search build loads the posts build and reaches the LeetCode one through it. A new post appears in the
+  feeds and the search index with no change to either.
+- A source file is front matter (`title`, `summary`, `group`, `tags`, optional `order`) between `---` lines, then the
+  body. A `group` that is not in its build's `GROUPS` still gets a page but no list row, so `check.py` reports the post
+  as not listed; `order` sorts within the group.
 
 `tools/dev/` holds helpers that the site does not use: `same_articles.py` (compares article text with a git ref, run
 after any layout change), `shoot.sh` and `shoot3d.sh` (headless Chrome screenshots), `frame.html` (a phone frame for
@@ -88,8 +93,8 @@ work) and `workflows/` (the agent workflows that wrote the room and the topic po
 | Step | What it runs | Fails when |
 |---|---|---|
 | privacy | `scripts/check.py --denylist-only` | a private term from `scripts/denylist.local.txt` is in any served file's text or name |
-| site | `scripts/check.py` | a broken link or `#fragment`, an incomplete page head, an unpinned CDN, a post missing from its list, a card count that differs from its rows, a feed or search entry missing, the home over 150 KB, a hand-written count out of date |
-| check tests | `python3 -m unittest test_check` | the checker itself regressed |
+| site | `scripts/check.py` | a broken link or `#fragment`, an incomplete page head, an unpinned CDN, a post missing from its list, a card count that differs from its rows, a feed or search entry missing, `index.html` plus `style.css` over 150 KB (`room.js` and three.js are not counted), a hand-written count out of date |
+| check tests | `python3 -m unittest test_check` | the checker regressed, or the theme's tokens lost contrast or the room's pinned colours changed |
 | search tests | `node --test scripts/test_search.mjs` | ranking cases or golden queries fail |
 | post wording | `grep` over `tools/posts/src` | interview, vault, Obsidian or MusicGen wording, except one allowed credit |
 | post, leetcode, feeds, search builds | the four builds above | a post's code fails |
@@ -121,9 +126,12 @@ Common changes:
   search index follow. A new LeetCode post also changes the hand-written counts on the home page; the `site` check
   names each one that is out of date.
 - **New long-form post:** write `posts/<slug>/index.html` in the reading shell (copy one), add it to the top of
-  `LONGFORM`, and make the home's `.lofi-latest` match the first three posts of the posts list (`check.py` checks).
-- **Another project repo's posts:** add its name to `EXTERNAL` in `scripts/check.py` and its posts to the build's
-  lists. Never create a top-level folder with a project repo's name: it would hide that project's site.
+  `LONGFORM`, run the posts, feeds and search builds (the search build reads the page's headings), and make the home's
+  `.lofi-latest` match the first three posts of the posts list (`check.py` checks).
+- **Another project repo's posts:** a code change, since `MUSICGEN` serves only the MusicGen repo. Its name goes in
+  `EXTERNAL` in `scripts/check.py`, and its posts need a section of their own in `tools/posts/build.py`, a heading in
+  `tools/feeds/build.py` and a label in `tools/search/build.py`, as MusicGen has. Never create a top-level folder with
+  a project repo's name: it would hide that project's site.
 
 ## Follow-ups
 
