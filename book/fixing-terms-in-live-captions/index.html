@@ -42,7 +42,7 @@
 <p>"I designed a correction layer after speech recognition that fixed a client's mis-transcribed product names inside a 50 ms streaming budget, and the platform team deployed it."</p>
 <h2 id="who-did-what">Who did what</h2>
 <table><thead><tr><th>Part</th><th>Owner</th></tr></thead><tbody><tr><td>The correction algorithm</td><td>me</td></tr><tr><td>The streaming recognizer and its integration</td><td>the platform team</td></tr><tr><td>The caption display and deployment</td><td>the platform team</td></tr><tr><td>The table of known errors and correct terms</td><td>the client, who kept it up to date</td></tr></tbody></table>
-<p>The correction runs on finalized segments, after the recognizer stops revising them. I can explain how the recognizer's streaming events feed my layer; I did not build that part.</p>
+<p>I can explain how the recognizer's streaming events feed my layer; I did not build that part.</p>
 <h2 id="three-steps">Three steps</h2>
 <p><b>Split into morphemes.</b> Japanese text has no spaces, so there are no words to compare against. A dictionary-based morphological analyzer (Janome) splits each segment into morphemes. Product names often split into two or three of them, so the layer tries windows of one to three adjacent morphemes as candidate spans.</p>
 <p><b>Normalize katakana.</b> The same foreign word has several accepted katakana spellings: ヴァ or バ, a long-vowel mark or not, half-width or full-width characters. To an edit distance these are real differences. If the threshold allows one edit and a spelling variant already costs one, nothing is left for the recognition error itself. So both sides are normalized first, and what distance remains is signal.</p>

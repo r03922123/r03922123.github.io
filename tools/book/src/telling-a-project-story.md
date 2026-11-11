@@ -50,7 +50,7 @@ Most broken stories are a number that sounds measured and was not. I sort every 
 |---|---|---|
 | Measured on a held-out set | 0.88 AUC on the test split | "on the held-out test set" |
 | Derived from the design | 42% less compute: 14 candidate segments instead of 24 | "follows from the schedule" |
-| Measured on a reproduction | about 1 ms per caption segment, timed on my rebuild | "on my reproduction, not the client's system" |
+| Measured on a reproduction | about 1.2 ms per caption segment, timed on my rebuild | "on my reproduction, not the client's system" |
 
 A number that fits none of these, such as an impression from a meeting, does not go on the résumé. I removed two that way: an efficiency gain nobody timed, and a speed-up larger than the schedule's own ceiling, which meant the baseline differed in some way I could not isolate.
 
@@ -87,7 +87,7 @@ Fifteen minutes a session:
 
 ## The thread
 
-Across projects I look for one sentence that ties them together, so the stories read as one career rather than a list. Mine is that I get models to work under a hard constraint I did not choose: a recall floor, a tiny label budget, a latency budget. Each project page names its constraint in its first paragraph for that reason.
+Across projects I look for one sentence that ties them together, so the stories read as one career rather than a list. In my case the common thread is a limit someone else set, which the model had to live within: reviewers who expect a minimum catch rate, a few hundred labeled scans, a caption that must appear within 50 ms. Each project page names its constraint in its first paragraph for that reason.
 
 ## What this does not settle
 

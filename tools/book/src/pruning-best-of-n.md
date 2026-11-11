@@ -19,7 +19,7 @@ The goal was a text-to-music feature for KKBOX's listeners, who would pick from 
 
 ## The decision
 
-Every 10 seconds, each candidate's audio so far is embedded with CLAP and compared with the prompt's text embedding, and the weaker half is dropped. Eight candidates run the first 10 seconds, four the next, two the last, and the better of the two wins. CLAP is a model trained to place audio and text in one embedding space, so the similarity says how well the audio matches the words.
+At each 10-second mark I embed what every surviving candidate has produced so far with CLAP, score it against the embedding of the prompt text, and keep the top half. So the batch shrinks from eight to four to two over the clip, and the final pick is the stronger of the last pair. CLAP is a model trained to place audio and text in one embedding space, so the similarity says how well the audio matches the words.
 
 ## The number, and why it is derived
 
@@ -32,13 +32,13 @@ saving = 1 - pruned / baseline
 assert (baseline, pruned) == (24, 14)
 assert round(saving, 3) == 0.417            # "about 42%"
 
-# Even if a step on one candidate cost nothing extra in a smaller batch, the last third still runs 2 of 8,
-# so pruning alone can never speed this schedule up by more than 8 / 2.
-ceiling = 8 / 2
-assert ceiling == 4
+# However cheap the smaller batches get, the first 10 s still runs all eight candidates, which is a third of
+# the baseline's three full-batch segments: pruning alone cannot make this schedule more than 3x faster.
+ceiling = baseline / 8
+assert ceiling == 3
 ```
 
-That is why the claim is compute, not wall-clock time. A decoding step has a large fixed cost that does not shrink with the batch, so the clock gains less than the segment count suggests. At the time I measured a speed-up near 5x, which is above the schedule's ceiling of 4x, so the baseline must have differed in something else, and I could not separate the two. I do not quote it.
+That is why the claim is compute, not wall-clock time. A decoding step has a large fixed cost that does not shrink with the batch, so the clock gains less than the segment count suggests. At the time I timed a wall-clock speed-up above that ceiling of 3x, which pruning cannot produce on its own, so the baseline must have differed in something else, and I could not separate the two. I do not quote that figure.
 
 A later reproduction on my own laptop, not KKCompany's pipeline, shows the same gap between compute and clock: the derived compute ratio was 1.71x, the measured end-to-end speed-up 1.59x (104 s down to 65 s). Halving the batch did not halve the step time, which is the fixed cost at work.
 
@@ -55,7 +55,7 @@ We compared pruned and unpruned outputs side by side, on final CLAP score and by
 
 ## The two likeliest follow-ups
 
-**"Does the early score predict the final one?"** I did not validate it. I would generate a few hundred unpruned candidates, log the 10-second and final CLAP scores, and measure the rank correlation and how often the eventual best is pruned early. The sketch below shows that measurement on synthetic scores, where I choose the correlation; it says nothing about real music.
+**"Does the early score predict the final one?"** That is untested. The check is cheap: run a few hundred prompts with no pruning, record each candidate's CLAP score at 10 seconds and at the end, then look at how well the two rankings agree and how often the song that would have won is cut early. The sketch below shows that measurement on synthetic scores, where I choose the correlation; it says nothing about real music.
 
 ```python
 import numpy as np
