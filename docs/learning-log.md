@@ -2,9 +2,25 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-voice PR 4, statistics and experimentation
+
+1. **Change the voice, not the claim.** `causal-inference` had an overstated sentence written in "we". The spec
+   forbids "we" and also forbids hiding a correction, so only the pronoun changed ("where the true answer is known")
+   and the overstatement went on the findings list. It is like correcting a typo in a quote without changing what the
+   speaker said. Trade-off: the sentence still overstates until its own fix. Risk: an impersonal rewrite can drift in
+   meaning, so the reviewer compares it with the original.
+2. **Say what a simulation builds in.** A test that plants an assumption and then recovers it shows the method
+   works, not that the assumption holds. So the new limits say so outright: "each simulation here is built so that
+   its method's assumption holds, except the DiD run that breaks it on purpose". Trade-off: the posts sound less
+   sure of themselves. Risk: a reader may take the limit as doubt about the maths, which the asserts do settle.
+3. **Put the assert into words.** An assert such as `abs(wald - 2) < 0.15` proves a result, but few readers parse it.
+   One sentence after it ("the Wald ratio lands within 0.15 of the compliers' 2") makes the evidence readable.
+   Trade-off: a few words of the 10% growth budget. Risk: the sentence can round the assert into a stronger claim, so
+   each one quotes the bound the code checks.
+
 ## 2026-11-11 · build: post-voice PR 3, machine learning fundamentals
 
-1. **An overstated sentence stays as it was, and goes on a list.** Seven existing sentences in six posts claim more
+1. **An overstated sentence stays as it was, and goes on a list.** Six existing sentences in six posts claim more
    than their code shows, such as "checks each claim in code" and "each with a small experiment". Turning those into
    "I check …" would make the overstatement the author's own, and quietly fixing them would hide a correction in a
    style diff. So they stay word for word, and the PR lists them for their own fix, like an erratum filed apart from
