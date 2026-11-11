@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stroke triage on head CT from 500 labeled volumes · r03922123</title>
+<meta name="description" content="The story of a CT triage model where the label budget drove every decision: a 2.5D input instead of 3D, an encoder started from my own hemorrhage-competition model, attention across slices, and a 0.88 AUC told with the interval a small test set implies.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<meta name="robots" content="noindex">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
+  <a class="home" href="/">r03922123</a>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
+</header>
+<div class="wrap">
+<main>
+<article class="post-body">
+<header class="post-head">
+  <p class="crumb"><a href="/book/#project-stories">Project stories</a></p>
+  <h1>Stroke triage on head CT from 500 labeled volumes</h1>
+</header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 11, 2026</dd><dt>Reading time</dt><dd>3 min</dd><dt>Topic</dt><dd>Project stories</dd><dt>Tags</dt><dd>medical imaging · transfer learning · small data · evaluation</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-one-sentence">The one sentence</a></li><li><a href="#three-decisions-one-constraint">Three decisions, one constraint</a></li><li><a href="#the-number-with-its-interval">The number, with its interval</a></li><li><a href="#who-did-what">Who did what</a></li><li><a href="#limits-said-first">Limits, said first</a></li><li><a href="#the-two-likeliest-follow-ups">The two likeliest follow-ups</a></li><li><a href="#what-a-deployment-would-measure">What a deployment would measure</a></li><li><a href="#what-i-would-do-today">What I would do today</a></li></ol></nav>
+</aside>
+<div class="prose">
+<p>Labels on head CT need a radiologist, so the stroke triage project at HTC had 500 labeled volumes and no way to get many more. A volume is not one image: it is dozens of slices, and early ischemic stroke shows on only a few of them, as a faint darkening. The goal was to flag suspicious scans so they get read sooner. Every modeling choice in the story follows from the label budget, and the result, 0.88 AUC, needs the uncertainty a small test set brings.</p>
+<h2 id="the-one-sentence">The one sentence</h2>
+<p>"With only 500 labeled CT volumes, I fine-tuned a 2.5D encoder started from my own hemorrhage-detection model and added attention across slices, reaching 0.88 slice-level AUC on a held-out set split by patient."</p>
+<h2 id="three-decisions-one-constraint">Three decisions, one constraint</h2>
+<p><b>2.5D, not 3D.</b> A 3D network has far more parameters, and 500 volumes would let it memorize. Stacking a slice with its neighbours as input channels keeps a 2D model's size while giving the first layer some through-plane context. It also made the next decision possible, because large labeled head-CT datasets are 2D.</p>
+<p><b>Start from my own hemorrhage model.</b> In 2019 I placed 30th of 1,345 (top 3%) in Kaggle's RSNA intracranial hemorrhage competition, on about 750,000 labeled CT slices. Hemorrhage is a different disease, but it is the same modality, anatomy and physics, which is a much shorter step than from ImageNet photographs. The risk is real and worth saying: bleeding is bright on CT and early ischemia is a subtle dark change, so the pretraining may favour bright findings.</p>
+<p><b>Attention across slices.</b> Each slice's decision should use the slices around it, because a faint change that continues across neighbours is more convincing than one that appears once. An attention layer over the slice embeddings learns that context from the labels instead of a fixed rule.</p>
+<h2 id="the-number-with-its-interval">The number, with its interval</h2>
+<p>0.88 is the measured AUC on the held-out test set, which was split by patient, so no patient's slices were in both training and test. I do not remember the test set's size, so the interval below uses an assumed one, 30 positive and 70 negative cases, with the Hanley and McNeil approximation for the standard error of an AUC.</p>
+<pre><code class="language-python">import math
+
+def auc_interval(a, n_pos, n_neg):
+    q1, q2 = a / (2 - a), 2 * a * a / (1 + a)
+    var = (a * (1 - a) + (n_pos - 1) * (q1 - a * a) + (n_neg - 1) * (q2 - a * a)) / (n_pos * n_neg)
+    se = math.sqrt(var)
+    return a - 1.96 * se, a + 1.96 * se
+
+low, high = auc_interval(0.88, 30, 70)                 # assumed counts, not the project's
+assert round(low, 2) == 0.80 and round(high, 2) == 0.96
+low3, high3 = auc_interval(0.88, 300, 700)              # ten times the data: about a third as wide
+assert 0.30 &lt; (high3 - low3) / (high - low) &lt; 0.33</code></pre>
+<p>At that size, 0.88 cannot be told apart from 0.84. For a slice-level AUC the formula is too kind, because slices from one patient are not independent; the right interval resamples whole patients, a bootstrap by patient.</p>
+<h2 id="who-did-what">Who did what</h2>
+<p>I owned the model end to end: preprocessing, the 2.5D input, the transfer from my competition model and the attention over slices. Radiologists made the labels. It stayed a research prototype, so the integration into a reading worklist and any clinical validation never happened.</p>
+<h2 id="limits-said-first">Limits, said first</h2>
+<ul><li>No confidence interval was reported at the time; the one above is an illustration with assumed counts.</li><li>No external validation. A model trained on one hospital's scanners often loses several AUC points at another.</li><li>No comparison with the same model started from ImageNet at the same 500 volumes, which is the baseline that would show how much the pretraining bought.</li></ul>
+<h2 id="the-two-likeliest-follow-ups">The two likeliest follow-ups</h2>
+<p><b>"Sample-efficient compared with what?"</b> I do not have that baseline number, and I should. The right comparison is the same architecture initialized from ImageNet, trained on the same 500 volumes.</p>
+<p><b>"How was the data split?"</b> By patient. A split by slice would put neighbouring slices of one scan on both sides and inflate the AUC.</p>
+<h2 id="what-a-deployment-would-measure">What a deployment would measure</h2>
+<p>AUC is not what triage is for. A deployment would fix a sensitivity at an operating point the clinicians accept, then report specificity there; measure how much sooner true positives get read, which is the point of triage; and validate on scans from another hospital before any of it counts.</p>
+<h2 id="what-i-would-do-today">What I would do today</h2>
+<p>Pretrain without labels first, with contrastive or masked-image objectives on unlabeled head CT, which uses far more scans and does not import the hemorrhage bias. Whether that beats starting from a supervised hemorrhage model at 500 labels is the question I would test.</p>
+</div>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

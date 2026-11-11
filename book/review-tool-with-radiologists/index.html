@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A review tool built with radiologists, and a story with no numbers · r03922123</title>
+<meta name="description" content="The story of a heatmap review tool, windowing presets and a multi-reader labeling protocol designed in weekly sessions with radiologists: why a single score is useless to a reader, why a heatmap is a lead and not an explanation, and how to tell a result that was never measured.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<meta name="robots" content="noindex">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
+  <a class="home" href="/">r03922123</a>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
+</header>
+<div class="wrap">
+<main>
+<article class="post-body">
+<header class="post-head">
+  <p class="crumb"><a href="/book/#project-stories">Project stories</a></p>
+  <h1>A review tool built with radiologists, and a story with no numbers</h1>
+</header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 11, 2026</dd><dt>Reading time</dt><dd>3 min</dd><dt>Topic</dt><dd>Project stories</dd><dt>Tags</dt><dd>medical imaging · explainability · labeling · human factors</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-one-sentence">The one sentence</a></li><li><a href="#three-things-three-reasons">Three things, three reasons</a></li><li><a href="#what-a-heatmap-does-not-show">What a heatmap does not show</a></li><li><a href="#how-to-tell-a-result-with-no-number">How to tell a result with no number</a></li><li><a href="#limits-said-first">Limits, said first</a></li><li><a href="#the-two-likeliest-follow-ups">The two likeliest follow-ups</a></li><li><a href="#what-i-would-measure-now">What I would measure now</a></li></ol></nav>
+</aside>
+<div class="prose">
+<p>A model that gives a radiologist one score per scan saves no time: "0.83" still leaves the whole study to read. Alongside the stroke triage model at HTC, I met board-certified radiologists every week to make the model's output usable and its labels trustworthy. Out of those sessions came a review tool with heatmaps, windowing presets designed together, and a multi-reader labeling protocol that the team then used for later datasets. None of it was measured, and the story says so.</p>
+<h2 id="the-one-sentence">The one sentence</h2>
+<p>"I built a heatmap review tool and co-designed windowing presets and a multi-reader labeling protocol with radiologists in weekly sessions; the protocol became the team's labeling standard."</p>
+<h2 id="three-things-three-reasons">Three things, three reasons</h2>
+<p><b>Show where, not just how much.</b> The tool overlaid Grad-CAM heatmaps on each slice, so a radiologist could see where the model responded and check that region, which is faster than reading from scratch. Grad-CAM weights the last convolutional layer's feature maps by the gradient of the score, so its map is that layer's coarse grid stretched to the slice.</p>
+<p><b>Windowing presets, chosen by eye.</b> CT stores intensity in Hounsfield units (HU), and a display window picks which range of HU maps onto the screen's gray levels. Early ischemic change is a difference of a few HU, and a wide window squeezes it into a couple of gray levels. Whether a reader can see a finding is a question about human perception, so no loss function can tune it; the only source of that signal is a radiologist looking. We designed the presets in the sessions and then used the same windows as the model's input.</p>
+<p>The arithmetic of the squeeze, for an 8-bit display (these widths illustrate the effect; they are not our presets):</p>
+<pre><code class="language-python">def gray_levels(hu_difference, window_width, levels=256):
+    return hu_difference * levels / window_width
+
+assert gray_levels(4, 80) == 12.8      # a 4 HU change in an 80 HU window
+assert gray_levels(4, 400) == 2.56     # the same change in a 400 HU window: almost invisible</code></pre>
+<p><b>More than one reader per label.</b> Early ischemia is a judgment call, and readers disagreed exactly at the boundary the model has to learn. That disagreement, not the model, was the real data-quality problem. The protocol had several readers label each case and set a clear path for settling disagreements, instead of trusting one reader. It is slower and costs more reader time per case, so the same budget labels fewer cases.</p>
+<h2 id="what-a-heatmap-does-not-show">What a heatmap does not show</h2>
+<p>A heatmap shows where the model responded, not why it decided. At the resolution of the last convolutional layer it is coarse for a subtle finding, and saliency methods can produce similar maps even after a model's weights are randomized. So I presented it as a lead to check, never as an explanation; clinicians, like everyone, tend to trust anything that looks like a heatmap.</p>
+<h2 id="how-to-tell-a-result-with-no-number">How to tell a result with no number</h2>
+<p>There was no reader study, no timing and no agreement statistic. An earlier résumé line carried an efficiency gain that was an impression from the sessions, not a measurement, and I removed it. What I can say is what happened: the tool and presets were used in the prototype, and the labeling protocol became how the team built later datasets.</p>
+<p>The number that was easiest to collect and was not is agreement between readers before and after the protocol. Cohen's kappa corrects raw agreement for the agreement chance alone would give:</p>
+<pre><code class="language-python">def cohen_kappa(agree, positive_rate_a, positive_rate_b):
+    chance = positive_rate_a * positive_rate_b + (1 - positive_rate_a) * (1 - positive_rate_b)
+    return (agree - chance) / (1 - chance)
+
+# Two readers agree on 80 of 100 cases, and each calls half of them positive.
+assert round(cohen_kappa(0.80, 0.5, 0.5), 2) == 0.60
+# The same 80% agreement means less when both readers call nearly everything negative.
+assert round(cohen_kappa(0.80, 0.1, 0.1), 2) &lt; 0</code></pre>
+<h2 id="limits-said-first">Limits, said first</h2>
+<ul><li>It was a research prototype and demo; it never went through a regulatory pathway or clinical deployment.</li><li>No reader study: I cannot say the heatmaps made reading faster, or that they did not add misses.</li><li>No before-and-after agreement figure for the protocol.</li></ul>
+<h2 id="the-two-likeliest-follow-ups">The two likeliest follow-ups</h2>
+<p><b>"Was it deployed?"</b> No. What was adopted inside the team was the labeling protocol.</p>
+<p><b>"Does Grad-CAM prove the model saw the lesion?"</b> No; it is evidence to check, and a coarse one.</p>
+<h2 id="what-i-would-measure-now">What I would measure now</h2>
+<p>A small reader study: several radiologists read the same cases in random order, with and without the tool, with a washout period between sessions, recording both time and accuracy. And kappa before and after the protocol, which costs almost nothing once two readers label the same cases.</p>
+</div>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

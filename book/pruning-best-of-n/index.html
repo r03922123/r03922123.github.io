@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pruning best-of-N music generation: a 42% that is derived, not measured · r03922123</title>
+<meta name="description" content="The story behind cutting text-to-music best-of-N compute by about 42%: score partial candidates every 10 seconds, drop the weaker half, and say plainly that the number follows from the schedule and that the early score was never validated.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<meta name="robots" content="noindex">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
+  <a class="home" href="/">r03922123</a>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
+</header>
+<div class="wrap">
+<main>
+<article class="post-body">
+<header class="post-head">
+  <p class="crumb"><a href="/book/#project-stories">Project stories</a></p>
+  <h1>Pruning best-of-N music generation: a 42% that is derived, not measured</h1>
+</header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 11, 2026</dd><dt>Reading time</dt><dd>4 min</dd><dt>Topic</dt><dd>Project stories</dd><dt>Tags</dt><dd>generative audio · inference · best-of-N · CLAP</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#the-one-sentence">The one sentence</a></li><li><a href="#context-and-constraint">Context and constraint</a></li><li><a href="#the-decision">The decision</a></li><li><a href="#the-number-and-why-it-is-derived">The number, and why it is derived</a></li><li><a href="#what-quality-claim-it-supports">What quality claim it supports</a></li><li><a href="#limits-said-first">Limits, said first</a></li><li><a href="#the-two-likeliest-follow-ups">The two likeliest follow-ups</a></li><li><a href="#what-i-would-do-today">What I would do today</a></li></ol></nav>
+</aside>
+<div class="prose">
+<p>Best-of-N generation pays for N songs and keeps one. At KKCompany the text-to-music setup generated eight 30-second candidates with MusicGen and picked the one whose CLAP embedding sat closest to the prompt's, so seven full generations were paid for and thrown away. I changed the generation loop to drop weak candidates early. The compute saving is about 42%, and that figure comes from the schedule, not from a stopwatch; this page is about telling it that way.</p>
+<p>The fuller technical write-ups are the two <a href="/posts/#musicgen">MusicGen posts</a>. This page is the version for telling the project.</p>
+<h2 id="the-one-sentence">The one sentence</h2>
+<p>"I cut best-of-N music generation compute by about 42% by scoring partial candidates against the prompt with CLAP every 10 seconds and dropping the weaker half."</p>
+<h2 id="context-and-constraint">Context and constraint</h2>
+<p>The goal was a text-to-music feature for KKBOX's listeners, who would pick from a few generated songs. I worked on it alone, with my manager reviewing direction, and owned the inference code. The constraint was cost: every candidate ran to the full 30 seconds before anything judged it, so the batch paid full price for songs it would discard.</p>
+<h2 id="the-decision">The decision</h2>
+<p>Every 10 seconds, each candidate's audio so far is embedded with CLAP and compared with the prompt's text embedding, and the weaker half is dropped. Eight candidates run the first 10 seconds, four the next, two the last, and the better of the two wins. CLAP is a model trained to place audio and text in one embedding space, so the similarity says how well the audio matches the words.</p>
+<h2 id="the-number-and-why-it-is-derived">The number, and why it is derived</h2>
+<p>Count 10-second segments generated. The baseline runs eight candidates for three segments; the pruned schedule runs eight, then four, then two.</p>
+<pre><code class="language-python">baseline = 8 * 3
+pruned = 8 + 4 + 2
+saving = 1 - pruned / baseline
+assert (baseline, pruned) == (24, 14)
+assert round(saving, 3) == 0.417            # "about 42%"
+
+# Even if a step on one candidate cost nothing extra in a smaller batch, the last third still runs 2 of 8,
+# so pruning alone can never speed this schedule up by more than 8 / 2.
+ceiling = 8 / 2
+assert ceiling == 4</code></pre>
+<p>That is why the claim is compute, not wall-clock time. A decoding step has a large fixed cost that does not shrink with the batch, so the clock gains less than the segment count suggests. At the time I measured a speed-up near 5x, which is above the schedule's ceiling of 4x, so the baseline must have differed in something else, and I could not separate the two. I do not quote it.</p>
+<p>A later reproduction on my own laptop, not KKCompany's pipeline, shows the same gap between compute and clock: the derived compute ratio was 1.71x, the measured end-to-end speed-up 1.59x (104 s down to 65 s). Halving the batch did not halve the step time, which is the fixed cost at work.</p>
+<h2 id="what-quality-claim-it-supports">What quality claim it supports</h2>
+<p>We compared pruned and unpruned outputs side by side, on final CLAP score and by listening: my manager, the project lead and I. We heard no noticeable difference. There was no blind test and no statistical test, so the honest phrase is "no noticeable drop", never "no significant drop".</p>
+<h2 id="limits-said-first">Limits, said first</h2>
+<ul><li>It stayed in research. No product owner took it on, so there was never a definition of good enough to ship. The lesson I took is to find a product counterpart at the start.</li><li>The main gap: I never checked that a candidate's score at 10 seconds predicts its score at 30. If it does not, pruning throws away songs that would have won.</li><li>A product would stop at k candidates for the listener to choose from, not one; the experiment pruned to one to measure the largest saving.</li><li>Every 10 seconds and half each time is a fixed schedule I did not tune.</li></ul>
+<h2 id="the-two-likeliest-follow-ups">The two likeliest follow-ups</h2>
+<p><b>"Does the early score predict the final one?"</b> I did not validate it. I would generate a few hundred unpruned candidates, log the 10-second and final CLAP scores, and measure the rank correlation and how often the eventual best is pruned early. The sketch below shows that measurement on synthetic scores, where I choose the correlation; it says nothing about real music.</p>
+<pre><code class="language-python">import numpy as np
+
+def best_survives(rho, prompts=4000, n=8, seed=0):
+    """Share of prompts where the candidate with the best final score survives the 8 -&gt; 4 -&gt; 2 schedule,
+    if each 10-second score correlates rho with the final score (synthetic Gaussian scores)."""
+    rng = np.random.default_rng(seed)
+    final = rng.standard_normal((prompts, n))
+    def early():
+        return rho * final + np.sqrt(1 - rho**2) * rng.standard_normal((prompts, n))
+    alive = np.ones((prompts, n), bool)
+    for keep in (4, 2):                       # cut at 10 s and at 20 s, each on a fresh noisy early score
+        score = np.where(alive, early(), -np.inf)
+        cut = np.sort(score, axis=1)[:, -keep][:, None]
+        alive &amp;= score &gt;= cut
+    return alive[np.arange(prompts), final.argmax(axis=1)].mean()
+
+rates = [best_survives(r) for r in (0.0, 0.5, 0.9)]
+assert abs(rates[0] - 2 / 8) &lt; 0.03         # no signal: the best survives as often as any 2 of 8
+assert rates[0] &lt; rates[1] &lt; rates[2]       # more correlation, fewer good songs lost</code></pre>
+<p>With the real logs, the same function's question, how often the eventual best is still alive at the end, is the number that would justify or kill the schedule, and a curve of it against when and how hard to cut would replace my fixed choice.</p>
+<p><b>"Why not quantize or use a smaller model?"</b> Those make each step cheaper; pruning skips steps. They stack.</p>
+<h2 id="what-i-would-do-today">What I would do today</h2>
+<p>I would score with a learned music reward model trained on human preference pairs instead of raw CLAP, since such models are now used to pick the best of N generated songs, and I would validate the early-score assumption before pruning on it. Open-source text-to-music has also moved on to full songs with vocals, so a 30-second instrumental setup is an old baseline; the pruning idea does not depend on it.</p>
+</div>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>

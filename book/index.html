@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An old book · r03922123</title>
+<meta name="description" content="Notes on preparing a résumé and telling the projects on it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<meta name="robots" content="noindex">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<style>:root:has(#method:target) .topics a[href="#method"], :root:has(#project-stories:target) .topics a[href="#project-stories"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }</style>
+</head>
+<body>
+<header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
+  <a class="home" href="/">r03922123</a>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
+</header>
+<div class="wrap">
+<main>
+<section class="intro">
+  <h1>An old book</h1>
+  <p>You found the book on the mantel. Inside: how I prepare the projects on my résumé to be told well, one
+  method and one story per project, each with what the numbers do and do not show.</p>
+</section>
+<nav class="topics" id="topics" aria-label="Topics">
+  <a href="#method"><b>Method</b><span>1 post</span></a>
+  <a href="#project-stories"><b>Project stories</b><span>5 posts</span></a>
+</nav>
+<p class="count">6 articles</p>
+<div class="groups">
+<section class="group" id="method">
+<h2>Method</h2><a class="all" href="#topics">All topics</a>
+<ul class="series">
+  <li><a href="telling-a-project-story/">Telling a project story: constraint, decision, number, limit</a><span>How I prepare each project on my résumé to be told in thirty seconds or ten minutes: one sentence, five words to keep the order, a number that says where it came from, and the limits said before anyone asks.</span></li>
+</ul>
+</section>
+<section class="group" id="project-stories">
+<h2>Project stories</h2><a class="all" href="#topics">All topics</a>
+<ul class="series">
+  <li><a href="pruning-best-of-n/">Pruning best-of-N music generation: a 42% that is derived, not measured</a><span>The story behind cutting text-to-music best-of-N compute by about 42%: score partial candidates every 10 seconds, drop the weaker half, and say plainly that the number follows from the schedule and that the early score was never validated.</span></li>
+  <li><a href="fixing-terms-in-live-captions/">Fixing product names in live Japanese captions, without an accuracy number</a><span>The story of a correction layer after speech recognition: morphemes because Japanese has no spaces, katakana normalization so spelling variants do not eat the match budget, fuzzy lookup in the client's error table, and why the honest result has a latency figure and no accuracy figure.</span></li>
+  <li><a href="precision-at-a-recall-floor/">Raising precision at a recall floor: an ad-review detector</a><span>The story of a smoking-violation detector that screened ads before human review: why recall was fixed and precision moved, two levels of class imbalance, hard negatives as the main gain, and the arithmetic that checks "+25 points" against "two thirds fewer false positives".</span></li>
+  <li><a href="ct-triage-from-500-labels/">Stroke triage on head CT from 500 labeled volumes</a><span>The story of a CT triage model where the label budget drove every decision: a 2.5D input instead of 3D, an encoder started from my own hemorrhage-competition model, attention across slices, and a 0.88 AUC told with the interval a small test set implies.</span></li>
+  <li><a href="review-tool-with-radiologists/">A review tool built with radiologists, and a story with no numbers</a><span>The story of a heatmap review tool, windowing presets and a multi-reader labeling protocol designed in weekly sessions with radiologists: why a single score is useless to a reader, why a heatmap is a lead and not an explanation, and how to tell a result that was never measured.</span></li>
+</ul>
+</section>
+</div>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>
