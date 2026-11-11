@@ -5,7 +5,7 @@ group: Probability
 order: 4
 tags: probability · exponential · Poisson process · survival
 ---
-Rides are requested at an average of 6 per hour, independently of each other. How long until the next one? The [Poisson distribution](../poisson-distribution/) answers a counting question, how many events land in a fixed window. The exponential distribution answers the matching timing question, how long until the first event. Same process, other side of the coin.
+Rides are requested at an average of 6 per hour, independently of each other, and about 22% of the time the next one takes more than 15 minutes. The exponential distribution gives that number. The [Poisson distribution](../poisson-distribution/) answers a counting question, how many events land in a fixed window; the exponential answers the matching timing question, how long until the first event. I derive its density from the Poisson count of zero events, check it against a simulation that chops time into short slots, and check most of what follows by simulation too.
 
 One correction up front, because it is a common slip: the exponential is a **continuous** distribution, so it has a probability density function (PDF), not a probability mass function (PMF). A waiting time can be 3.7 minutes or 3.7001 minutes, and the chance of hitting any single exact value is zero. Probabilities come from areas under the density, and the density itself can be larger than 1.
 
@@ -155,7 +155,7 @@ Given complete waiting times \(t_1, \dots, t_n\), the log-likelihood is \(n \ln 
 
 events divided by total time watched. (The general recipe is in [MLE and MAP](../statistical-estimation-mle-map/).)
 
-Real data are rarely complete. A study ends, a user is still subscribed, a machine is still running: for those units we only know \(T > c_i\). That is **right censoring**, and each censored unit contributes \(S(c_i) = e^{-\lambda c_i}\) to the likelihood instead of \(f(t_i)\). The estimate keeps the same shape:
+Real data are rarely complete. A study ends, a user is still subscribed, a machine is still running: for those units only \(T > c_i\) is known. That is **right censoring**, and each censored unit contributes \(S(c_i) = e^{-\lambda c_i}\) to the likelihood instead of \(f(t_i)\). The estimate keeps the same shape:
 
 \[ \hat\lambda = \frac{\text{number of observed events}}{\text{total time at risk, censored units included}} . \]
 
@@ -213,6 +213,6 @@ Reach for the exponential when you model time to an event that has a roughly con
 - **Mean versus median.** For skewed waits, the median (\(0.69/\lambda\)) describes the typical experience; the mean drives capacity planning.
 - **Sampling by time.** Waits and gaps observed from a random moment are length-biased, as in the paradox above.
 
-For the discrete side of the same process see [Poisson distribution](../poisson-distribution/), and for a compact table of distributions see the [probability cheatsheet](../probability-cheatsheet/).
+Apart from the uniform contrast, every simulation here draws waits with a constant rate, so it shows what follows from that assumption, not whether a given stream of requests or failures meets it. When the hazard rises or falls, the Weibull distribution and the Kaplan-Meier curve are where to go next. For the discrete side of the same process see [Poisson distribution](../poisson-distribution/), and for a compact table of distributions see the [probability cheatsheet](../probability-cheatsheet/).
 
 The derivation from the Poisson zero-count probability is the standard textbook argument; its whole-unit version is laid out in a [Mathematics Stack Exchange answer](https://math.stackexchange.com/a/1089139) and in Milefoot's [notes on the exponential distribution](https://www.milefoot.com/math/stat/pdfc-exponential.htm), which this post rewrites and extends.
