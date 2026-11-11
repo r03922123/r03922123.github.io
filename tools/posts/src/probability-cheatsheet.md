@@ -5,7 +5,7 @@ group: Probability
 order: 9
 tags: probability · reference · distributions · Bayes' rule
 ---
-This page collects the probability that keeps coming back when you build and evaluate models, in the order you usually need it: how to combine events, how to describe a random quantity, how means and variances behave, which distribution to reach for, and what happens when you average many draws. It is a reference, so each section is short and, where one exists, points to the post that develops the idea properly.
+A test that catches 99% of cases and clears 99% of healthy people is still wrong half the time it says positive, if the disease affects 1% of people. Results like that come from the probability that keeps coming back when you build and evaluate models. This page collects it in the order you usually need it: how to combine events, how to describe a random quantity, how means and variances behave, which distribution to reach for, and what happens when you average many draws. It is a reference, so each section is short and, where one exists, points to the post that develops the idea properly.
 
 Nothing here is taken on faith. The formulas on the page are checked below, either exactly or against `scipy` and a simulation, so the code doubles as a set of worked examples.
 
@@ -267,5 +267,7 @@ assert np.isclose(g1.mean() - g0.mean(), 1) and np.isclose(g1.var(), g0.var())
 revenue = rng.lognormal(0.0, 1.0, 1_000_000)
 assert np.log(revenue).mean() < np.log(revenue.mean()) - 0.4    # gap is sigma^2 / 2 = 0.5 for a lognormal
 ```
+
+The code checks each formula at a few parameter values, exactly or on simulated data, so it catches a wrong formula or a mixed-up convention but does not prove a formula in general. The derivations are in the linked posts.
 
 For worked problems that put these tools to use, see [is this coin fair?](../is-this-coin-fair/) and the [ML fundamentals quick reference](../ml-fundamentals-quick-reference/).
