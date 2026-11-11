@@ -1,8 +1,8 @@
 # Uncertainty in a rate: the Beta posterior, the standard error and the bootstrap
 
-An item was clicked 3 times in 4 impressions. Another was clicked 300 times in 400. Both have a click-through rate of 75%, and nobody would trust the two numbers equally. A single estimate throws away how much evidence stands behind it. This post is about keeping that information.
+An item was clicked 3 times in 4 impressions, another 300 times in 400. Both have a click-through rate of 75%, and nobody would trust the two numbers equally: from a uniform prior, their 95% credible intervals run from 0.28 to 0.95 and from 0.71 to 0.79. A single estimate throws away how much evidence stands behind it; I keep that information by putting a distribution on the rate.
 
-There are two standard ways to do it. The Bayesian way describes what we believe about the unknown rate with a whole distribution; for a probability, that is almost always a **Beta**. The frequentist way keeps the rate fixed and asks how much the estimate would move if we collected the data again, which leads to the **standard error** and, when no formula exists, the **bootstrap**. The formulas and numbers below are checked in code.
+There are two standard ways to do it. The Bayesian way describes what you believe about the unknown rate with a whole distribution; for a probability, that is almost always a **Beta**. The frequentist way keeps the rate fixed and asks how much the estimate would move if you collected the data again, which leads to the **standard error** and, when no formula exists, the **bootstrap**. I check the formulas and numbers below in code. On 3,000 simulated new items, ranking by posterior mean instead of the raw rate puts items in the top 20 whose true rates are higher by more than a percentage point on average.
 
 ## From counts to a distribution over p
 Suppose a coin with unknown heads probability \(p\) lands heads \(h\) times and tails \(t\) times. Start with no preference among values of \(p\), a uniform prior. Bayes' rule says the posterior is proportional to prior times likelihood, and the likelihood of a particular sequence is \(p^h (1-p)^t\), so
@@ -166,7 +166,7 @@ Now drop the prior and treat the unknown quantity as fixed. Let \(X_1, \dots, X_
 
 \[ \text{Var}(\bar X) = \frac{1}{n^2} \sum_{i=1}^{n} \text{Var}(X_i) = \frac{\sigma^2}{n}. \]
 
-The standard deviation of \(\bar X\), \(\sigma / \sqrt{n}\), is the **standard error**. We do not know \(\sigma\), so we plug in the sample variance \(S^2 = \frac{1}{n-1} \sum_i (X_i - \bar X)^2\), whose \(n - 1\) makes it unbiased for \(\sigma^2\) (dividing by \(n\) underestimates by a factor \((n-1)/n\)). The independence step does real work: positively correlated draws make the true variance larger than \(\sigma^2 / n\). And \(S / \sqrt{n}\) is only an estimate, shaky for tiny samples or heavy tails.
+The standard deviation of \(\bar X\), \(\sigma / \sqrt{n}\), is the **standard error**. You do not know \(\sigma\), so you plug in the sample variance \(S^2 = \frac{1}{n-1} \sum_i (X_i - \bar X)^2\), whose \(n - 1\) makes it unbiased for \(\sigma^2\) (dividing by \(n\) underestimates by a factor \((n-1)/n\)). The independence step does real work: positively correlated draws make the true variance larger than \(\sigma^2 / n\). And \(S / \sqrt{n}\) is only an estimate, shaky for tiny samples or heavy tails.
 
 ```python
 rng = np.random.default_rng(3)
@@ -180,7 +180,7 @@ assert abs(x.var(axis=1, ddof=0).mean() / (4.0 * (n - 1) / n) - 1) < 0.01   # wi
 ```
 
 ## The bootstrap: error bars without a formula
-The standard error formula covers the mean. For a median, a ratio of means, a percentile or an AUC there is often no simple formula. The **bootstrap**, introduced by Bradley Efron in 1979, replaces the formula with computation. The sample is our best picture of the population, so we draw new samples from it, with replacement and of the same size, recompute the statistic on each, and use the spread of those values as the spread of the statistic.
+The standard error formula covers the mean. For a median, a ratio of means, a percentile or an AUC there is often no simple formula. The **bootstrap**, introduced by Bradley Efron in 1979, replaces the formula with computation. The sample is the best picture of the population, so you draw new samples from it, with replacement and of the same size, recompute the statistic on each, and use the spread of those values as the spread of the statistic.
 
 **Confidence interval.** Resample each group separately, compute the statistic each time, and take the 2.5th and 97.5th percentiles: the **percentile interval**. Its promise is about the procedure: across repeated experiments, about 95% of intervals built this way contain the true value of the quantity being estimated. That coverage is only approximate, and it degrades for small or very skewed samples.
 
@@ -247,5 +247,7 @@ With these sample sizes the bootstrap and Welch intervals agree to within a few 
 - **Beta(a, b)** is a belief about a probability, centred at \(a / (a + b)\) and tighter as \(a + b\) grows; a \(\text{Beta}(a, b)\) prior plus \(h\) successes and \(t\) failures gives \(\text{Beta}(a + h, b + t)\), so the prior acts as pseudo-counts that shrink small samples.
 - **Posteriors answer direct questions** such as \(P(p_B > p_A)\), and drive Thompson sampling.
 - **The standard error** of a mean is \(\sigma / \sqrt{n}\) for independent draws; **the bootstrap** gets intervals and tests for any statistic by resampling, with approximate coverage.
+
+The ranking, Thompson sampling and coverage results each come from one simulated population with a fixed seed and independent trials, so they show how the methods behave when their assumptions hold, not how much they gain on real traffic. Two choices stay open on real data, and each is the analyst's to justify and report: how strong a prior to use, and at what level to resample when trials are correlated.
 
 The Beta-as-belief view and the two-group bootstrap follow the way Stanford's CS109 (Probability for Computer Scientists), in Chris Piech's course notes, teaches them; the examples and code here are new. For the related estimation story, see [MLE and MAP](../statistical-estimation-mle-map/), and the [probability cheatsheet](../probability-cheatsheet/) collects the formulas.
