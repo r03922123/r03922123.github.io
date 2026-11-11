@@ -6,9 +6,9 @@ The three most important whys of each change, newest first. Each heading reads `
 
 1. **A test that cannot fail proves nothing.** The Markdown check's code case `ops[op](a, b)` passed with or without
    the code-skipping it was meant to test, since the space already kept it from matching the link pattern. Each fix
-   here began with a test seen failing on the old code: 8 of them, plus 7 that pin behaviour already right. Like a
-   smoke alarm, a check is only trusted after it has gone off once on purpose. Trade-off: more test lines than fix
-   lines. Risk: a coverage test written to pass can still assert the wrong thing; the fresh reviewer re-ran the 8
+   to the checker and the build began with a test seen failing on the old code: 8 of them, plus 7 that pin behaviour
+   already right. The CSS, licence and dev-tool fixes had none. Like a smoke alarm, a check is only trusted after it
+   has gone off once on purpose. Trade-off: more test lines than fix lines. Risk: a coverage test written to pass can still assert the wrong thing; the fresh reviewer re-ran the 8
    against the old code.
 2. **Read the field you mean.** The card count came from the whole card's text, so a topic named "Top 3 posts" with
    no count would have passed. It now reads the `<span>` only, as a form validator reads the field, not the page
@@ -17,7 +17,7 @@ The three most important whys of each change, newest first. Each heading reads `
 3. **Measure the layout, then pick the number.** The bar's links wrapped between 700 and about 940 px. The fix is a
    breakpoint from a measurement in Chrome (a 376 px cell), set in `em` so a larger default font moves it too.
    Trade-off: two rows of bar up to 960 px. Risk: another browser's text metrics differ slightly; the breakpoint
-   leaves about 20 px of room.
+   leaves 20 px of room with overlay scrollbars and 5 px with a classic 15 px one.
 
 ## 2026-11-11 · docs: architecture map, README trimmed
 

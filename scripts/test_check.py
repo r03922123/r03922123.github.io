@@ -429,6 +429,14 @@ class CheckTest(unittest.TestCase):
         md = "# A\n\nsee [B](../b/), `f[i](x)`, \\( f[i](x) \\)\n\n```python\nops[op](x)\n```\n"
         self.assertEqual(self.feed_site(**{"posts/a/index.md": md}), ["posts/a/index.md: broken link ../b/"])
 
+    def test_unclosed_maths_does_not_hide_the_next_paragraph(self):
+        md = "# A\n\nan open \\( x\n\nsee [B](../b/)\n\nthen \\( y \\)\n"
+        self.assertEqual(self.feed_site(**{"posts/a/index.md": md}), ["posts/a/index.md: broken link ../b/"])
+
+    def test_llms_reads_only_its_list_links(self):
+        # A summary may quote code such as f[i](x); only "- [title](url)" lines are links.
+        self.assertEqual(self.feed_site(**{"llms.txt": LLMS + "- [x](" + SITE + "/posts/a/): uses f[i](x)\n"}), [])
+
     def test_markdown_keeps_front_matter(self):
         out = self.feed_site(**{"posts/a/index.md": "---\ntitle: A\n---\nbody\n"})
         self.assertEqual(out, ["posts/a/index.md: front matter kept"])
