@@ -47,11 +47,15 @@
 </aside>
 <div class="prose">
 
-<p>Three ideas carry most of text-to-music today: a <b>codec language model</b> that writes music as
-discrete tokens, a <b>reward model</b> that judges what it wrote, and <b>preference alignment</b> that
-folds those judgments back into the generator. This post builds all three from a handful of parts, with the
-tensor shape written next to every step. It follows MusicGen (2023) to HeartMuLa (2026), CLAP to the CMI
-reward model, and best-of-N to DPO.</p>
+<p>At 50 codec frames per second, a four-minute song takes 12,003 steps of one large model, and self-attention
+cost grows with the square of that length. A 12.5 Hz codec, with a small model filling in detail inside each
+frame, cuts the large model to 3,000 steps and its attention work roughly 16 times. Three ideas carry most of
+text-to-music today: a <b>codec language model</b> that writes music as discrete tokens, a <b>reward model</b>
+that judges what it wrote, and <b>preference alignment</b> that folds those judgments back into the generator.
+I write all three out from a handful of parts as one walk-through, with the tensor shape next to every step.
+It follows MusicGen (2023) to HeartMuLa (2026), CLAP to the CMI
+reward model, and best-of-N to DPO. Along the way I derive DPO's loss from the closed-form optimum of the
+reward objective, and the appendix shows that classifier-free guidance has the same form.</p>
 <p class="note"><b>Notation.</b> <span class="tag">[paper]</span> marks a fact stated by the cited source.
 <span class="tag">[illustrative]</span> marks a number or structure chosen to explain an idea, not the model's
 actual setting. The code is shape-annotated pseudocode, not a runnable implementation.</p>
@@ -408,6 +412,11 @@ approximation of guiding the whole sequence. Finally, rewriting \(p_\gamma\) sho
 <p>the same form as \(\pi^* \propto \pi_{\text{ref}} \exp(r/\beta)\) with \(r = \log p(c \mid y)\) and
 \(\beta = 1/(\gamma - 1)\). CFG is inference-time alignment whose reward is the model's own implicit
 classifier.</p>
+<p>Every measured result on this page comes from a cited paper, and the code is pseudocode, so the page shows
+how the parts fit together, not how well any combination of them works. Combining pruning with a
+preference-trained reward, which I have not seen done, first needs the measurement section 5 leaves open:
+whether a reward model's score on the first ten seconds predicts its score on the finished clip. For CMI-RM,
+check the weights first, since the paper says they are released but gives no model repository.</p>
 
 <h2 id="refs">References</h2>
 <ol class="refs">
