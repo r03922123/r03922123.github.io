@@ -14,6 +14,7 @@ Nothing needs to be learned.
 | Bookshelf | `posts/` | books glow, label "POSTS" (the bookshelf) |
 | Open spellbook on a lectern | `leetcode/` | a page turns, label "LEETCODE" (the spellbook · 31 pattern notes) |
 | Three portraits above the mantel: KK, TT, HTC | `about.html#kkcompany`, `#tiktok`, `#htc` | that frame lights up, label "ABOUT · KKCOMPANY" etc. |
+| Worn purple book on the mantel (2026-11-11, `SPEC-resume-book.md`) | `book/`, unlisted: not in the text list, lo-fi list or hint | the book glows, label "OLD BOOK" (on the mantel) |
 
 Ambience (no links): a gramophone on a side table, a crackling fireplace (flickering light and a few rising embers), candles, two armchairs and a rug,
 a tall window with moon and stars, a tapestry. Portraits show emblems (a note, a play triangle, goggles), not faces.
