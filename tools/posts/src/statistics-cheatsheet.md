@@ -5,7 +5,7 @@ group: Statistics and experimentation
 order: 9
 tags: statistics · reference · hypothesis testing · confidence intervals · power
 ---
-Most statistics in day-to-day ML work comes down to one question asked in different clothes: is this difference real, or is it noise? A new ranker lifts click-through rate by 0.4 points, a fine-tuned model gains two points of accuracy, a cohort spends more after a launch. This page collects the tools for answering it, in the order you usually need them. Sections are short and link to the posts that develop each idea; the distributions themselves live in the [probability cheatsheet](../probability-cheatsheet/). The formulas and numbers are checked in code, against `scipy`, `scikit-learn` or a simulation.
+Use 1.96 with an estimated standard error at \(n = 10\) and a "95%" interval covers the truth only about 92% of the time. Check an experiment with no effect 20 times and stop at the first \(p < 0.05\), and about a quarter end up "significant". Most statistics in day-to-day ML work comes down to one question asked in different clothes: is this difference real, or is it noise? A new ranker lifts click-through rate by 0.4 points, a fine-tuned model gains two points of accuracy, a cohort spends more after a launch. This page collects the tools for answering it, in the order you usually need them. Sections are short and link to the posts that develop each idea; the distributions themselves live in the [probability cheatsheet](../probability-cheatsheet/). The formulas and numbers are checked in code, against `scipy`, `scikit-learn` or a simulation.
 
 ## Estimates and standard errors
 An estimate is a number computed from a sample, and the **standard error** (SE) is how much that number would wobble if you drew a fresh sample. Four formulas cover most cases:
@@ -322,6 +322,6 @@ for s in rate:
 - **Choosing the analysis after seeing the data.** Trying metrics, segments or outlier rules until something crosses 0.05 is multiple testing without the correction. Fix the primary metric and test in advance.
 - **Trusting "n > 30".** It is a rough guide for mild skew; for heavy-tailed metrics, check the normal approximation by simulation.
 
-For the evaluation side of the same ideas, such as comparing models offline and running online tests, see [Evaluating ML systems](/posts/evaluating-ml-systems/) and [is this coin fair?](../is-this-coin-fair/).
+The simulations here draw independent units from fixed distributions, so they show each formula working when those assumptions hold; correlated sessions, effects that change over time and interference, from the pitfalls above, break them. For the evaluation side of the same ideas, such as comparing models offline and running online tests, see [Evaluating ML systems](/posts/evaluating-ml-systems/) and [is this coin fair?](../is-this-coin-fair/).
 
 This page is a rewritten summary of standard material; for fuller treatments see Casella and Berger's Statistical Inference and, on peeking, Evan Miller's essay [How Not To Run an A/B Test](https://www.evanmiller.org/how-not-to-run-an-ab-test.html).
