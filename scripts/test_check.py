@@ -1,5 +1,6 @@
 # Tests for check.py: a clean site passes; each planted fault is reported.
 import ast
+import importlib.util
 import io
 import json
 import os
@@ -28,6 +29,11 @@ MUSICGEN_PATHS = ("/musicgen-prune-inference/", "/musicgen-prune-inference/decod
 SITE = "https://r03922123.github.io"
 RSS = '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>r</title>{}</channel></rss>\n'
 ITEM = f"<item><title>A</title><link>{SITE}/posts/a/</link><pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate></item>"
+# The other listed posts of feed_site, so rss.xml and llms.txt are complete (posts/a's item is ITEM).
+OTHER_POSTS = ("/posts/c/", *MUSICGEN_PATHS, "/leetcode/b/")
+ITEMS = "".join(f"<item><link>{SITE}{u}</link><pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate></item>" for u in OTHER_POSTS)
+LLMS = "# r\n\n> s\n\n" + "".join(f"- [x]({SITE}{u}{'index.md' if u in ('/posts/a/', '/leetcode/b/') else ''}): y\n"
+                                  for u in ("/posts/a/", *OTHER_POSTS))
 SITEMAP = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{}</urlset>\n'
 FIXED = ("/", "/about.html", "/posts/", "/leetcode/")
 TAGGED = PAGE.replace("</head>", "{head}</head>")
@@ -72,6 +78,9 @@ class CheckTest(unittest.TestCase):
         out = self.findings({"index.html": PAGE.format(body=""), "notes.md": "has Secret-Term here"})
         self.assertEqual(len(out), 1)
         self.assertIn("notes.md:1", out[0])
+
+    def test_encoded_newline_does_not_shift_the_line(self):
+        self.assertEqual(self.findings({"notes.md": "x%0Ay\nsecret-term\n"}), ["notes.md:2: private term 'secret-term'"])
 
     def test_every_text_file_is_scanned(self):
         files = {name: "has secret-term here" for name in ("notes.yml", "CNAME", "resume.tex", "data.csv")}
@@ -185,6 +194,25 @@ class CheckTest(unittest.TestCase):
     def test_missing_fragment_on_the_same_page(self):
         out = self.findings(self.fragment_site('<h2 id="here">h</h2><a href="#missing">x</a>'))
         self.assertEqual(out, ["index.html: broken fragment #missing"])
+
+    def test_missing_page_with_a_fragment_is_reported_once(self):
+        out = self.findings(self.fragment_site('<a href="nope.html#x">x</a>'))
+        self.assertEqual(out, ["index.html: broken link nope.html#x"])
+
+    def test_fragment_must_match_the_id_case(self):
+        out = self.findings(self.fragment_site('<h2 id="Here">h</h2><a href="#here">x</a>'))
+        self.assertEqual(out, ["index.html: broken fragment #here"])
+
+    def test_top_fragment_ignores_case(self):
+        # Browsers scroll to the top for #top in any case when no element has that id.
+        self.assertEqual(self.findings(self.fragment_site('<a href="#TOP">x</a><a href="#Top">y</a>')), [])
+
+    def test_fragment_is_percent_decoded(self):
+        self.assertEqual(self.findings(self.fragment_site('<h2 id="a b">h</h2><a href="#a%20b">x</a>')), [])
+
+    def test_fragment_on_a_non_html_file_is_not_checked(self):
+        site = {**self.fragment_site('<a href="/notes.txt#x">x</a>'), "notes.txt": "n"}
+        self.assertEqual(self.findings(site), [])
 
     # SPEC-reading-shell: each page on the stylesheet but the home preloads both reading fonts, and each article has
     # the side and text columns, so a hand-written page cannot keep the old markup unnoticed.
@@ -307,6 +335,13 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(self.topics_findings([("a", "3 posts")], [("a", 2)]),
                          ["leetcode/index.html: card #a says 3 posts, its section has 2 rows"])
 
+    def test_card_count_is_read_from_its_count_only(self):
+        # A topic name that ends in a number of posts must not stand in for a missing count.
+        body = ('<nav class="topics"><a href="#a"><b>Top 3 posts</b><span></span></a></nav>'
+                '<section class="group" id="a"><ul><li>1</li><li>2</li><li>3</li></ul></section>')
+        self.assertEqual(self.findings({"leetcode/index.html": PAGE.format(body=body)}),
+                         ["leetcode/index.html: card #a says no count, its section has 3 rows"])
+
     def test_listed_post_missing_from_search_index(self):
         # SPEC-site-search: once the index build exists, every post a listing links must be in the index.
         files = {"posts/index.html": PAGE.format(body='<a href="a/">a</a><a href="b/">b</a>' + MUSICGEN),
@@ -332,8 +367,8 @@ class CheckTest(unittest.TestCase):
                 "leetcode/b/index.html": TAGGED.format(head=head("/leetcode/b/", post=True, md=True), body=""),
                 "leetcode/b/index.md": "# B\n\nsee [A](../../posts/a/)\n",
                 "tools/leetcode/src/b.md": "---\ntitle: B\n---\nsee [A](../../posts/a/)\n",
-                "rss.xml": RSS.format(item), "sitemap.xml": SITEMAP.format("".join(f"<url><loc>{SITE}{u}</loc></url>" for u in urls)),
-                "robots.txt": f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n", "llms.txt": "# r\n\n> s\n"}
+                "rss.xml": RSS.format(item + ITEMS), "sitemap.xml": SITEMAP.format("".join(f"<url><loc>{SITE}{u}</loc></url>" for u in urls)),
+                "robots.txt": f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n", "llms.txt": LLMS}
         site.update(files)
         if edit:
             path, old, new = edit
@@ -367,8 +402,22 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(self.feed_site(item=re.sub(r"<pubDate>.*</pubDate>", "", ITEM)), ["rss.xml: item 1 has no pubDate"])
 
     def test_email_in_feed(self):
-        out = self.feed_site(**{"llms.txt": "# r\n\n> s, katex@0.16.11\nwrite to someone@example.com\n"})
-        self.assertEqual(out, ["llms.txt:4: email address"])
+        out = self.feed_site(**{"llms.txt": LLMS + "katex@0.16.11\nwrite to someone@example.com\n"})
+        self.assertEqual(out, [f"llms.txt:{LLMS.count(chr(10)) + 2}: email address"])
+
+    def test_listed_post_missing_from_rss_or_llms(self):
+        self.assertEqual(self.feed_site(item=""), [f"rss.xml: missing {SITE}/posts/a/"])
+        out = self.feed_site(**{"llms.txt": LLMS.replace(f"({SITE}/leetcode/b/index.md)", "(/leetcode/b/index.md)")})
+        self.assertEqual(out, [f"llms.txt: missing {SITE}/leetcode/b/", "llms.txt: link /leetcode/b/index.md is not on " + SITE])
+
+    def test_feed_link_on_another_host(self):
+        out = self.feed_site(item=ITEM.replace(f"{SITE}/posts/a/", "https://example.com/posts/a/"))
+        self.assertEqual(out, [f"rss.xml: missing {SITE}/posts/a/", f"rss.xml: link https://example.com/posts/a/ is not on {SITE}"])
+
+    def test_markdown_copy_without_a_source(self):
+        # A renamed source leaves its old index.md online unless something notices.
+        out = self.feed_site(**{"posts/old/index.md": "# Old\n"})
+        self.assertEqual(out, ["posts/old/index.md: no source tools/posts/src/old.md"])
 
     def test_post_source_without_markdown(self):
         self.assertEqual(self.feed_site(**{"posts/a/index.md": None}), ["posts/a/index.md: missing (source tools/posts/src/a.md)"])
@@ -377,7 +426,7 @@ class CheckTest(unittest.TestCase):
 
     def test_broken_link_in_markdown_copy(self):
         # The page drops a link to an unwritten post, but its index.md keeps it live; code is never a link.
-        md = "# A\n\nsee [B](../b/), `f[i](x)`\n\n```python\nops[op](a, b)\n```\n"
+        md = "# A\n\nsee [B](../b/), `f[i](x)`, \\( f[i](x) \\)\n\n```python\nops[op](x)\n```\n"
         self.assertEqual(self.feed_site(**{"posts/a/index.md": md}), ["posts/a/index.md: broken link ../b/"])
 
     def test_markdown_keeps_front_matter(self):
@@ -387,6 +436,11 @@ class CheckTest(unittest.TestCase):
     def test_canonical_link_must_match_the_page_url(self):
         out = self.feed_site(edit=("posts/a/index.html", f'canonical" href="{SITE}/posts/a/"', f'canonical" href="{SITE}/posts/c/"'))
         self.assertEqual(out, [f"posts/a/index.html: canonical link {SITE}/posts/c/ is not {SITE}/posts/a/"])
+
+    def test_page_needs_exactly_one_canonical_link(self):
+        own = f'<link rel="canonical" href="{SITE}/posts/a/">\n'
+        out = self.feed_site(edit=("posts/a/index.html", own, own * 2))
+        self.assertEqual(out, [f"posts/a/index.html: canonical link {SITE}/posts/a/, {SITE}/posts/a/ is not {SITE}/posts/a/"])
 
     def test_page_without_canonical_link(self):
         out = self.feed_site(edit=("leetcode/index.html", f'<link rel="canonical" href="{SITE}/leetcode/">\n', ""))
@@ -418,6 +472,29 @@ class CheckTest(unittest.TestCase):
         # unittest.main() exits, so any test class defined after it would not run when this file is executed
         last = ast.parse(Path(__file__).read_text()).body[-1]
         self.assertIn("__main__", ast.unparse(last.test) if isinstance(last, ast.If) else "")
+
+
+class BuildTest(unittest.TestCase):
+    """The page template in tools/leetcode/build.py, which both post builds use."""
+
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("lc_build", Path(__file__).resolve().parent.parent / "tools/leetcode/build.py")
+        cls.lc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.lc)
+
+    def test_json_ld_has_no_angle_bracket(self):
+        # "<!--" or "</script" inside the script would change how the page parses; \u003c is the same JSON.
+        title = "a <!-- b </script> <c>"
+        tags = self.lc.head_tags("/posts/a/", (title, "s", "November 1, 2026"))
+        ld = tags.split('<script type="application/ld+json">', 1)[1].rsplit("</script>", 1)[0]
+        self.assertNotIn("<", ld)
+        self.assertEqual(json.loads(ld)["headline"], title)
+
+    def test_chosen_card_rule_works_for_an_id_that_starts_with_a_digit(self):
+        # #1-a is not a valid CSS selector, so the whole rule would be dropped; an attribute selector is.
+        _, chosen = self.lc.topic_list([("1 A", "1-a", ["<li></li>"], "")])
+        self.assertIn(':root:has([id="1-a"]:target) .topics a[href="#1-a"]', chosen)
 
 
 STYLE = Path(__file__).resolve().parent.parent / "style.css"
@@ -624,7 +701,7 @@ class MainTest(unittest.TestCase):
         # A punctuated term has only the loose rule, so every <...> the old rule read as a gap must still be one.
         scrub = scrubber(["acme-corp"])
         for gap in ("<1>", "<!--x-->", "< b>", "</ b>", "<_x>", "<!DOCTYPE html>", "<?xml v?>", "<b>", "< >",
-                    "<%1>", "<&1>", "<%20b>", "<&NBSP;b>"):
+                    "<%1>", "<&1>", "<%20b>", "<%20%3Eb>", "<&NBSP;b>"):
             self.assertNotIn("acme", scrub(f"x acme{gap}corp.png"), gap)
 
     def test_term_at_the_end_of_a_longer_word_is_left_alone(self):
