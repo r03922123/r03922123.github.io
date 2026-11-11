@@ -7,7 +7,7 @@ tags: RAG · retrieval · vector search · BM25 · LLM
 ---
 A language model knows only what was in its training data, as of the day that data was collected. It knows nothing about your product manual, last week's policy change or a customer's account. Retrieval-augmented generation (RAG) is the standard workaround: when a question arrives, search a document collection for the passages most likely to contain the answer, paste them into the prompt, and ask the model to answer from them. The model's weights never change. Updating its knowledge means updating an index.
 
-The name comes from Lewis et al. [1], who trained a retriever and a generator together. In practice the term now covers the looser pattern of any search system feeding any LLM, and that is what this post builds. No model is downloaded, so the generator is left out and every other stage is small enough to check with asserts.
+The name comes from Lewis et al. [1], who trained a retriever and a generator together. In practice the term now covers the looser pattern of any search system feeding any LLM, and that is what I build here. No model is downloaded, so the generator is left out and every other stage is small enough to check with asserts. On fourteen questions over eight made-up help-centre articles, neither BM25 nor character vectors alone puts every answer in the top three, and fusing their rankings does.
 
 ## Two pipelines, one index
 A RAG system is really two pipelines that share an index:
@@ -273,7 +273,7 @@ assert curve[1][1] < 0.03 and 0.45 < curve[1][0] < 0.65                 # 1 list
 assert curve[16][1] < 0.3 and curve[16][0] > 0.9                         # 16 lists: about a quarter of the work, over 90%
 ```
 
-Probing one list out of 64 scans under 3% of the vectors and finds about half of the true top 10; probing 16 scans about a quarter and finds over 90%. The right setting is a measured choice: build a ground-truth set with exact search, then pick the cheapest `nprobe` (or HNSW `ef`) that meets a recall target. The practical side of choosing and running a vector store is in [vector databases](../vector-databases/).
+Probing one list out of 64 scans under 3% of the vectors and finds about half of the true top 10; probing 16 scans about a quarter and finds over 90%. These fractions come from 10,000 synthetic 32-dimensional vectors around 50 topics, so they show the trade-off, not the setting a real collection needs. The right setting is a measured choice: build a ground-truth set with exact search, then pick the cheapest `nprobe` (or HNSW `ef`) that meets a recall target. The practical side of choosing and running a vector store is in [vector databases](../vector-databases/).
 
 ## Assembling the prompt
 The retrieved chunks go into the prompt with a number each, so the model can cite them and the application can link the citations back to documents. Three rules carry most of the value. Keep the instruction explicit: answer only from the sources, cite them, and say so when they do not contain the answer. Respect a context budget, because every chunk adds cost and latency to prefill (see [LLM inference](../llm-inference/)). And mind order: models use information at the start and end of a long context more reliably than information in the middle [7], so the best chunk should not be buried.
@@ -352,6 +352,8 @@ They solve different problems and are often combined. RAG suits knowledge that c
 - **Chunks without context.** The sentence chunk "They cost an extra ten cents per minute…" from the example index never says what "they" are. Prepend the document title and section path to each chunk before embedding.
 - **Mismatched embeddings.** Queries and chunks must be embedded by the same model version, and changing the model means re-embedding the whole collection.
 - **Evaluating on questions the model already knows.** A general-knowledge test set rewards the model's memory, not the retrieval. Use questions that only the documents can answer.
+
+With no generator here, the grounding check runs on two hand-written answers, and character n-gram vectors stand in for a learned embedding model. Two questions stay open for a real system: how much a learned embedding closes the paraphrase gap on "minimum age to sign up", and how often the model ignores its sources. The labelled questions from the debugging section are the way to measure both, retrieval first.
 
 Eugene Yan's [Patterns for Building LLM-based Systems & Products](https://eugeneyan.com/writing/llm-patterns/) was a starting point for this post; the example corpus, code and measurements here are my own.
 
