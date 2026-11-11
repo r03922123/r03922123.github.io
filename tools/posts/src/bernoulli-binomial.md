@@ -5,7 +5,7 @@ group: Probability
 order: 2
 tags: Bernoulli · binomial · distributions · probability
 ---
-A huge share of the data an ML system sees is yes-or-no: did the user click, did the request fail, is the label positive, did the model get this example right. One such outcome is a **Bernoulli** random variable. Count how many came out "yes" across a fixed number of independent tries and you have a **binomial** random variable. These two are the simplest distributions in probability, and also two of the most used: a click-through rate, an accuracy on a test set and the binary cross-entropy loss are all statements about them.
+An ad gets 40 clicks in 1,000 impressions: a click-through rate of 4%, with a rough 95% interval from 2.8% to 5.2%, wide enough that a 4.5% variant could easily be no better. That interval comes from the binomial. Much of the data an ML system sees is yes-or-no like this: did the user click, did the request fail, is the label positive. One such outcome is a **Bernoulli** random variable. Count how many came out "yes" across a fixed number of independent tries and you have a **binomial** random variable. A click-through rate, an accuracy on a test set and the binary cross-entropy loss are all statements about them.
 
 This post defines both, derives their mean and variance without grinding through sums, checks every formula in code, then works through examples and the assumptions that fail most often in practice.
 
@@ -99,7 +99,7 @@ assert abs(sums.mean() - n * p) < 0.01 and abs(sums.var() - n * p * (1 - p)) < 0
 For \(0 < p < 1\), the most likely count, the mode, is \(\lfloor (n + 1)p \rfloor\) (when \((n + 1)p\) is a whole number, that value and the one below it tie). The shape is symmetric only at \(p = 1/2\); for small \(p\) it piles up near zero with a long right tail.
 
 ## The proportion, and how many trials you need
-Usually we care about the fraction of successes \(\hat p = X / n\) rather than the count. Dividing by \(n\) gives
+Usually you care about the fraction of successes \(\hat p = X / n\) rather than the count. Dividing by \(n\) gives
 
 \[ \mathbb{E}[\hat p] = p, \qquad \text{SE}(\hat p) = \sqrt{\frac{p(1 - p)}{n}}. \]
 
@@ -159,6 +159,8 @@ one_sided = tail_at_least(60, 100, 0.5)
 assert round(one_sided, 3) == 0.028
 assert math.isclose(2 * one_sided, stats.binomtest(60, 100, 0.5).pvalue)
 ```
+
+In the simulation, letting the five voters copy one shared vote 60% of the time leaves each 70% accurate but keeps the majority below 0.78, against 0.837 for independent voters.
 
 ## Its neighbours
 The binomial sits in the middle of a small family, and knowing the links saves a lot of re-deriving.
@@ -226,5 +228,7 @@ assert round(math.exp(binomial_logpmf(1000, 2000, 0.5)), 4) == 0.0178
 - **Binomial:** the number of successes in \(n\) independent trials with the same \(p\); PMF \(\binom{n}{k} p^k (1-p)^{n-k}\), mean \(np\), variance \(np(1 - p)\).
 - **The proportion** \(k/n\) estimates \(p\) with standard error \(\sqrt{p(1-p)/n}\): four times the data for half the error.
 - **Check the assumptions** before trusting the error bars: independent trials, one shared \(p\), and \(n\) fixed in advance.
+
+These simulations build in their own departures from the binomial: voters that copy one shared vote 60% of the time, and users whose click rates come from one Beta distribution with mean 0.04. So they show the direction of each effect, not its size on real data. How correlated real trials are stays open, and the binomial cannot answer it; counting at the level where independence plausibly holds, or a model with extra variance such as the beta-binomial, is where to go next.
 
 The next posts in this group cover the Poisson, exponential and normal distributions, and the [probability cheatsheet](../probability-cheatsheet/) collects all of them on one page. The derivations here are standard textbook material; Joseph Blitzstein and Jessica Hwang's Introduction to Probability (2nd edition, 2019) treats them, and the idea of reading each distribution as a story about how the data was generated, in much more depth.
