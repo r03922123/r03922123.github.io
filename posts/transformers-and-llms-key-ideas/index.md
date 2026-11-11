@@ -198,7 +198,7 @@ def continuation_tv(fix_up, runs=20_000):
 
 tv, per_run = continuation_tv("leftover")
 tv_bad, _ = continuation_tv("target")                              # wrong fix-up: redraw from p
-assert tv < 0.06 < 0.1 < tv_bad                                    # noise ~0.03; the bug ~0.15
+assert tv < 0.06 < 0.1 < tv_bad                                    # noise ~0.03; the bug ~0.12
 assert per_run < 2                                                 # 3 tokens in under 2 passes
 print(f"TV {tv:.3f} (broken fix-up: {tv_bad:.3f}); 3 tokens in {per_run:.2f} target passes")
 ```
