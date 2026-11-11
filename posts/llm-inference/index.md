@@ -1,6 +1,6 @@
 # LLM inference: where the time and memory go
 
-Training a language model is a one-off bill; serving it is a running one, measured in how long a user waits for the first word, how fast the rest arrives, and how many users one GPU carries at once. This post builds a simple cost model of a decoding step and uses it to explain the standard serving techniques. Most of them answer one question: how to get more tokens out of each trip through GPU memory.
+In a simple cost model of a 7B model on a GPU with roughly an A100's figures, decoding one sequence takes 7 ms per token and leaves more than 99% of the arithmetic idle. A batch of 64 raises throughput from 143 to 9,143 tokens per second, until each sequence's 2,000-token cache must be read as well, which cuts it to 1,578 with 32 key/value heads. Training a language model is a one-off bill; serving it is a running one, measured in how long a user waits for the first word, how fast the rest arrives, and how many users one GPU carries at once. I build that cost model of a decoding step and use it to explain the standard serving techniques. Most of them answer one question: how to get more tokens out of each trip through GPU memory.
 
 The mechanics of the KV cache, grouped-query attention and the proof that speculative decoding is exact are in [Transformers and LLMs: the key engineering ideas](../transformers-and-llms-key-ideas/). Here the focus is on what happens when many requests share a machine.
 
@@ -327,6 +327,8 @@ assert all(p.shape == full.shape for p in partials)
 - **Sizing for weights only.** The KV cache grows with batch size times context and can exceed the weights. Plan memory as weights plus cache plus workspace, at the longest context the service allows.
 - **Averages hide tails.** One long prompt can stall everyone queued behind it; report percentiles of TTFT and TPOT, not means.
 - **Trusting reconstruction error.** Layer error is a proxy. Check task metrics on the real quantized checkpoint, with calibration data close to production traffic.
+
+Every number here comes from a cost model built on one GPU's peak figures or from small simulations: random weights, synthetic request lengths, one time unit per decode step. They show why each technique helps and where its gain fades, not what a given server will measure. The simulation also leaves out prefill, so how to schedule it alongside decode stays open here; Sarathi-Serve and DistServe answer that in different ways.
 
 The overview of inference optimization on Lilian Weng's blog, [Large Transformer Model Inference Optimization](https://lilianweng.github.io/posts/2023-01-10-inference-optimization/), was a starting point for these notes; the explanations and simulations here are my own. For the model these techniques serve, see [Foundation models](../foundation-models/) and [FlashAttention](../flashattention/), which removes the memory cost of the attention matrix during prefill.
 
