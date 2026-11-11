@@ -1,8 +1,8 @@
 # Dropout: random masks, ensembles and a hidden L2 penalty
 
-Dropout is the simplest regularizer in deep learning to write down: on every training step, set each unit's output to zero with probability \(p\), independently, and use a fresh random pattern on the next step. At inference nothing is dropped. A unit can no longer count on any particular neighbour being present, so the network has to spread what it knows across many units instead of building fragile combinations that only work together.
+Fit a network with about 17,000 weights to 20 noisy points and it memorizes the noise: training MSE 0.03, test MSE 0.17. Dropout moves those to 0.13 and 0.12. It is the simplest regularizer in deep learning to write down: on every training step, set each unit's output to zero with probability \(p\), independently, and use a fresh random pattern on the next step. At inference nothing is dropped. A unit can no longer count on any particular neighbour being present, so the network has to spread what it knows across many units instead of building fragile combinations that only work together.
 
-This post writes dropout from scratch, checks it against PyTorch and shows it closing the gap between training and test error, then makes three common one-liners precise. "It trains an ensemble" is exact only in special cases. "It is like weight decay" is exact for a linear model, with a twist. And "never use it with batch norm" is really a rule about placement: the trouble comes from dropout that feeds a batch-norm layer.
+I write dropout from scratch, check it against PyTorch and show it closing that gap, then make three common one-liners precise. "It trains an ensemble" is exact only in special cases. "It is like weight decay" is exact for a linear model, with a twist. And "never use it with batch norm" is really a rule about placement: the trouble comes from dropout that feeds a batch-norm layer.
 
 ## The forward pass
 For an activation vector \(h\), draw a mask \(m\) with independent entries \(m_i \sim \text{Bernoulli}(1 - p)\) and output
@@ -67,7 +67,7 @@ A network with about 17,000 weights fitted to 20 noisy points is the standard wa
 | No dropout | 0.03 | 0.17 |
 | Dropout, \(p = 0.5\) | 0.13 | 0.12 |
 
-Without dropout the training error falls far below the noise level: the network memorized the noise, and test error pays for it. Dropout makes memorizing hard: a wiggle through one training point has to survive whichever half of the units is missing. Training error goes up and test error goes down, as a regularizer should (the [bias–variance trade-off](../bias-variance-tradeoff/) again).
+Without dropout the training error falls far below the noise level: the network memorized the noise, and test error pays for it. Dropout makes memorizing hard: a wiggle through one training point has to survive whichever half of the units is missing. Training error goes up and test error goes down, as a regularizer should (the [bias–variance trade-off](../bias-variance-tradeoff/) again). These numbers come from one sine-wave task averaged over four seeds, so they show the mechanism, not how much dropout will help on other data.
 
 ```python
 def fit(p, seed, n=20, steps=1500, width=128):
@@ -253,5 +253,7 @@ ones = torch.ones(4, 100)
 assert (Leaky().eval()(ones) == 0).any()              # still dropping in eval mode
 assert torch.equal(Fixed().eval()(ones), ones)
 ```
+
+What these blocks leave open is scale. Every check runs on something small: one sine-wave task, a 10-unit layer, a linear model with 8 features. The nonlinear ensemble check uses random weights, so it shows that the deterministic network can miss the ensemble average, not how far a trained one misses it. And in a deep network the penalty has no closed form, so "dropout regularizes in activation space" is carried over from the linear case, not proven by these blocks. How much dropout buys on a given model is still a question for its validation data.
 
 The masking scheme, the weight-scaling rule and the ensemble interpretation are from Hinton et al. (2012) and Srivastava et al. (2014). The linear-model penalty follows the analysis in Srivastava et al. and Wager, Wang and Liang (2013), and the batch-norm interaction is from Li et al. (2019).
