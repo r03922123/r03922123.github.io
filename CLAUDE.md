@@ -24,7 +24,7 @@ Preview:     python3 -m http.server 8000
 
 ## Where things are decided
 
-- `CONSTRAINTS.md`: the workflow rules and the six gates. Do not loosen it to make a change pass.
+- `CONSTRAINTS.md`: the workflow rules and the gates. Do not loosen it to make a change pass.
 - `CAPABILITY-MAP.md`: the index of modules and their build order; each module has a `SPEC-<id>.md`.
 - `docs/adr/`: decisions and what they give up. `docs/learning-log.md`: the three whys of each change.
 

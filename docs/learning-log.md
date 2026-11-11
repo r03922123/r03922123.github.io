@@ -9,16 +9,17 @@ The three most important whys of each change, newest first. Each heading reads `
    edit. Like photographing a crime scene before anyone walks in: later PRs can reword freely, and the check shows
    nothing else moved. Trade-off: a 78 KB generated file lives in the repo until PR 8 deletes it. Risk: if someone
    regenerates the baseline after an edit, the check would bless that edit, so it refuses to overwrite itself.
-2. **Compare numbers as sets, not text.** A rewrite may move "17,000 weights" into another sentence or say "4 seeds"
-   because the code says `seeds = 4`. So a prose number passes if the post already had it in its prose, code,
-   tables or maths, and fails if it is new or gone. Trade-off: repeating a number, or dropping one of two
-   mentions, is not caught. Risk: the check can't tell whether a number still means the same thing, which is why
-   a fresh reviewer reads every new sentence.
-3. **Parse the way the build does.** The check splits a source with the same line rules as
-   `tools/leetcode/build.py` (fences, `|` tables, `\[` blocks, `##` headings), so it sees the post the reader sees.
-   On the 4 long-form pages it leaves out the header, nav and aside, as `reading-shell` owns those. Trade-off: if
-   the Markdown engine gains a new block type, the check must learn it too. Risk: a block it doesn't know counts as
-   prose, so only the numbers in it stay guarded.
+2. **Compare numbers, spans and links as sets, not text.** A rewrite may move "17,000 weights" into another
+   sentence, say "4 seeds" because the code says `seeds = 4`, or reuse \(p\) in a sentence about a table. So a prose
+   number passes if the post already had it in its prose, code, tables, inline code or maths, and fails if it is
+   new or gone; inline code, maths and links follow the same rule. Trade-off: repeating one, or dropping one of two
+   mentions, is not caught, nor are "half", "twice" or a lost minus sign. Risk: the check can't tell whether a
+   number still means the same thing, which is why a fresh reviewer reads every new sentence.
+3. **Parse the way the build does.** The check splits a source with the same line rules as `tools/leetcode/build.py`
+   (fences, `|` tables, `\[` blocks, `##` headings), so it sees the post the reader sees. On the 4 long-form pages it
+   leaves out only `reading-shell`'s own header, nav and aside, by class, so a new callout counts as prose.
+   Trade-off: if the Markdown engine gains a new block type, the check must learn it too. Risk: a block it doesn't
+   know counts as prose, so only the numbers in it stay guarded.
 
 ## 2026-11-11 · build: expert accuracy pass over all 90 posts
 
