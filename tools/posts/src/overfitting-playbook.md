@@ -5,9 +5,9 @@ group: Machine learning fundamentals
 order: 9
 tags: overfitting · regularization · augmentation · early stopping
 ---
-A model overfits when it learns patterns that are true of its training set and nowhere else: the noise in the labels, the quirks of the particular rows it saw. Training error keeps falling, and error on new data stops falling and then rises.
+Fit 20 noisy points from a sine curve with a degree-12 polynomial, and its training error is lower than the best degree's while its validation error is more than twice as high. That model overfits: it learns patterns that are true of its training set and nowhere else, the noise in the labels and the quirks of the particular rows it saw. Training error keeps falling, and error on new data stops falling and then rises.
 
-The fixes are not interchangeable, and the fixes for underfitting point the opposite way, so the first job is diagnosis. Then come the levers, cheapest first, each with a small experiment that shows what it does.
+The fixes are not interchangeable, and the fixes for underfitting point the opposite way, so I start with diagnosis. Then come the levers, cheapest first, each with a small experiment that shows what it does.
 
 ## Diagnose first
 The basic instrument is a pair of numbers, training error and validation error, measured on the same metric with the model in evaluation mode. Watch them as one thing varies: model capacity, training set size or training steps.
@@ -276,6 +276,8 @@ assert mse(tuned, X_va, y_va) < 0.8 * mse(deep, X_va, y_va)
 assert tuned.best_params_["max_depth"] < deep.get_depth()
 ```
 
+On 300 sine points the unrestricted tree fits its training set exactly, and the tree tuned by 5-fold cross-validation has less than 0.8 times its validation error.
+
 Deep networks often behave the other way: a bigger, well-regularized network frequently beats a smaller one, and test error, after peaking near the size at which the model can just fit the training set exactly, can fall again as the model grows past it, the "double descent" of Belkin et al. (2019) and Nakkiran et al. (2019). Shrinking a network saves inference cost but is rarely the best way to buy accuracy.
 
 ## Which lever, in what order
@@ -296,5 +298,7 @@ Cheapest first: early stopping and weight decay, then the augmentations your dom
 - **Overfitting the validation set.** Every choice made by looking at validation (epochs, \(\lambda\), architecture) leaks a little of it into the model. Keep a test set you look at rarely.
 - **A small gap that hides leakage.** Preprocessing fitted on all the data, duplicates across the split, or a feature derived from the label make validation look as good as training.
 - **Adam with `weight_decay`.** In `torch.optim.Adam` that argument is an L2 penalty that adaptive scaling weakens for some weights and strengthens for others. Use AdamW.
+
+Every experiment here is small: polynomials, linear models and trees on synthetic data whose noise I set, so they show what each lever does, not how much it buys on a given model. Weight decay has no experiment here, and for dropout, label smoothing and mixup I check only the mechanics (the targets, the losses, the variance shift) without training a network to watch the gap close. Double descent is cited, not reproduced. On a real network, its own learning curves and validation set decide which lever pays.
 
 Chapter 7 of Goodfellow, Bengio and Courville's Deep Learning (2016) covers most of these levers, including early stopping as an L2 penalty; the noise-as-ridge result is from Bishop (Neural Computation, 1995). AdamW is from Loshchilov and Hutter (ICLR 2019), batch normalization from Ioffe and Szegedy (ICML 2015), and the mixup calibration result from Thulasidasan et al. (NeurIPS 2019). Mixup is from Zhang, Cisse, Dauphin and Lopez-Paz (ICLR 2018), Cutout from DeVries and Taylor (2017), SpecAugment from Park et al. (2019), dropout from Srivastava et al. (JMLR 2014), label smoothing from Szegedy et al. (CVPR 2016), and the dropout and BatchNorm variance shift from Li, Chen, Hu and Yang (CVPR 2019).
