@@ -220,8 +220,8 @@ LAION-CLAP <span class="tag">[paper]</span>.</p>
 </table>
 <p>Self-attention cost grows with \(T^2\), so at four minutes the large model does roughly
 \((12000/3000)^2 = 16\) times less attention work. The small model takes more steps, but each looks only
-inside one frame (at most eight tokens), which is cheap. A low frame rate plus hierarchical prediction is the
-main reason whole songs of two to four minutes became practical.</p>
+inside one frame (at most eight tokens), which is cheap. A low frame rate plus hierarchical prediction cuts
+the attention work that makes whole songs of two to four minutes expensive.</p>
 
 <h2 id="scoring">3. Scoring: from CLAP to reward models</h2>
 <h3>How CLAP is trained</h3>
@@ -280,7 +280,7 @@ def train_step(batch):            # batch holds pairs
 <p>The paper also uses it for best-of-N on MusicGen-small and Stable-Audio-Open-small: 2,183 MusicCaps prompts,
 ten 10-second clips each, \(N \in \{1, 3, 10\}\), scored only after every clip is fully generated. Compared with
 CLAP best-of-N, the only change is the scoring function, one trained on human preferences. Pruning makes the
-selection <em>cheaper</em>; a better reward makes it <em>more accurate</em>. I have not seen the two combined.</p>
+selection <em>cheaper</em>; a better reward makes it <em>more accurate</em>. Combining them is left open below.</p>
 <p>Code is at <code>github.com/Haiwen-Xia/CMI-RewardBench</code>, and the CMI-Pref datasets are on Hugging Face
 under CC BY-NC-SA. The paper says weights are released but gives no model repository, so check before
 planning an experiment around them.</p>
@@ -313,7 +313,7 @@ answer = Thinker_MoE(interleave(a, tokenize("Which clip is better?")))   # 30B t
 </table>
 <p>Why can a 30M-parameter head beat Gemini 3 Pro on agreement? A large model is a general judge that was
 never calibrated to these 31 annotators' taste. CMI-RM's encoders were trained on music, and its heads were
-fit with Bradley–Terry directly on human choices. Small and specialized beats large and general here.</p>
+fit with Bradley–Terry directly on human choices. In this one reported comparison, small and specialized beats large and general.</p>
 
 <h2 id="dpo">4. Alignment: DPO</h2>
 <h3>What alignment is for</h3>
@@ -384,7 +384,7 @@ harder it pushes; once a pair is ranked correctly it barely moves.</p>
 <p>How far does best-of-N move the output distribution? The commonly quoted formula, shown by Beirami et
 al. <a href="#ref-10">[10]</a> to be an upper bound, is</p>
 \[ \mathrm{KL}\big(\pi_{\text{BoN}} \,\|\, \pi_{\text{ref}}\big) \le \log N - \frac{N - 1}{N}. \]
-<p>At \(N = 8\) that is about \(2.08 - 0.875 \approx 1.2\) nats. Doubling \(N\) adds only about
+<p>At \(N = 8\) that is about \(2.08 - 0.875 \approx 1.2\) nats. Doubling \(N\) raises the bound by only about
 \(\log 2 \approx 0.69\) nats while doubling the cost, so best-of-N hits diminishing returns quickly. That is the
 case for moving preferences into the model at training time.</p>
 <p>Put together: pruning lowers the cost of best-of-N, a preference-trained reward model makes its choice
