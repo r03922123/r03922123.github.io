@@ -5,7 +5,7 @@ group: Machine learning fundamentals
 order: 3
 tags: regression · maximum likelihood · loss functions
 ---
-Squared error for regression and cross-entropy for classification are usually presented as conventions. They are not. Each is the negative log-likelihood of a specific assumption about how the targets were generated: Gaussian noise gives squared error, a biased coin gives cross-entropy. This post derives both from one recipe and checks every step numerically, then uses the same recipe to get the right loss for medians and counts, and to read L2 and L1 regularization as priors.
+Put ten gross errors at the large-x end of 200 points on a line of slope 0.5, and least squares nearly doubles the slope while an absolute-error fit stays near it. The two losses assume different noise. Squared error for regression and cross-entropy for classification are usually presented as conventions, but each is the negative log-likelihood of a specific assumption about how the targets were generated: Gaussian noise gives squared error, a biased coin gives cross-entropy. I derive both from one recipe and check every step numerically, then use the same recipe to get the right loss for medians and counts, and to read L2 and L1 regularization as priors.
 
 ## One recipe
 Maximum likelihood picks the parameters under which the observed data were most probable. In supervised learning that takes three steps.
@@ -291,5 +291,7 @@ Two cautions. The Laplace prior gives zero probability to any weight being exact
 - **Check the residuals.** If their spread grows with the prediction, the constant-variance assumption is wrong. Weighted least squares, a log transform or a different distribution will fit better.
 - **Reweighting changes the model.** Class weights and resampling change the likelihood being maximized, so the fitted probabilities are no longer calibrated to the original base rate.
 - **The MLE of the variance understates the noise.** \(\mathrm{RSS}/n\) is badly biased when \(p\) is not small compared with \(n\). Divide by \(n - p\).
+
+Every data set above is simulated, most of them from the very noise model being fitted, so the checks show that the recipe, the closed forms and the library solvers agree, not which noise model a real target follows. That stays open for each new target: compare full negative log-likelihoods across noise models, check the residuals, and for counts whose variance exceeds their mean, start from the [Poisson distribution](../poisson-distribution/) post.
 
 The probabilistic reading of regression is standard textbook material; for fuller derivations, see C. M. Bishop, Pattern Recognition and Machine Learning (2006), chapters 3 and 4, and K. P. Murphy, Probabilistic Machine Learning: An Introduction (2022), its chapters on logistic, linear and generalized linear models.
