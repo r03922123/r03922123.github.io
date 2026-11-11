@@ -7,7 +7,7 @@ tags: probability · Bayes' rule · base rates · calibration
 ---
 When a detector catches 90% of real events, fires on 20% of normal cases, and real events make up 10% of traffic, only one flag in three is real. Conditional probability explains why. It answers the question "given that I now know B happened, how likely is A?" Knowing B rules out every outcome where B did not happen; among the outcomes that are left you count how often A also happens. From that one idea I derive the rules for "or" and "and", Bayes' rule, and the base-rate effect that makes a good detector of a rare event produce mostly false alarms.
 
-Every claim below is checked in code, on a small sample space that can be enumerated exactly, or by simulation.
+Most claims below are checked in code, on a small sample space that can be enumerated exactly, or by simulation.
 
 ## Counting on a small sample space
 Roll two fair dice. There are 36 equally likely outcomes, so the probability of any event is the number of outcomes in it divided by 36. Writing events as functions of an outcome, and conditioning as a filter on the outcomes, gives exact answers with `Fraction`:
