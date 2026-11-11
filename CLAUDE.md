@@ -62,8 +62,9 @@ Preview:     python3 -m http.server 8000
 - `site-search` (merged): `search.mjs` inserts a box on the two list pages and ranks with `search-core.mjs`
   over `search-index.json`, written by `tools/search/build.py` after the post builds (gates.sh runs both, and
   `node --test scripts/test_search.mjs`). `check.py` fails on a listed post missing from the index.
-- `post-voice` in progress (8 PRs, `SPEC-post-voice.md`): PR 1 adds `scripts/voice_check.py` and
-  `scripts/voice-baseline.json`, written once from `main` at `28b63c9`; never regenerate it to get green. Next is the
-  3-post pilot, which the owner reads before PR 3. Reading-page PRs open with
+- `post-voice` in progress (8 PRs, `SPEC-post-voice.md`): PR 1 (#14) added `scripts/voice_check.py` and
+  `scripts/voice-baseline.json`, written from unedited posts of `main` at `28b63c9`; never regenerate it to get
+  green. PR 2 is the pilot (`dropout`, `ab-testing`, `position-bias`); the owner reads it before PR 3 starts. Edited
+  sources need `tools/posts/build.py . <slug>`, then the feeds and search builds. Reading-page PRs open with
   `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR 0002).
 - Parked branches: none.
