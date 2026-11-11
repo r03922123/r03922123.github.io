@@ -1,6 +1,6 @@
 ---
 title: The normal distribution: the bell curve, checked
-summary: Where the bell curve's formula comes from, why one table of the standard normal answers every normal question, which sums stay normal and which do not, how fast the central limit theorem kicks in, when the normal approximation to the binomial works, and the tail and skew pitfalls that bite in practice. Every claim checked in code.
+summary: Where the bell curve's formula comes from, why one table of the standard normal answers every normal question, which sums stay normal and which do not, how fast the central limit theorem kicks in, when the normal approximation to the binomial works, and the tail and skew pitfalls that bite in practice. Most claims checked in code.
 group: Probability
 order: 5
 tags: probability · normal · Gaussian · central limit theorem
