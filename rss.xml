@@ -213,7 +213,7 @@
     <title>Statistics on one page: estimates, intervals, tests and the traps</title>
     <link>https://r03922123.github.io/posts/statistics-cheatsheet/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/statistics-cheatsheet/</guid>
-    <description>A compact reference for the statistics behind experiments and model comparisons: standard errors, what a confidence interval does and does not promise, the testing loop and its two kinds of error, which test to use for which data, power and sample size, multiple comparisons and peeking, MLE versus MAP, and Simpson's paradox. The formulas and numerical claims are checked in code.</description>
+    <description>A compact reference for the statistics behind experiments and model comparisons: standard errors, what a confidence interval does and does not promise, the testing loop and its two kinds of error, which test to use for which data, power and sample size, multiple comparisons and peeking, MLE versus MAP, and Simpson's paradox. Most formulas and numerical claims are checked in code.</description>
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>

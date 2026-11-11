@@ -4,7 +4,7 @@ Fit 100 rows with 50 features and 5 real effects, and the lasso's test MSE avera
 
 \[ \mathcal{L}(w) = \text{data loss}(w) + \lambda\, \Omega(w), \qquad \lambda \ge 0 \]
 
-Two choices of \(\Omega\) cover most of practice: the squared L2 norm \(\lVert w \rVert_2^2 = \sum_i w_i^2\) (ridge regression, and weight decay in neural networks) and the L1 norm \(\lVert w \rVert_1 = \sum_i \lvert w_i \rvert\) (the lasso). They look alike, but L2 makes every weight smaller and leaves them all nonzero, while L1 sets some weights exactly to zero and so selects features. This post shows why on one weight solved by hand, checks it on real regressions, gives the Bayesian reading of each penalty, and ends with deep learning, where an L2 penalty and weight decay stop being the same thing under Adam.
+Two choices of \(\Omega\) cover most of practice: the squared L2 norm \(\lVert w \rVert_2^2 = \sum_i w_i^2\) (ridge regression, and weight decay in neural networks) and the L1 norm \(\lVert w \rVert_1 = \sum_i \lvert w_i \rvert\) (the lasso). They look alike, but L2 makes every weight smaller and leaves them all nonzero, while L1 sets some weights exactly to zero and so selects features. This post shows why on one weight solved by hand, checks it on simulated regressions, gives the Bayesian reading of each penalty, and ends with deep learning, where an L2 penalty and weight decay stop being the same thing under Adam.
 
 ## One weight, solved exactly
 Strip the problem down to one weight whose unpenalized best value is \(z\), with data loss \(\tfrac12 (w - z)^2\). This is what each coefficient of a linear regression faces when the features are uncorrelated, as the next section checks. Adding each penalty and minimizing gives

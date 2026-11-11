@@ -2,7 +2,7 @@
 
 When I grow 20 deep regression trees on bootstrap resamples of the same 600 synthetic rows, the root question flips between two features. At a typical test point their predictions have a standard deviation of about 1.0, twice the noise level. Averaging 60 trees cuts test MSE from 2.67 for one tree to 1.29. A decision tree is a stack of yes/no questions about the features: is `age <= 30`, then is `income <= 50k`, and so on, until you reach a leaf that holds a prediction. Each question cuts the data into two parts, and a good question leaves each part more uniform than the whole.
 
-One tree is easy to read but unstable: a small change in the data can change the first question, and then everything below it changes too. **Bagging** and **random forests** grow many deep trees and average them, which cuts variance. **Boosting** grows many shallow trees one after another, each fixing what the sum so far gets wrong, which cuts bias. This post builds each piece and checks it against scikit-learn.
+One tree is easy to read but unstable: a small change in the data can change the first question, and then everything below it changes too. **Bagging** and **random forests** grow many deep trees and average them, which cuts variance. **Boosting** grows many shallow trees one after another, each fixing what the sum so far gets wrong, which cuts bias. This post builds each piece and tests it: the tree and gradient boosting match scikit-learn, AdaBoost's weights match its loss gradient, and XGBoost's leaf weight matches a numerical minimizer.
 
 ## Scoring a split
 A split sends a node's samples \(S\) into a left part \(L\) and a right part \(R\). The tree picks the split with the lowest size-weighted **impurity** of the two parts:
