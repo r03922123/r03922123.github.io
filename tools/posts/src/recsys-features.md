@@ -7,7 +7,7 @@ tags: recommendation · feature engineering · ranking · data leakage
 ---
 Compute an item's click rate over the whole of a simulated 30-day log and a ranker's offline AUC rises to 0.725; served with the rates it could actually have known, it scores 0.690, below the honest model's 0.693. A recommender's ranking model answers one question many times a second: how likely is this user to engage with this item, right now? The model can only be as good as what it is told about the three things in that sentence (the user, the item, the moment) and, above all, about how well the user and the item fit each other.
 
-"Use the user's history" is not a feature. A feature has a definition precise enough to compute twice and get the same answer: what is counted, over which time window, as of which moment, and smoothed how. This post sorts features into four kinds, builds one or two of each on a simulated click log, and then shows the mistake that most often makes a feature look better offline than it is. On that log, a logistic regression goes from a test AUC of 0.603 with user features alone to 0.693 with all four kinds.
+"Use the user's history" is not a feature. A feature has a definition precise enough to compute twice and get the same answer: what is counted, over which time window, as of which moment, and smoothed how. This post sorts features into four kinds, builds one or two of each on a simulated click log, and then shows how breaking point-in-time correctness makes a feature look better offline than it is. On that log, a logistic regression goes from a test AUC of 0.603 with user features alone to 0.693 with all four kinds.
 
 ## Four kinds of feature
 | kind | question it answers | examples | how fast it changes |
@@ -237,7 +237,7 @@ Not every model can use a cross feature. A **two-tower** retrieval model compute
 Ranking models can also learn crosses themselves. Tree ensembles find interactions through their splits ([decision trees to boosting](../decision-trees-to-boosting/)), and the Deep & Cross Network of Wang et al. (2017) adds layers that build explicit polynomial crosses of the inputs. Even then, a few hand-made crosses that encode known structure, such as category affinity or price relative to the user's usual spend, tend to make training faster and give a strong baseline to compare against.
 
 ## Point-in-time correctness
-The most expensive feature bug is computing a feature with information that would not exist when the prediction is made. The common version is an item CTR computed over the whole log and joined onto every row. For a row in the training set, that number includes clicks from the future and, for items with few impressions, a large share of the row's own label.
+A costly feature bug is computing a feature with information that would not exist when the prediction is made. The common version is an item CTR computed over the whole log and joined onto every row. For a row in the training set, that number includes clicks from the future and, for items with few impressions, a large share of the row's own label.
 
 ```python
 X_leaky = X.copy()
