@@ -48,10 +48,10 @@
 </aside>
 <div class="prose">
 
-<p>A model metric is only useful if moving it moves something people care about. This reference follows
-the same chain for four kinds of system: <b>business value → product metric → model metric</b>, then how
-to test offline and online, and the problems that tend to break each step. The formulas are written out,
-and the metric code at the end runs as is.</p>
+<p>A model metric is only useful if moving it moves something people care about, and the steps between the
+two are where evaluation tends to break. For four kinds of system, this reference follows the chain
+<b>business value → product metric → model metric</b>, then how to test offline and online, and the problems
+at each step. The formulas are written out, and the metric code at the end runs as is.</p>
 
 <h2 id="chain">The chain from value to metric</h2>
 <p>Start from what one more correct prediction is worth, and work down:</p>
@@ -232,6 +232,8 @@ assert mrr([[0, 1, 0], [1, 0, 0], [0, 0, 0]]) == 0.5     # (1/2 + 1 + 0) / 3
 assert recall_at_k([1, 0, 1, 0, 0], 3, n_relevant=4) == 0.5
 z, lift = two_proportion_z(10_000, 500_000, 10_500, 500_000)
 assert round(z, 2) == 3.53 and round(lift, 3) == 0.05</code></pre>
+<p>The asserts check NDCG, MRR and recall on small hand-made lists and reproduce the z and lift of the worked
+A/B example. Everything else on the page, ECE and the p-value included, is guidance the code does not test.</p>
 
 <h2 id="refs">References</h2>
 <ol class="refs">
