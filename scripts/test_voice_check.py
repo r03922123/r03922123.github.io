@@ -16,7 +16,7 @@ tags: regularization
 Dropout sets each unit's output to zero with probability \\(p\\) and uses `nn.Dropout` in PyTorch.
 Training error falls from 0.03 to 0.13 over two runs, see [the paper](https://arxiv.org/abs/1207.0580).
 
-## Results
+## Results at 30 epochs
 | p | test error |
 |---|---|
 | 0.5 | 0.12 |
@@ -169,6 +169,7 @@ class VoiceCheckTest(unittest.TestCase):
 
     def test_number_from_a_heading_or_reference_may_appear_in_prose(self):
         self.edit(self.page, "Ten items", "2005: ten items")    # 2005 is only in the reference list
+        self.edit(self.src, "over two runs", "over two runs of 30")      # 30 is only in a heading
         self.assertEqual(self.errors(), [])
 
     def test_repeating_a_span_or_link_passes(self):       # a sentence on a table may reuse a symbol or a citation
