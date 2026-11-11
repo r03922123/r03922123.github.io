@@ -2,7 +2,7 @@
 
 A recommender has to pick ten items out of millions for one person in a few tens of milliseconds. No single model can afford to look carefully at every item, so almost every production system is a funnel: a fast stage that throws away nearly everything, a slow stage that orders what is left, and a last pass that applies the rules a sorted list of scores cannot express.
 
-This post runs that funnel on a simulated catalogue where the true preferences are known, so each stage can be checked: what retrieval keeps, what the ranker adds, whether the ranking loss matters, and what diversity costs.
+I run that funnel on a simulated catalogue of 240 users and 2,000 items where the true preferences are known, so I can check each stage: what retrieval keeps, what the ranker adds, whether the ranking loss matters, and what diversity costs. The ranker lifts NDCG@10 from 0.44 to 0.67, mostly through one cross feature, and pointwise, RankNet and LambdaRank training tie.
 
 ## Why two stages
 Suppose a ranking model needs 20 microseconds to score one (user, item) pair with all its features. Scoring a catalogue of 10 million items would take 200 seconds per request. Scoring 500 candidates takes 10 milliseconds.
@@ -304,5 +304,7 @@ Offline NDCG, recall and MRR are cheap, so they choose which experiments to run.
 - **Averaging NDCG over lists with no relevant item.** IDCG is zero; drop or count those lists explicitly and report which.
 - **Training on different candidates than serving.** A ranker trained only on shown items has never seen the odd candidates a new retrieval source sends it.
 - **Optimizing the loss before the inputs.** As the table shows, a missing cross feature costs far more than the choice between pointwise, pairwise and LambdaRank training.
+
+These numbers come from one simulated catalogue, linear rankers over three features and true grades in place of logged clicks, so they show how the stages divide the work, not the size of each gain on real data. Two questions stay open: whether the losses still tie when the model cannot fit everything, and whether users value the variety that re-ranking adds, which only an online test can show.
 
 The overall framing of the funnel follows Eugene Yan's [system design for recommendations and search](https://eugeneyan.com/writing/system-design-for-discovery/); the prose, simulation and code here are original. RankNet is due to Burges et al. (ICML 2005), LambdaRank to Burges, Ragno and Le (NIPS 2006), and both with LambdaMART are surveyed in Burges, "From RankNet to LambdaRank to LambdaMART: An Overview" (Microsoft Research, 2010).
