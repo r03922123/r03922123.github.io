@@ -37,6 +37,7 @@ branch ─> sh scripts/gates.sh ─> push ─> PR ─> CI runs gates.sh ─> reb
 | Topic posts (55) | `posts/<slug>/index.html` | `tools/posts/build.py` from `tools/posts/src/<slug>.md` | Reading shell (`SPEC-reading-shell.md`): title block, side column (details and contents), one text column. |
 | LeetCode posts (31) | `leetcode/<slug>/index.html` | `tools/leetcode/build.py` from `tools/leetcode/src/<slug>.md` | Same shell. |
 | Long-form posts (4) | `posts/<slug>/index.html` | hand | Listed by `LONGFORM` in `tools/posts/build.py`. No Markdown source, so no `index.md` copy. |
+| The old book (6) | `book/index.html`, `book/<slug>/index.html` | `tools/book/build.py` from `tools/book/src/<slug>.md` | Unlisted on purpose (`SPEC-resume-book.md`, ADR 0003): reached only from the purple book on the room's mantel, `noindex`, and in no feed, index or list. `check.py` fails if another page links it. |
 | MusicGen posts (2) | another repo, served at `/musicgen-prune-inference/` | that repo | Listed by `MUSICGEN` in `tools/posts/build.py`; `EXTERNAL` in `scripts/check.py` lets links to it pass. |
 | About | `about.html` | hand | Each role is a `section` with an id; the room's three portraits link to those ids. |
 | Not found | `404.html` | hand | Pages serves it for any missing path. |
@@ -61,6 +62,7 @@ first. `gates.sh` runs posts first, which works because `leetcode/` is committed
 ```
 python3 -I tools/leetcode/build.py .  [slug ...]   # no slugs = every source
 python3 -I tools/posts/build.py .     [slug ...]
+python3 -I tools/book/build.py .                     # every book page; nothing else reads tools/book/src
 python3 -I tools/feeds/build.py .
 python3 -I tools/search/build.py .
 ```
@@ -73,7 +75,8 @@ python3 -I tools/search/build.py .
   library held to one thread and a 120 s timeout. An error or a failing assert stops the build, so every asserted
   claim is re-checked on each build. A printed number with no assert is not checked.
 - **`tools/posts/build.py` reuses that engine.** It loads its own copy of the LeetCode build and points it at the posts
-  sources, and adds `GROUPS`, `LONGFORM` and `MUSICGEN`.
+  sources, and adds `GROUPS`, `LONGFORM` and `MUSICGEN`. `tools/book/build.py` does the same for the book, without
+  the head tags.
 - **`tools/feeds/build.py` and `tools/search/build.py`** read the builds' lists: the feeds build loads each build on
   its own, the search build loads the posts build and reaches the LeetCode one through it. A new post appears in the
   feeds and the search index with no change to either.
