@@ -1,6 +1,6 @@
 ---
 title: Docker for ML: containers, layer caching and reproducible builds
-summary: What a container actually is, why a model's behaviour depends on things outside its source code, how Docker's build cache decides what to rebuild, and why a lockfile matters more than the Dockerfile. Small simulations of the build cache and of an unpinned install show each rule.
+summary: What a container actually is, why a model's behaviour depends on things outside its source code, how Docker's build cache decides what to rebuild, and what a lockfile pins that a cached build does not. Small simulations of the build cache and of an unpinned install show each rule.
 group: ML systems and design
 order: 4
 tags: Docker · containers · reproducibility · deployment
@@ -9,7 +9,7 @@ Add the same 100,000 float32 values in four ways and you get four different sums
 
 Several practical facts follow. Starting a container costs little more than starting the process inside it. An image is mostly just the files that process needs, so it is small next to a disk image. And a Linux container needs a Linux kernel, which is why Docker on a Mac or on Windows quietly runs a small Linux virtual machine underneath.
 
-This post covers what that means for shipping models: why ML code is unusually sensitive to its environment, how to write a Dockerfile whose build cache works for you, and why the lockfile is the part that actually makes builds reproducible.
+This post covers what that means for shipping models: why ML code is unusually sensitive to its environment, how to write a Dockerfile whose build cache works for you, and why a cached build is not a reproducible one, and what a lockfile fixes.
 
 ## What a container is, and is not
 The isolation comes from two Linux kernel features. **Namespaces** give a process its own view of a resource (mount points, process IDs, network, hostname, users), and **cgroups** cap what it may consume (CPU, memory, I/O). An **image** is a frozen, layered filesystem plus a little metadata such as the default command; a **container** is one running instance of an image, with a thin writable layer on top that disappears when the container is removed.
