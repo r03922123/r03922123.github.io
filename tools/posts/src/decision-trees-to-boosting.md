@@ -368,6 +368,6 @@ assert np.isclose(far[0], far[1]) and abs(far[0] - 30) < 0.5          # flat bey
 
 In the forest above, the six pure-noise features took about 18% of the impurity importance between them; their permutation importance was zero to two decimal places.
 
-Every result here comes from small synthetic datasets with fixed seeds. No test compares a forest's test error with gradient boosting's, and early stopping and the learning rate are left untested. On real data, which family wins and how to set its knobs are questions for a validation set.
+Every result the code produces comes from small synthetic datasets with fixed seeds. No test compares a forest's test error with gradient boosting's, and early stopping and the learning rate are left untested. On real data, which family wins and how to set its knobs are questions for a validation set.
 
 The outline of this post follows the CS229 notes on decision trees and Yann Dubois's machine-learning glossary entry on trees, rewritten with new examples and code; the bagging and boosting material follows chapters 8, 10 and 15 of Hastie, Tibshirani and Friedman's The Elements of Statistical Learning.

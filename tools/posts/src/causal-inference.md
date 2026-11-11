@@ -14,7 +14,7 @@ Write \(Y_i(1)\) for the outcome unit \(i\) would have with the treatment and \(
 
 \[ \text{ATE} = \mathbb{E}[Y(1) - Y(0)]. \]
 
-The fundamental problem is that each unit shows us only one of the two: \(Y_i(1)\) if treated, \(Y_i(0)\) if not. Causal inference is the business of filling in the missing column. The naive estimate compares the treated with the untreated, and a two-line rearrangement shows what it really measures:
+The fundamental problem is that each unit shows only one of the two: \(Y_i(1)\) if treated, \(Y_i(0)\) if not. Causal inference is the business of filling in the missing column. The naive estimate compares the treated with the untreated, and a two-line rearrangement shows what it really measures:
 
 \[ \underbrace{\mathbb{E}[Y \mid T=1] - \mathbb{E}[Y \mid T=0]}_{\text{naive difference}} = \underbrace{\mathbb{E}[Y(1) - Y(0) \mid T=1]}_{\text{effect on the treated}} + \underbrace{\mathbb{E}[Y(0) \mid T=1] - \mathbb{E}[Y(0) \mid T=0]}_{\text{selection bias}}. \]
 
