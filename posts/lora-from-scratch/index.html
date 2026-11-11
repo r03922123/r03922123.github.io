@@ -74,7 +74,7 @@ matrices and leaves \(W_0\) frozen:</p>
   <li><b>Inference.</b> \(W = W_0 + \frac{\alpha}{r} BA\) can be computed once, after which the adapted model costs
   exactly what the original did.</li>
 </ul>
-<p>The rest of the post checks all but the \(\alpha / r\) scale.</p>
+<p>The rest of the post checks the trainable share, the zero start and fusion, not the \(\alpha / r\) scale.</p>
 
 <h2 id="gpt">A GPT small enough to read</h2>
 <p>Character-level, two layers, 48-dimensional embeddings. It is far too small to write English, but it has

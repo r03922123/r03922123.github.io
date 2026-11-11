@@ -384,7 +384,7 @@ harder it pushes; once a pair is ranked correctly it barely moves.</p>
 <p>How far does best-of-N move the output distribution? The commonly quoted formula, shown by Beirami et
 al. <a href="#ref-10">[10]</a> to be an upper bound, is</p>
 \[ \mathrm{KL}\big(\pi_{\text{BoN}} \,\|\, \pi_{\text{ref}}\big) \le \log N - \frac{N - 1}{N}. \]
-<p>At \(N = 8\) that is about \(2.08 - 0.875 \approx 1.2\) nats. Doubling \(N\) raises the bound by only about
+<p>At \(N = 8\) that is about \(2.08 - 0.875 \approx 1.2\) nats. Doubling \(N\) raises the bound by a little under
 \(\log 2 \approx 0.69\) nats while doubling the cost, so best-of-N hits diminishing returns quickly. That is the
 case for moving preferences into the model at training time.</p>
 <p>Put together: pruning lowers the cost of best-of-N, a preference-trained reward model makes its choice
