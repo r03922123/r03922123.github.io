@@ -5,7 +5,7 @@ group: LLMs and generative AI
 order: 11
 tags: LLM · evaluation · RAG · LLM-as-judge · guardrails · bootstrap
 ---
-A prompt change that is truly 3 points better scores the same or worse on a 60-question golden set in about 30% of runs. To detect the same change with 80% power, the arithmetic below needs about 865 questions. That is the gap between how LLM applications are often evaluated (a few dozen hand-picked questions, eyeballed before and after a change) and what the numbers can support.
+A prompt change that is truly 3 points better scores the same or worse on a 60-question golden set in about 30% of runs. If 10% of questions get different answers from the two versions, detecting that change with 80% power needs about 865 questions. That is the gap between how LLM applications are often evaluated (a few dozen hand-picked questions, eyeballed before and after a change) and what the numbers can support.
 
 An **evaluation loop** is the routine that turns "the new prompt looks better" into a measured decision: a fixed set of labelled questions, metrics that say which part of the system moved, a grader that is itself checked, an interval around every difference, and a gate that runs the whole thing on every change. **Guardrails** are the checks that run on live traffic and block an unsafe input or output. If you know classifier evaluation, most of this is familiar: a judge is a classifier to be validated against labels, and a guardrail is a classifier with an operating point. What is new is that the system under test produces text, so the labels themselves come from a model or a person.
 
@@ -217,9 +217,12 @@ for name, cells in (("same", SAME), ("drop", DROP)):
         block[name, n] = (sum(gate(b, c, rng) for b, c in runs), sum(c.mean() < b.mean() for b, c in runs))
 assert block == {("same", 60): (4, 179), ("same", 200): (17, 205), ("same", 1000): (7, 186),   # blocks out of 400:
                  ("drop", 60): (98, 358), ("drop", 200): (294, 397), ("drop", 1000): (400, 400)}  # (noise-aware, naive)
+noninferior_blocks = {n: sum(bootstrap_ci(c - b, rng, B=2000)[0] < -0.02 for b, c in (draw(SAME, n, rng) for _ in range(400)))
+                      for n in (60, 1000)}                        # pass only if the lower end is above -2 points
+assert noninferior_blocks == {60: 347, 1000: 184}                 # blocks out of 400 harmless changes
 ```
 
-The naive gate blocks 45% to 51% of changes that do nothing, which teaches a team to override it. The noise-aware gate blocks 1% to 4%. Its cost is the other error: a real 5-point drop is blocked only 24.5% of the time on 60 questions, 73.5% on 200 and every time on 1000. A gate this lenient on a small set must be paired with the sample-size arithmetic above; the stricter alternative, a non-inferiority gate that passes only when the interval's lower end is above a tolerated drop, would block most changes on 60 questions, where the paired interval above spans more than 16 points, which is the honest answer when the set cannot tell.
+The naive gate blocks 45% to 51% of changes that do nothing, which teaches a team to override it. The noise-aware gate blocks 1% to 4%. Its cost is the other error: a real 5-point drop is blocked only 24.5% of the time on 60 questions, 73.5% on 200 and every time on 1000. A gate this lenient on a small set must be paired with the sample-size arithmetic above; the stricter alternative, a non-inferiority gate that passes only when the interval's lower end is above a tolerated drop of 2 points, blocks 86.8% of the harmless changes on 60 questions and still 46% on 1000, which is the honest answer when the set cannot tell.
 
 ## The loop in one table
 

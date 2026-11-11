@@ -55,7 +55,7 @@
 resource "aws_s3_bucket" "models" {
   bucket = "example-ml-models-dev"
   lifecycle {
-    prevent_destroy = true       # reject any plan that would delete the model store
+    prevent_destroy = true       # reject a plan that would destroy it, while this block is in the config
   }
 }</code></pre>
 <p>The workflow is two commands. <code>terraform plan</code> computes and prints the changes without making them; <code>terraform apply</code> makes them. Saving the plan (<code>plan -out=tfplan</code>, then <code>apply tfplan</code>) applies exactly what a reviewer read.</p>
@@ -91,7 +91,7 @@ def plan(desired, state, actual, force_new, replace=(), protect=(), ignore=None)
             elif changed:
                 actions[addr] = "update"
     for addr, act in actions.items():
-        if addr in protect and act in ("replace", "delete"):  # lifecycle prevent_destroy
+        if addr in protect and act == "replace":              # prevent_destroy; a deleted block has none
             raise RuntimeError(f"{addr} has prevent_destroy; plan rejected")
     return actions, drift
 
@@ -150,10 +150,12 @@ try:
     plan(renamed, state, actual, FORCE_NEW, protect={"bucket.models"})
     raise AssertionError("renaming a protected bucket should be rejected")
 except RuntimeError:
-    pass</code></pre>
-<p><code>terraform plan -replace=ADDRESS</code> forces a replace with no config change, for an object that has gone bad. <code>ignore_changes</code> stops planned updates to listed attributes, which is right when something else, such as an autoscaler, owns them; without it every plan fights the autoscaler. <code>prevent_destroy</code> turns a plan that would delete the resource into an error, which matters for the bucket of model artifacts, since renaming it forces a replace. One more mode exists for drift you meant to keep: refresh-only mode (<code>terraform apply -refresh-only</code>) updates the state to match the world and changes nothing else.</p>
+    pass
+without_block = {k: v for k, v in desired.items() if k != "bucket.models"}   # delete the block: the protection goes too
+assert plan(without_block, state, actual, FORCE_NEW, protect={"bucket.models"})[0]["bucket.models"] == "delete"</code></pre>
+<p><code>terraform plan -replace=ADDRESS</code> forces a replace with no config change, for an object that has gone bad. <code>ignore_changes</code> stops planned updates to listed attributes, which is right when something else, such as an autoscaler, owns them; without it every plan fights the autoscaler. <code>prevent_destroy</code> turns a plan that would destroy the resource into an error, which matters for the bucket of model artifacts, since renaming it forces a replace. It protects only while its resource block is in the config: delete the block and the setting goes with it, so the next plan destroys the bucket without complaint, as the last assert shows. One more mode exists for drift you meant to keep: refresh-only mode (<code>terraform apply -refresh-only</code>) updates the state to match the world and changes nothing else.</p>
 <h2 id="the-state-file-shared-locked-and-sensitive">The state file: shared, locked, and sensitive</h2>
-<p>The state exists because the config alone cannot say which real object <code>endpoint.scorer</code> is. Terraform's documentation gives three uses: mapping config to real resources, keeping metadata, and speed on large setups. Kept on one laptop, it blocks teamwork, so teams store it in a <b>remote backend</b> (an object store, or HCP Terraform). Shared state brings a new failure. Each <code>apply</code> reads the state, changes the world, and writes the whole state back. Below, two jobs each add one endpoint, and I run every ordering of their read and write steps, with and without a lock.</p>
+<p>The state exists because the config alone cannot say which real object <code>endpoint.scorer</code> is. Terraform's documentation gives four uses: mapping config to real resources, keeping metadata such as dependencies, speed on large setups, and syncing, so a team works from one copy. Kept on one laptop, it cannot sync, so teams store it in a <b>remote backend</b> (an object store, or HCP Terraform). Shared state brings a new failure. Each <code>apply</code> reads the state, changes the world, and writes the whole state back. Below, two jobs each add one endpoint, and I run every ordering of their read and write steps, with and without a lock.</p>
 <pre><code class="language-python">from itertools import permutations
 
 
@@ -255,10 +257,11 @@ print(f"accuracy {b.mean():.3f}, models disagree on {np.mean(b != c):.0%} of ite
       f"standard error of the difference: paired {se_paired:.4f}, unpaired {se_unpaired:.4f}")
 
 same, small, large = rates["same quality"], rates["small drop"], rates["large drop"]
-assert 1.8 &lt; mean_drop["large drop"] &lt; 2.2 and 0.4 &lt; mean_drop["small drop"] &lt; 0.6
-assert 0.45 &lt; same["any drop"] &lt; 0.55 and small["any drop"] &gt; 0.7 and large["any drop"] &gt; 0.95
-assert same["unpaired z-test"] &lt; 0.01 and small["unpaired z-test"] &lt; 0.01 and 0.25 &lt; large["unpaired z-test"] &lt; 0.45
-assert 0.03 &lt; same["paired McNemar"] &lt; 0.08 and small["paired McNemar"] &lt; 0.2 and large["paired McNemar"] &gt; 0.75
+pct = lambda row: {g: round(100 * r) for g, r in row.items()}
+assert round(mean_drop["small drop"], 1) == 0.5 and round(mean_drop["large drop"], 1) == 2.0
+assert pct(same) == {"any drop": 49, "unpaired z-test": 0, "paired McNemar": 6}
+assert pct(small) == {"any drop": 76, "unpaired z-test": 0, "paired McNemar": 15}
+assert pct(large) == {"any drop": 99, "unpaired z-test": 36, "paired McNemar": 83}
 assert 0.08 &lt; np.mean(b != c) &lt; 0.12 and 0.45 &lt; se_paired / se_unpaired &lt; 0.6</code></pre>
 <table><thead><tr><th>Gate</th><th>blocks a same-quality retrain</th><th>blocks a 0.5-point drop</th><th>blocks a 2-point drop</th></tr></thead><tbody><tr><td>any drop</td><td>about half (49%)</td><td>about three in four (76%)</td><td>almost always (99%)</td></tr><tr><td>unpaired z-test</td><td>almost never (0%)</td><td>almost never (0%)</td><td>about a third (36%)</td></tr><tr><td>paired McNemar</td><td>about 1 in 17 (6%)</td><td>about 1 in 7 (15%)</td><td>about 4 in 5 (83%)</td></tr></tbody></table>
 <p>The paired test is the only one that both lets equal retrains through and catches the large drop; the naive gate fails every second harmless retrain, which teaches a team to rerun or override it. Pairing wins because two models agree on most items, so the noise in their difference comes only from the items they disagree on, about one in ten here, and its standard error is about half the unpaired one. No gate catches half a point reliably on 2,000 items: the paired one blocks such a model about once in seven tries. To guard smaller drops, enlarge the eval set or accept a gate that also blocks some equal models; the same power trade-off appears in <a href="../ab-testing/">A/B testing</a>. The eval set must stay fixed across runs and should be pinned by a hash, or the gate compares two models on different questions.</p>
@@ -266,6 +269,8 @@ assert 0.08 &lt; np.mean(b != c) &lt; 0.12 and 0.45 &lt; se_paired / se_unpaired
 <p>CD moves an artifact that already passed CI through environments: build the image once, deploy it to staging, then promote the same image, by digest, to prod. A sketch of the jobs in GitHub Actions (not run):</p>
 <pre><code class="language-plaintext">on:
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
 jobs:
   test:
@@ -280,7 +285,7 @@ jobs:
       - run: uv run python -m train.gate --eval-set eval/fixed.parquet --baseline registry:prod
   deploy-prod:
     needs: eval-gate
-    if: github.event_name == 'push'          # a separate workflow on push to main, in practice
+    if: github.event_name == 'push'          # deploy only after the merge, not from a PR
     environment: production                  # waits for the environment's protection rules
     runs-on: ubuntu-24.04
     steps:

@@ -25,7 +25,7 @@ terraform {
 resource "aws_s3_bucket" "models" {
   bucket = "example-ml-models-dev"
   lifecycle {
-    prevent_destroy = true       # reject any plan that would delete the model store
+    prevent_destroy = true       # reject a plan that would destroy it, while this block is in the config
   }
 }
 ```
@@ -67,7 +67,7 @@ def plan(desired, state, actual, force_new, replace=(), protect=(), ignore=None)
             elif changed:
                 actions[addr] = "update"
     for addr, act in actions.items():
-        if addr in protect and act in ("replace", "delete"):  # lifecycle prevent_destroy
+        if addr in protect and act == "replace":              # prevent_destroy; a deleted block has none
             raise RuntimeError(f"{addr} has prevent_destroy; plan rejected")
     return actions, drift
 
@@ -132,12 +132,14 @@ try:
     raise AssertionError("renaming a protected bucket should be rejected")
 except RuntimeError:
     pass
+without_block = {k: v for k, v in desired.items() if k != "bucket.models"}   # delete the block: the protection goes too
+assert plan(without_block, state, actual, FORCE_NEW, protect={"bucket.models"})[0]["bucket.models"] == "delete"
 ```
 
-`terraform plan -replace=ADDRESS` forces a replace with no config change, for an object that has gone bad. `ignore_changes` stops planned updates to listed attributes, which is right when something else, such as an autoscaler, owns them; without it every plan fights the autoscaler. `prevent_destroy` turns a plan that would delete the resource into an error, which matters for the bucket of model artifacts, since renaming it forces a replace. One more mode exists for drift you meant to keep: refresh-only mode (`terraform apply -refresh-only`) updates the state to match the world and changes nothing else.
+`terraform plan -replace=ADDRESS` forces a replace with no config change, for an object that has gone bad. `ignore_changes` stops planned updates to listed attributes, which is right when something else, such as an autoscaler, owns them; without it every plan fights the autoscaler. `prevent_destroy` turns a plan that would destroy the resource into an error, which matters for the bucket of model artifacts, since renaming it forces a replace. It protects only while its resource block is in the config: delete the block and the setting goes with it, so the next plan destroys the bucket without complaint, as the last assert shows. One more mode exists for drift you meant to keep: refresh-only mode (`terraform apply -refresh-only`) updates the state to match the world and changes nothing else.
 
 ## The state file: shared, locked, and sensitive
-The state exists because the config alone cannot say which real object `endpoint.scorer` is. Terraform's documentation gives three uses: mapping config to real resources, keeping metadata, and speed on large setups. Kept on one laptop, it blocks teamwork, so teams store it in a **remote backend** (an object store, or HCP Terraform). Shared state brings a new failure. Each `apply` reads the state, changes the world, and writes the whole state back. Below, two jobs each add one endpoint, and I run every ordering of their read and write steps, with and without a lock.
+The state exists because the config alone cannot say which real object `endpoint.scorer` is. Terraform's documentation gives four uses: mapping config to real resources, keeping metadata such as dependencies, speed on large setups, and syncing, so a team works from one copy. Kept on one laptop, it cannot sync, so teams store it in a **remote backend** (an object store, or HCP Terraform). Shared state brings a new failure. Each `apply` reads the state, changes the world, and writes the whole state back. Below, two jobs each add one endpoint, and I run every ordering of their read and write steps, with and without a lock.
 
 ```python
 from itertools import permutations
@@ -261,10 +263,11 @@ print(f"accuracy {b.mean():.3f}, models disagree on {np.mean(b != c):.0%} of ite
       f"standard error of the difference: paired {se_paired:.4f}, unpaired {se_unpaired:.4f}")
 
 same, small, large = rates["same quality"], rates["small drop"], rates["large drop"]
-assert 1.8 < mean_drop["large drop"] < 2.2 and 0.4 < mean_drop["small drop"] < 0.6
-assert 0.45 < same["any drop"] < 0.55 and small["any drop"] > 0.7 and large["any drop"] > 0.95
-assert same["unpaired z-test"] < 0.01 and small["unpaired z-test"] < 0.01 and 0.25 < large["unpaired z-test"] < 0.45
-assert 0.03 < same["paired McNemar"] < 0.08 and small["paired McNemar"] < 0.2 and large["paired McNemar"] > 0.75
+pct = lambda row: {g: round(100 * r) for g, r in row.items()}
+assert round(mean_drop["small drop"], 1) == 0.5 and round(mean_drop["large drop"], 1) == 2.0
+assert pct(same) == {"any drop": 49, "unpaired z-test": 0, "paired McNemar": 6}
+assert pct(small) == {"any drop": 76, "unpaired z-test": 0, "paired McNemar": 15}
+assert pct(large) == {"any drop": 99, "unpaired z-test": 36, "paired McNemar": 83}
 assert 0.08 < np.mean(b != c) < 0.12 and 0.45 < se_paired / se_unpaired < 0.6
 ```
 
@@ -283,6 +286,8 @@ CD moves an artifact that already passed CI through environments: build the imag
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -296,7 +301,7 @@ jobs:
       - run: uv run python -m train.gate --eval-set eval/fixed.parquet --baseline registry:prod
   deploy-prod:
     needs: eval-gate
-    if: github.event_name == 'push'          # a separate workflow on push to main, in practice
+    if: github.event_name == 'push'          # deploy only after the merge, not from a PR
     environment: production                  # waits for the environment's protection rules
     runs-on: ubuntu-24.04
     steps:

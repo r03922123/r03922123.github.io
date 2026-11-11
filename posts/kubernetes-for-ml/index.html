@@ -35,7 +35,7 @@
   <h1>Kubernetes for ML: requests, probes and autoscaling for model servers</h1>
 </header>
 <aside class="post-side">
-  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>16 min</dd><dt>Topic</dt><dd>ML systems and design</dd><dt>Tags</dt><dd>Kubernetes · deployment · autoscaling · serving · GPUs</dd></dl>
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>17 min</dd><dt>Topic</dt><dd>ML systems and design</dd><dt>Tags</dt><dd>Kubernetes · deployment · autoscaling · serving · GPUs</dd></dl>
   <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#pod-deployment-service">Pod, Deployment, Service</a></li><li><a href="#requests-and-limits">Requests and limits</a></li><li><a href="#scheduling-is-by-requests-not-usage">Scheduling is by requests, not usage</a></li><li><a href="#probes-model-load-time-and-rollouts">Probes, model load time and rollouts</a></li><li><a href="#the-horizontal-pod-autoscaler">The Horizontal Pod Autoscaler</a></li><li><a href="#the-failure-modes-in-one-table">The failure modes in one table</a></li><li><a href="#what-the-simulations-do-not-show">What the simulations do not show</a></li></ol></nav>
 </aside>
 <div class="prose">
@@ -120,11 +120,13 @@ x = torch.randn(3, 512)
 assert torch.equal(naive(x), lean(x))
 assert peak_naive == 2 * weight_bytes and peak_lean == weight_bytes
 
-w_gib = 1.5e9 * 2 / GiB                          # a 1.5B-parameter model in bfloat16
+w_gib = 1.5e9 * 2 / GiB                          # a 1.5B-parameter model, built and stored in bfloat16
+fp32_build_peak = 1.5e9 * 4 / GiB + w_gib        # built in float32 first, then the bf16 weights loaded
 limit = 5.0                                      # GiB, the memory limit in the manifest
 print(f"weights {w_gib:.2f} GiB: naive load peaks at {2 * w_gib:.2f} GiB, lean load at {w_gib:.2f} GiB")
-assert round(w_gib, 2) == 2.79 and round(2 * w_gib, 2) == 5.59 and w_gib &lt; limit &lt; 2 * w_gib</code></pre>
-<p>Both models compute the same outputs, but the naive load holds twice the weight bytes at its peak. For a 1.5B-parameter model in bfloat16 that is 5.59 GiB against 2.79 GiB, so under a 5 GiB limit the pod is killed during every start, restarts, and is killed again, which Kubernetes reports as <code>CrashLoopBackOff</code>.</p>
+assert round(w_gib, 2) == 2.79 and round(2 * w_gib, 2) == 5.59 and w_gib &lt; limit &lt; 2 * w_gib
+assert fp32_build_peak / w_gib == 3</code></pre>
+<p>Both models compute the same outputs, but the naive load holds twice the weight bytes at its peak. For a 1.5B-parameter model built directly in bfloat16 that is 5.59 GiB against 2.79 GiB (built in the default float32 first, the fresh weights alone are twice the checkpoint and the peak is 3 times it), so under a 5 GiB limit the pod is killed during every start, restarts, and is killed again, which Kubernetes reports as <code>CrashLoopBackOff</code>.</p>
 <p>The second trap fires under load. Each request in flight holds activations and buffers, so memory follows concurrency, which is random. Below, 20 requests a second arrive at random, each takes about 0.25 s and holds 0.15 GiB, on top of the weights and 0.5 GiB of runtime overhead. Then the same traffic goes through a server that admits at most as many concurrent requests as the limit has room for and queues the rest.</p>
 <pre><code class="language-python">rng = np.random.default_rng(0)
 rate, hour = 20.0, 3600.0
@@ -228,7 +230,7 @@ assert spread[1] &gt; 0.95 * spread[0]           # refused while 8+ GPUs were fr
 <h2 id="probes-model-load-time-and-rollouts">Probes, model load time and rollouts</h2>
 <p>The kubelet on each node runs three kinds of <b>probe</b> against a container:</p>
 <ul><li><b>Readiness</b>: while it fails, the pod is removed from its Services' endpoints and gets no traffic. A container with no readiness probe counts as ready as soon as it starts.</li><li><b>Liveness</b>: after <code>failureThreshold</code> failures in a row (default 3, every <code>periodSeconds</code>, default 10), the container is restarted.</li><li><b>Startup</b>: while it has not yet succeeded, liveness and readiness probes do not run; if it fails <code>failureThreshold</code> times, the container is restarted.</li></ul>
-<p>A model server's process starts in seconds, but its model loads for much longer, so "started" and "able to answer" are far apart. A liveness probe alone kills the server before it can load:</p>
+<p>A model server's process starts in seconds, but its model loads for much longer, so "started" and "able to answer" are far apart. If the server loads its model before it starts listening, so that <code>/live</code> cannot answer during the load, a liveness probe alone kills the server before it can load:</p>
 <pre><code class="language-python">load_s = 60
 liveness_budget = 3 * 10                         # failureThreshold x periodSeconds, the defaults
 startup_budget = 30 * 10                         # the startupProbe in the manifest
@@ -288,6 +290,8 @@ def recommend(n, ready, load_rps):
     ratio = load_rps / (ready * POD_RPS) / TARGET
     if ratio &gt; 1 and ready &lt; n:                  # scaling up: not-ready pods count as idle
         ratio = ratio * ready / n
+        if ratio &lt;= 1 + TOLERANCE:               # now a scale-down or inside the tolerance: no action
+            return n
     return n if abs(ratio - 1) &lt;= TOLERANCE else math.ceil(n * ratio)
 
 
@@ -317,9 +321,9 @@ assert recommend(4, 4, 4 * POD_RPS * 0.65) == 4  # ratio 1.08 is inside the tole
 flappy, stable = autoscale(0), autoscale(300)
 print(f"pods created in 6 h: window 0 s -&gt; {flappy[0]}, window 300 s -&gt; {stable[0]}; "
       f"unserved load {flappy[1]:.2%} vs {stable[1]:.2%}")
-assert flappy[0] &gt; 2_000 and stable[0] &lt; 150 and flappy[0] &gt; 10 * stable[0]
+assert 1_600 &lt; flappy[0] &lt; 1_700 and stable[0] &lt; 150 and flappy[0] &gt; 10 * stable[0]
 assert stable[1] == 0 and 0 &lt; flappy[1] &lt; 0.005</code></pre>
-<p>Without the window, the HPA creates over 2,000 pods in six hours, each loading a model for 75 seconds before it serves, and still leaves a little load unserved when a burst follows a scale-down; the default 300-second window creates fewer than 150 and serves everything. For model servers the stabilization window is not a detail: a pod is expensive to start, so removing one that will be needed a minute later is pure waste.</p>
+<p>Without the window, the HPA creates about 1,600 pods in six hours, each loading a model for 75 seconds before it serves, and still leaves a little load unserved when a burst follows a scale-down; the default 300-second window creates fewer than 150 and serves everything. For model servers the stabilization window is not a detail: a pod is expensive to start, so removing one that will be needed a minute later is pure waste.</p>
 <h2 id="the-failure-modes-in-one-table">The failure modes in one table</h2>
 <table><thead><tr><th>Problem</th><th>Naive fix</th><th>How it breaks</th><th>Real fix</th><th>How it's measured</th></tr></thead><tbody><tr><td>Pod OOMKilled at start</td><td>raise the memory limit until it stops</td><td>the limit pays for a load-time spike forever</td><td>build on <code>meta</code>, load with <code>assign=True</code></td><td>peak resident bytes during load</td></tr><tr><td>Pod OOMKilled under load</td><td>size memory from the average</td><td>random concurrency crosses the limit hundreds of times an hour</td><td>cap concurrent requests to what the limit holds</td><td>peak memory and queue wait</td></tr><tr><td>Slow p99 with idle CPUs</td><td>more threads</td><td>threads burn the CPU quota early, then wait 100 ms</td><td>threads no more than the CPU limit, or a higher limit</td><td>latency against request size; throttled-period counters</td></tr><tr><td>Pod stays <code>Pending</code></td><td>add nodes</td><td>requests, not usage, decide fit; GPUs fragment</td><td>requests from measured usage; bin-pack GPUs</td><td>free resources per node, not per cluster</td></tr><tr><td>Errors during a rollout</td><td>none: rollouts look instant</td><td>pods count as ready before the model loads</td><td>readiness probe on model loaded, startup probe for load time</td><td>failed requests during rollout</td></tr><tr><td>Replica count flaps</td><td>lower the target</td><td>pods are removed and recreated each dip</td><td>keep the stabilization window; requests set right</td><td>pods created per hour</td></tr></tbody></table>
 <h2 id="what-the-simulations-do-not-show">What the simulations do not show</h2>
