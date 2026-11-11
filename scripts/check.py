@@ -360,6 +360,17 @@ def feed_findings(root, listed):
     return findings + head_findings(root)
 
 
+def search_findings(root, listed):
+    """SPEC-site-search. Active once tools/search/build.py exists: every post a listing links is in the index."""
+    if not (root / "tools/search/build.py").is_file():
+        return []
+    try:
+        urls = {e["u"] for e in json.loads((root / "search-index.json").read_text())}
+    except (OSError, ValueError, KeyError, TypeError) as error:   # the error's name only, never file text
+        return [f"search-index.json: unreadable ({type(error).__name__})"]
+    return [f"search-index.json: missing {path}" for path in dict.fromkeys(listed) if path not in urls]
+
+
 def check(root, denylist, terms_only=False):
     root = Path(root)
     deny = [(term, term_forms(term)) for term in denylist]
@@ -425,6 +436,7 @@ def check(root, denylist, terms_only=False):
     listed = [path for section in ("posts", "leetcode") for kind, path, _ in links(root, f"{section}/index.html", f"/{section}/")
               if kind == "a" and (re.fullmatch(rf"/{section}/[^/]+/", path) or path in MUSICGEN)]
     findings += feed_findings(root, list(dict.fromkeys([*FIXED_PAGES, *listed])))
+    findings += search_findings(root, listed)
     # The home page's hand-written copies of the listings must keep up with them.
     count = len(list(root.glob("leetcode/*/index.html")))
     for rel in ("index.html", "posts/index.html"):
