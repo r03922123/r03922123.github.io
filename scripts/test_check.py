@@ -508,6 +508,13 @@ class CheckTest(unittest.TestCase):
                 out = self.book_site(**{rel: PAGE.format(body=f'<a href="{href}">b</a>{extra}')})
                 self.assertEqual(out, [f"{rel}: links /book/ 1 times (allowed: 0)"], (rel, href))
 
+    def test_book_linked_from_any_other_page(self):
+        for rel in ("posts/x/index.html", "leetcode/y/index.html", "404.html"):
+            extra = {"posts/index.html": PAGE.format(body='<a href="x/">x</a>' + MUSICGEN)} if rel.startswith("posts") else \
+                    {"leetcode/index.html": PAGE.format(body='<a href="y/">y</a>')} if rel.startswith("leetcode") else {}
+            out = self.book_site(**{rel: PAGE.format(body='<a href="/book/">b</a>'), **extra})
+            self.assertEqual(out, [f"{rel}: links /book/ 1 times (allowed: 0)"], rel)
+
     def test_home_links_the_book_only_from_its_door(self):
         body = '<a class="rm-door" href="book/">Old book</a><ul class="lofi-doors"><li><a href="book/">Book</a></li></ul>'
         self.assertEqual(self.book_site(**{"index.html": PAGE.format(body=body)}),
