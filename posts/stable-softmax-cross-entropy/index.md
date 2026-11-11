@@ -1,6 +1,6 @@
 # Numerically stable softmax and cross-entropy
 
-Softmax and cross-entropy are one line of math each, and the one-line code for each breaks on inputs a real network can produce. In float32, a logit of 100 overflows, and a gap of 120 between two logits makes a probability exactly zero, and the log of that zero is infinite. This post derives the two fixes every deep learning framework uses: subtract the maximum before exponentiating, and compute log-probabilities directly with log-sum-exp instead of taking the log of a probability. Each fix is checked against a brute force, and the post ends with the common bugs that quietly undo them.
+Softmax and cross-entropy are one line of math each, and the one-line code for each breaks on inputs a real network can produce. In float32, a logit of 100 overflows, and a gap of 120 between two logits makes a probability exactly zero, so the loss comes out infinite where the true value is about 120. I derive the two fixes every deep learning framework uses: subtract the maximum before exponentiating, and compute log-probabilities directly with log-sum-exp instead of taking the log of a probability. Each fix is checked against a brute force, and the post ends with the common bugs that quietly undo them.
 
 Throughout, \(z \in \mathbb{R}^K\) is a vector of logits (the raw scores a network outputs for \(K\) classes) and \(y\) is the index of the correct class.
 
@@ -273,5 +273,7 @@ assert math.isclose(kl, soft_cross_entropy(logits, teacher) - teacher_entropy, r
 | Probabilities to show or threshold | the max-shifted softmax | `torch.softmax(logits, dim=-1)` |
 
 The rule behind the table: keep everything as logits or log-probabilities for as long as possible, and turn them into probabilities only at the end, when a person needs to read them or a threshold needs to be applied.
+
+The checks use random logits at a few fixed scales plus hand-picked extremes, so they show where each formula breaks, not how often a training run produces such logits. The code does not run PyTorch's autocast or Keras's `from_logits` flag, so those two pitfalls are stated, not checked.
 
 The outline of this post, the max shift followed by the log-softmax rearrangement, follows Jay Mody's post [Numerically Stable Softmax and Cross Entropy](https://jaykmody.com/blog/stable-softmax/).
