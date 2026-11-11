@@ -314,7 +314,7 @@ assert acc_lora_slow < acc["lora"] - 0.25
 | LoRA, all linear layers | 3,848 | 0.90 |
 | Full fine-tuning | 18,312 | 0.94 |
 
-Read this as a picture of the trade-offs, not a benchmark. One small task, one seed and one learning rate per method decide the exact order. Run for 1,000 steps instead of 200 and every method except the frozen head gets above 0.85, with prefix tuning and IA³ passing LoRA. LoRA run at full fine-tuning's \(10^{-3}\) reaches only about 0.43 in the 200 steps. Three things do carry over to real models. Prompt tuning trails prefix tuning, because a few vectors at the input of a small model have little leverage, while prefixes act directly inside every layer's attention. IA³ gets a lot from very few parameters. And rounding the frozen base to 4 bits barely moves LoRA, which is the bet QLoRA makes.
+Read this as a picture of the trade-offs, not a benchmark. One small task, one seed and one learning rate per method decide the exact order. Run for 1,000 steps instead of 200 and every method except the frozen head gets above 0.85, with prefix tuning and IA³ passing LoRA. LoRA run at full fine-tuning's \(10^{-3}\) reaches only about 0.43 in the 200 steps. Three things here are likely to hold on real models too, though one toy cannot show it. Prompt tuning trails prefix tuning, because a few vectors at the input of a small model have little leverage, while prefixes act directly inside every layer's attention. IA³ gets a lot from very few parameters. And rounding the frozen base to 4 bits barely moves LoRA, which is the bet QLoRA makes.
 
 ## Serving: merging, swapping and forgetting
 Training cost is half the story. The other half is what the adapted model costs to run and how many tasks it can serve.
