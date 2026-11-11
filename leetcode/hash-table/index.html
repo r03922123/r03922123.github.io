@@ -35,7 +35,7 @@
   <h1>Hash tables from scratch: chaining, hash functions, resizing</h1>
 </header>
 <aside class="post-side">
-  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>3 min</dd><dt>Topic</dt><dd>Stacks, queues, heaps and hashing</dd><dt>Tags</dt><dd>hashing · design · data structures</dd></dl>
+  <dl class="details"><dt>Published</dt><dd>October 31, 2026</dd><dt>Reading time</dt><dd>4 min</dd><dt>Topic</dt><dd>Stacks, queues, heaps and hashing</dd><dt>Tags</dt><dd>hashing · design · data structures</dd></dl>
   <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#hash-functions-for-integer-keys">Hash functions for integer keys</a></li><li><a href="#separate-chaining-and-resizing">Separate chaining and resizing</a></li><li><a href="#chaining-versus-open-addressing">Chaining versus open addressing</a></li><li><a href="#practice">Practice</a></li></ol></nav>
 </aside>
 <div class="prose">
@@ -63,6 +63,8 @@ assert len({mult_hash_wrong(k) for k in keys}) == 1   # low bits of a*k are all 
 <h2 id="separate-chaining-and-resizing">Separate chaining and resizing</h2>
 <p>Each slot holds a small list of <code>(key, value)</code> pairs. With \(n\) items in \(m\) slots, the <b>load factor</b> \(\alpha = n/m\) is the average chain length, and an operation costs \(O(1 + \alpha)\). Keep \(\alpha\) bounded by doubling \(m\) and rehashing whenever it passes a threshold. A single resize costs \(O(n)\), but doubling means it happens after \(n\) cheap inserts, so the cost averages out to \(O(1)\) per insert.</p>
 <pre><code class="language-python">import random
+
+random.seed(0)                                  # unseeded, the chain-length assert fails in about 1.4% of runs
 
 
 class MyHashMap:
