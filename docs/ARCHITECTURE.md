@@ -141,6 +141,3 @@ Known gaps, with why each is not done yet.
   sign-in and no forms.
 - **Performance is measured once, not checked.** First paint, draw calls and frame rate are in `CONSTRAINTS.md` under
   "Measured, not yet enforced". A Lighthouse step in CI would need a browser in the job.
-- **Two post fixes wait for the owner's OK**, since each changes post code: `transformers-and-llms-key-ideas`'s
-  comment "the bug ~0.15" (it runs to 0.118), and the LeetCode `hash-table` note's unseeded chain-length assert
-  (fails about 1.4% of runs).
