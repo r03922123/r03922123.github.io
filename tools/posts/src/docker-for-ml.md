@@ -5,7 +5,7 @@ group: ML systems and design
 order: 4
 tags: Docker · containers · reproducibility · deployment
 ---
-Add the same 100,000 float32 values in four orders and you get four different sums, so a model's numbers can shift with the libraries installed around it. I show that, then simulate Docker's build cache, where the order of a Dockerfile decides whether a one-line code edit rebuilds in under two seconds or pays the full dependency install again. A container is an ordinary Linux process that has been given its own view of the system: its own root filesystem, its own process list, its own network interfaces. Nothing is booted and nothing is emulated. The host kernel runs the process directly, and the only difference from any other process is what that process is allowed to see, starting with which directory it believes is `/`.
+Add the same 100,000 float32 values in four ways and you get four different sums, so a model's numbers can shift with the libraries installed around it. I show that, then simulate Docker's build cache, where the order of a Dockerfile decides whether a one-line code edit rebuilds in under two seconds or pays the full dependency install again. A container is an ordinary Linux process that has been given its own view of the system: its own root filesystem, its own process list, its own network interfaces. Nothing is booted and nothing is emulated. The host kernel runs the process directly, and the only difference from any other process is what that process is allowed to see, starting with which directory it believes is `/`.
 
 Several practical facts follow. Starting a container costs little more than starting the process inside it. An image is mostly just the files that process needs, so it is small next to a disk image. And a Linux container needs a Linux kernel, which is why Docker on a Mac or on Windows quietly runs a small Linux virtual machine underneath.
 
@@ -247,6 +247,6 @@ For GPUs the split is precise: the host provides the NVIDIA driver, and the imag
 ## When to reach for it
 Containerize anything that runs somewhere other than the laptop it was written on: a model server, a batch scoring job, a training job on a cluster, a reproducible evaluation. For exploratory notebooks a lockfile alone is often enough. The deployment questions around the container (rollout, autoscaling, monitoring) belong to the wider [ML infrastructure](../ml-infrastructure/) and [system design](../ml-system-design-framework/) posts.
 
-The simulations model only the cache key and a toy package index, and the build times are costs I assign to each step, so they show which steps rerun, not how long a real build takes. One source of drift stays open: a container pins library versions but does not make GPU kernels deterministic, and none of the code here runs on a GPU.
+The simulations model only the cache key and a toy package index, and the build times are costs I assign to each step, so they show which steps rerun, not how long a real build takes. One source of drift stays open: an image fixes the library versions it was built with but does not make GPU kernels deterministic, and none of the code here runs on a GPU.
 
 The layer caching rules follow Docker's documentation on the build cache, and the uv pattern (`--no-install-project`, cache mounts, `--locked`) follows the Docker integration guide in uv's documentation.

@@ -7,7 +7,7 @@ tags: system design · design review · evaluation · serving
 ---
 An online shop with 5 million daily users asks, in one sentence, for personalised recommendations in a "recommended for you" row on its home page. Between that sentence and a model in production sit a dozen decisions, and bad designs usually make them in the wrong order or never write them down.
 
-The [framework post](../ml-system-design-framework/) lists the questions a design has to answer. I lay out the working process: the steps for writing or reviewing a design, what each should leave in the design document, and the small calculations that turn opinions into numbers. That shop is the running example throughout.
+The [framework post](../ml-system-design-framework/) lists the questions a design has to answer. I lay out the working process: the steps for writing or reviewing a design, what each should leave in the design document, and the small calculations that turn opinions into numbers, such as the roughly 155,000 users per arm its A/B test needs if the unit is a user. That shop is the running example throughout.
 
 ## Step 1: clarify the problem and size it
 Before any modelling, pin down four things.
