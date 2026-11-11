@@ -2,6 +2,24 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-voice PR 6, LLMs and generative AI
+
+1. **Other people's systems stay theirs.** These posts discuss models, kernels and libraries the author did not
+   build: FlashAttention's CUDA kernels, Llama, LangGraph, HNSW. Each "I" is for the post's own NumPy or PyTorch
+   reconstruction, and each limit names the line between the two ("the speedups quoted above are the paper's own
+   measurements", "the LangChain and LangGraph snippets were not run"). It is like a lab notebook that cites a
+   colleague's result instead of copying it in as your own. Trade-off: the posts sound smaller than the systems they
+   explain. Risk: a reader skimming the opening may still assume the author built the system, so the opening
+   numbers come from the post's own code or arithmetic.
+2. **Arithmetic is evidence, but not measurement.** Several openings lead with a computed number: 14 GB read per
+   token, 2 GiB of KV cache, 30.72 GB per exact-search batch. These are exact for the stated shapes, but they are not
+   timings, and the limits say "say nothing about speed on a GPU". Trade-off: no wall-clock numbers. Risk: a cost
+   model hides real overheads, which is why each post calls it a model.
+3. **A toy that reproduces a shape is enough to argue a shape.** The RLHF toy has one prompt and length as the only
+   feature, yet it reproduces reward over-optimization: the reward model's score climbs while true reward falls.
+   The limit keeps the claim to that shape, not where the turn comes for a real model. Trade-off: no claim about
+   scale. Risk: a vivid toy can be over-read, so the closing points to Gao et al. for the real-model curve.
+
 ## 2026-11-11 · build: post-voice PR 5, probability
 
 1. **A test is not a proof, so the limit says which one it is.** Where the probability posts check a formula, they do
