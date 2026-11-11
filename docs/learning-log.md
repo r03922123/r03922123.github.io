@@ -2,6 +2,22 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: post-voice PR 8, the last posts and the gate removed
+
+1. **Take the scaffolding down once the wall stands.** The voice check guarded one migration, not a permanent rule.
+   Its baseline freezes every number as of `28b63c9`, so keeping it would block any future fix to a post. PR 8
+   deletes the check, its tests, the baseline and both gate steps, which leaves `gates.sh` and `CONSTRAINTS.md`
+   byte-identical to before the module. Trade-off: later prose edits lose the number guard. Risk: a future edit can
+   change a prose number or a table unnoticed; the builds still run every assert, so code stays checked.
+2. **Prove completeness on the committed tree.** `voice_check.py --final` passed on the commit just before the
+   removal. It shows every one of the 59 posts changed its prose with its evidence intact. Running it on a
+   commit, not on a working copy, leaves the evidence in history, like a final inspection signed before the
+   scaffolding comes down. Trade-off: one extra commit boundary in the PR. Risk: none; the check reads only files.
+3. **Say whose results they are.** `text-to-music-2026` explains other people's music models. Its new closing says
+   every measured result comes from a cited paper and its code is pseudocode, and each "I" covers only the page's
+   own derivation. Trade-off: the page claims less than a reader might assume. Risk: an old sentence elsewhere could
+   still blur the line, which is what the PRs' findings lists are for.
+
 ## 2026-11-11 · build: post-voice PR 7, recommender systems and ML systems
 
 1. **The spec's list decides which pages are references.** A drafter read the two system-design posts as reference
