@@ -2,13 +2,31 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · fix: review nits deferred from PRs #4 to #11
+
+1. **A test that cannot fail proves nothing.** The Markdown check's code case `ops[op](a, b)` passed with or without
+   the code-skipping it was meant to test, since the space already kept it from matching the link pattern. Each fix
+   here began with a test seen failing on the old code: 8 of them, plus 7 that pin behaviour already right. Like a
+   smoke alarm, a check is only trusted after it has gone off once on purpose. Trade-off: more test lines than fix
+   lines. Risk: a coverage test written to pass can still assert the wrong thing; the fresh reviewer re-ran the 8
+   against the old code.
+2. **Read the field you mean.** The card count came from the whole card's text, so a topic named "Top 3 posts" with
+   no count would have passed. It now reads the `<span>` only, as a form validator reads the field, not the page
+   around it. Trade-off: the parser tracks one more state. Risk: a nested span confuses it, which shows up as a
+   "no count" finding, not a silent pass.
+3. **Measure the layout, then pick the number.** The bar's links wrapped between 700 and about 940 px. The fix is a
+   breakpoint from a measurement in Chrome (a 376 px cell), set in `em` so a larger default font moves it too.
+   Trade-off: two rows of bar up to 960 px. Risk: another browser's text metrics differ slightly; the breakpoint
+   leaves about 20 px of room.
+
 ## 2026-11-11 · docs: architecture map, README trimmed
 
 1. **Write the map from the code, not from the specs.** Specs say what a module should do on the day it was
    approved; the code says what the site does now. `docs/ARCHITECTURE.md` was drafted from the files it names, as a
    surveyor walks the ground instead of copying the old plan, and a fresh reviewer then checked each claim and found
-   four wrong ones, such as the order of the builds. Trade-off: the map has to be kept up by hand. Risk: it drifts like the README did, so it says the code wins and lists only where things are, not how
-   they work, which drifts slower.
+   four wrong ones, such as the order of the builds. Trade-off: the map has to be kept up by hand. Risk: it drifts
+   like the README did, so it says the code wins and lists only where things are, not how they work, which drifts
+   slower.
 2. **One home for each fact.** The README had grown its own copy of the layout and the steps for adding a post, and
    both went stale with version 2. It now holds a few links and two commands, and the map holds the layout.
    Trade-off: a reader clicks once more. Risk: none beyond that click.
