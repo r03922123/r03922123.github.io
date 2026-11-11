@@ -5,9 +5,9 @@ group: ML systems and design
 order: 1
 tags: system design · ML objective · evaluation · monitoring
 ---
-When an ML project disappoints, the cause often sits upstream of the model: it optimized the wrong thing, a rule would have done the job, the labels quietly meant something else, or nobody noticed the inputs had changed after launch. The architecture is a late decision in a chain, and every earlier link can break it.
+Rank 2,000 simulated videos, a tenth of them clickbait, by click probability and a session gets 15.7 clicks and 15.5 minutes of watching; by expected minutes, 8.7 clicks and 79 minutes. When an ML project disappoints, the cause often sits upstream of the model: it optimized the wrong thing, a rule would have done the job, the labels quietly meant something else, or nobody noticed the inputs had changed after launch. The architecture is a late decision in a chain, and every earlier link can break it.
 
-This post lays out that chain as four questions, answered in order, with small simulations of what goes wrong when one is skipped. Sibling posts go deeper on each step; this one is the map.
+This post lays out that chain as four questions, answered in order, with small simulations of what goes wrong when one is skipped. I simulate a proxy rewarding clickbait, a rule matching boosted trees on one task only, a threshold set by business costs, and a drift alarm. Sibling posts go deeper on each step; this one is the map.
 
 ## Four questions, in order
 
@@ -107,7 +107,7 @@ assert gap["threshold"] < 0.01
 assert gap["interaction"] > 0.2
 ```
 
-The rule is also the **baseline** for question 3: whatever model you propose has to beat it by enough to pay for itself.
+The AUC gap stays under 0.01 on the threshold task and exceeds 0.2 on the interaction task. The rule is also the **baseline** for question 3: whatever model you propose has to beat it by enough to pay for itself.
 
 ## Step 2: data, labels and features
 This is where most of the effort goes and most of the silent bugs live.
@@ -132,7 +132,7 @@ cores = qps * candidates * ranker_us / 1e6                        # core-seconds
 assert cores == 200
 ```
 
-The same arithmetic sizes the serving fleet. [Recommendation ranking](../recommendation-ranking/) runs the retrieve, rank and re-rank funnel end to end, and [two-tower retrieval](../two-tower-retrieval/) covers the first stage.
+The same arithmetic sizes the serving fleet: 20,000 requests a second of 500 candidates each need 200 cores of ranking. [Recommendation ranking](../recommendation-ranking/) runs the retrieve, rank and re-rank funnel end to end, and [two-tower retrieval](../two-tower-retrieval/) covers the first stage.
 
 ## Step 3: model design
 Start with the baseline: a rule, a popularity list, or logistic regression on a few strong features. It is fast to build, exercises the whole pipeline, and sets the number every later model must beat. Then climb only as far as the constraints allow.
@@ -199,7 +199,7 @@ print(f"PSI same distribution {same:.4f}, after a shift {shifted:.3f}")
 assert same < 0.01 and shifted > 0.25
 ```
 
-An alarm sends you back around the loop: retrain on recent data if the relationship still holds, or return to steps 1 and 2 if the product, the users or the meaning of a label has changed.
+A fresh sample from the training distribution scores below 0.01; one with its log-mean moved from 3.0 to 3.5 and a wider spread scores above 0.25. An alarm sends you back around the loop: retrain on recent data if the relationship still holds, or return to steps 1 and 2 if the product, the users or the meaning of a label has changed.
 
 ## Pitfalls
 - **Starting at the model.** An architecture chosen before the objective and the labels are fixed is a guess.
@@ -208,5 +208,7 @@ An alarm sends you back around the loop: retrain on recent data if the relations
 - **Random splits on time-ordered data.** They leak the future and inflate offline scores. Split by time.
 - **Offline wins that do not survive online.** Feedback loops, position bias and skew open a gap that only an experiment closes.
 - **No owner after launch.** Drift, retraining and label pipelines are part of the system, not an afterthought.
+
+Every simulation here makes its own data, with the clickbait share, label noise, ticket costs and drift set in the code, so each shows how a step can fail, not how often it fails on real data. On a real system, the gap between offline and online results stays open until an experiment closes it.
 
 Sources: the overall loop from objective to monitoring follows Chip Huyen, Designing Machine Learning Systems (O'Reilly, 2022); the split into online and offline paths and the retrieval and ranking funnel also draw on Eugene Yan's [System Design for Recommendations and Search](https://eugeneyan.com/writing/system-design-for-discovery/) (2021) and on Yuan Meng's blog writing on ML model design for recommendation and search. The checklist for when ML is the right tool is adapted from chapter 1 of Huyen's book. All of it is rewritten here.
