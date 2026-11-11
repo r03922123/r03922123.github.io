@@ -6,6 +6,8 @@ A post is a topic source (tools/posts/src/<slug>.md) or a long-form page (posts/
 Code blocks, tables, headings, front matter and a long-form page's reference list must stay byte-identical. Inline
 code, maths and links are compared as sets: a sentence may move or reuse one, but none may be new or vanish. Prose may
 change, but every number in it must already be in the post, none may vanish, and it may grow by at most 10%.
+A number in the frozen evidence (code, tables, inline code, maths, headings, references) may appear in prose.
+Markdown reference and credit lines are prose: only their links and numbers are guarded; the reviewer reads the rest.
 --final also fails a post whose prose did not change at all.
 Output names posts, rules and numbers, never prose; it goes through check.py's scrubber, since a term can be a number.
 """
@@ -24,6 +26,7 @@ WORDS = {w: str(i) for i, w in enumerate("zero one two three four five six seven
 WORDS.update(twenty="20", thirty="30", forty="40", fifty="50", sixty="60", seventy="70", eighty="80", ninety="90",
              hundred="100", thousand="1000", million="1000000", billion="1000000000")
 # shortcut: no sign, and "64,128,256" reads as one number; "half", "twice" and "first" are left to the reviewer
+# shortcut: code spans are matched across the whole prose, not per paragraph as render() does; none straddles today
 NUMBER = re.compile(r"(?<![\d.])(?:\d+(?:[,_]\d{3})*(?:\.\d+)?|\.\d+)|\b(?:" + "|".join(WORDS) + r")\b", re.I)
 MATHS = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]", re.S)
 
@@ -78,7 +81,7 @@ def markdown(text):
     maths, text = spans(MATHS, text)
     links = sorted(set(re.findall(r"\]\(([^)\s]+)\)", text)))
     text = re.sub(r"\]\([^)\s]+\)", "]", text)
-    return code, tables, inline, sorted(set(display + maths)), [front] + heads + links, text
+    return code, tables, inline, sorted(set(display + maths)), heads, [front] + heads + links, text
 
 
 def shown(markup):
@@ -98,7 +101,7 @@ def page(text):
     inline, art = spans(re.compile(r"<code\b.*?</code>", re.S), art)
     links = sorted(set(re.findall(r'\b(?:href|id)="([^"]*)"', art)))
     maths, prose = spans(MATHS, shown(art))
-    return code, tables, inline, maths, heads + refs + links, prose
+    return code, tables, inline, maths, heads + refs, heads + refs + links, prose
 
 
 def posts(root):
@@ -113,8 +116,8 @@ def snapshot(root):
     for path in posts(root):
         text = path.read_text()
         md = path.suffix == ".md"
-        code, tables, inline, maths, frozen, prose = (markdown if md else page)(text)
-        evidence = "\n".join(code + tables + inline + maths)
+        code, tables, inline, maths, cited, frozen, prose = (markdown if md else page)(text)
+        evidence = "\n".join(code + tables + inline + maths + cited)
         snap[path.relative_to(root).as_posix()] = {
             "code": digest(code), "tables": digest(tables), "inline": digest(inline), "maths": digest(maths),
             "frozen": digest(frozen), "prose": digest(prose.split()), "words": len(prose.split()),
@@ -131,7 +134,7 @@ def write_baseline(root):
 
 
 RULES = [("code", "code blocks changed"), ("tables", "tables changed"), ("inline", "inline code changed"),
-         ("maths", "maths changed"), ("frozen", "headings, front matter or links changed")]
+         ("maths", "maths changed"), ("frozen", "headings, front matter, references or links changed")]
 
 
 def check(root, final=False):
@@ -155,7 +158,7 @@ def check(root, final=False):
 
 
 def main(argv):
-    from check import DENYLIST, scrubber            # the same scrubber and fail-closed rule as check.py's main
+    from check import DENYLIST, scrubber            # the same scrubber and fail-closed rules as check.py's main
     root = Path(__file__).resolve().parent.parent
     if argv == ["--baseline"]:
         write_baseline(root)
@@ -166,6 +169,8 @@ def main(argv):
         sys.exit(f"missing {DENYLIST}: the output could not be scrubbed")
     terms = [t for t in (line.strip() for line in DENYLIST.read_text(encoding="utf-8-sig").splitlines())
              if t and not t.startswith("#")]
+    if not terms:
+        sys.exit(f"no terms in {DENYLIST.name}: the output could not be scrubbed")
     try:
         errors = check(root, final=argv == ["--final"])
     except Exception:                                 # a traceback can quote page text: scrub it too
