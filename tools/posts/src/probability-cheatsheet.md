@@ -1,13 +1,13 @@
 ---
 title: Probability on one page: the rules, the distributions and the traps
-summary: A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Every formula is checked in code.
+summary: A compact reference for the probability that comes up most in ML work: the event rules and Bayes, PMF versus PDF versus CDF, the expectation and variance identities, a table of eight distributions with their means and variances, the limit theorems, and the parameter conventions and reasoning slips that cause most mistakes. Most formulas are checked in code.
 group: Probability
 order: 9
 tags: probability · reference · distributions · Bayes' rule
 ---
 A test that catches 99% of cases and clears 99% of healthy people is still wrong half the time it says positive, if the disease affects 1% of people. Results like that come from the probability that keeps coming back when you build and evaluate models. This page collects it in the order you usually need it: how to combine events, how to describe a random quantity, how means and variances behave, which distribution to reach for, and what happens when you average many draws. It is a reference, so each section is short and, where one exists, points to the post that develops the idea properly.
 
-Nothing here is taken on faith. The formulas on the page are checked below, either exactly or against `scipy` and a simulation, so the code doubles as a set of worked examples.
+Most formulas on the page are checked below, either exactly or against `scipy` and a simulation, so the code doubles as a set of worked examples.
 
 ## Events: the five rules
 For events \(A\) and \(B\), with \(A^c\) meaning "not \(A\)":
