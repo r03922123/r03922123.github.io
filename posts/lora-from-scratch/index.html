@@ -48,9 +48,10 @@
 </aside>
 <div class="prose">
 
-<p>LoRA is usually explained with one equation. Knowing the equation and knowing it holds for the code you
-just wrote are different things. This post builds a tiny GPT, "pretrains" it, wraps it in LoRA adapters,
-fine-tunes only the adapters on a new domain, and fuses them back into the weights. Every claim made along
+<p>On a two-layer character-level GPT, rank-4 adapters train 1,536 of 60,384 parameters and cut the loss on a
+new corpus from 6.69 to 1.37. LoRA is usually explained with one equation. Knowing the equation and knowing
+it holds for the code you just wrote are different things. I build a tiny GPT, "pretrain" it, wrap it in
+adapters, fine-tune only those on a new domain, and fuse them back into the weights. Every claim made along
 the way gets an <code>assert</code> next to it. If an assert fails, the claim is wrong.</p>
 <p>The whole thing runs on a laptop CPU in a few seconds: no GPU, no downloads. The code blocks, run in
 order, make one script.</p>
@@ -144,7 +145,7 @@ assert out.shape == (2, 16, 30), out.shape</code></pre>
 
 <h2 id="pretrain">Pretraining it</h2>
 <p>Two toy corpora in deliberately different styles: corpus A stands in for general pretraining data, corpus B
-for the domain we will adapt to.</p>
+for the domain I will adapt to.</p>
 <pre><code class="language-python">CORPUS_A = ("the quarterly report shows steady growth across all regions. "
             "management expects revenue to increase next fiscal year. "
             "the board approved the proposed budget for infrastructure. ") * 20
@@ -270,7 +271,7 @@ claims.</p>
 
 <h2 id="learned">What the asserts proved</h2>
 <ol>
-  <li>The transformer's forward pass has the shape we expect.</li>
+  <li>The transformer's forward pass has the shape I expect.</li>
   <li>Pretraining takes the loss well below a uniform guess, so there is something real to freeze.</li>
   <li>Wrapping with \(B = 0\) is an exact no-op on the whole model's output, and only 2.5% of parameters train.</li>
   <li>Training \(A\) and \(B\) leaves every other tensor, including the frozen half of each wrapped layer,
@@ -282,6 +283,9 @@ claims.</p>
 precision to cut memory, keeping the adapters in higher precision. Prefix and prompt tuning
 <a href="#ref-4">[4]</a> train even fewer parameters by learning input vectors instead of weight updates,
 usually at some cost in quality.</p>
+<p>These numbers come from one seeded run of a 27-character model on two toy corpora, so they show the
+mechanics, not how well LoRA adapts a real model. The code never tries a higher rank or more adapted layers,
+so whether either closes the gap from 1.37 to 0.11 is open.</p>
 
 <h2 id="refs">References</h2>
 <ol class="refs">
