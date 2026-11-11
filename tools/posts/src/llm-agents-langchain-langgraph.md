@@ -5,7 +5,7 @@ group: LLMs and generative AI
 order: 10
 tags: LLM · agents · tool calling · LangGraph · evaluation
 ---
-A chat model on its own can only produce text. Give it a list of functions it may ask for, run the ones it asks for, feed the results back, and repeat until it answers: that loop is what people call an agent. Libraries such as LangChain and LangGraph package the loop, but the loop itself is short, and most of the engineering is in what surrounds it: validating tool calls, bounding the number of steps, saving state, and pausing for a person before anything irreversible.
+The agent I build here answers "What does order A17 cost with tax?" in three model calls, two tool rounds and one to write the answer, and when asked for a refund it pauses before the refund runs until a reviewer approves. A chat model on its own can only produce text. Give it a list of functions it may ask for, run the ones it asks for, feed the results back, and repeat until it answers: that loop is what people call an agent. Libraries such as LangChain and LangGraph package the loop, but the loop itself is short, and most of the engineering is in what surrounds it: validating tool calls, bounding the number of steps, saving state, and pausing for a person before anything irreversible.
 
 This post builds each of those pieces in plain Python with a scripted stand-in for the model, so every claim can be checked with an assert. Then it shows the same structure in the two libraries, which are not installed here, so those snippets are marked as not executed.
 
@@ -376,7 +376,7 @@ for n_pred, n_ref in product(range(5), range(4)):
         assert in_order(pred, ref) == brute
 ```
 
-Track cost alongside accuracy: model calls, tokens and wall-clock time per task. Comparing a trajectory with a reference is cheap and catches routing regressions on every change; the answers need a reference set or a judge.
+The brute-force loop confirms that the in-order match agrees with a subsequence test for every prediction of up to four calls and every reference of up to three. Track cost alongside accuracy: model calls, tokens and wall-clock time per task. Comparing a trajectory with a reference is cheap and catches routing regressions on every change; the answers need a reference set or a judge.
 
 ## Pitfalls
 - **No step or cost limit.** Loops happen, especially when a tool keeps failing. Cap model calls per task and alert on runs that hit the cap.
@@ -385,6 +385,8 @@ Track cost alongside accuracy: model calls, tokens and wall-clock time per task.
 - **Too many tools.** Each tool's description costs context on every call, and similar tools get confused. Prefer a few well-described tools, or route to a sub-graph that holds the relevant ones.
 - **An agent where a workflow would do.** If the steps are known, write them as edges. Fewer model decisions means fewer ways to fail and lower latency.
 - **Unbounded message history.** Long runs fill the context window. Trim or summarise old turns, keeping the tool results the answer depends on.
+
+Every run here uses the scripted stand-in, so the asserts show that the loop, the dispatcher and the checkpoints behave as described for the calls it makes; they do not show how often a real model picks the right tool, and the LangChain and LangGraph snippets were not run. Whether a real model takes the same paths is a question for the trajectory checks above, run against that model.
 
 For the model underneath, see [Transformers and LLMs: the key engineering ideas](../transformers-and-llms-key-ideas/) and [LLM inference](../llm-inference/), which explains why each extra model call costs what it does. Lilian Weng's overview [LLM Powered Autonomous Agents](https://lilianweng.github.io/posts/2023-06-23-agent/) and the LangGraph documentation were starting points for this post; the explanations and code here are my own. LangChain was created by Harrison Chase and is developed by LangChain, Inc., which also builds LangGraph.
 
