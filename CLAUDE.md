@@ -11,7 +11,6 @@ this one included. A Python build turns Markdown into HTML, and the generated HT
 All gates:   sh scripts/gates.sh          # run before every push; about 4 min, mostly the post build
 Check tests: (cd scripts && python3 -m unittest test_check)
 Search tests: node --test scripts/test_search.mjs
-Voice check: python3 scripts/voice_check.py      # --final in PR 8 only; tests: (cd scripts && python3 -m unittest test_voice_check)
 Site check:  python3 scripts/check.py     # --denylist-only for terms only; --show-terms only when debugging locally
 Builds:      python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py . && python3 -I tools/search/build.py .
 Lock CI:     uv pip compile requirements-ci.in --generate-hashes --python-version 3.12 \
@@ -62,12 +61,11 @@ Preview:     python3 -m http.server 8000
 - `site-search` (merged): `search.mjs` inserts a box on the two list pages and ranks with `search-core.mjs`
   over `search-index.json`, written by `tools/search/build.py` after the post builds (gates.sh runs both, and
   `node --test scripts/test_search.mjs`). `check.py` fails on a listed post missing from the index.
-- `post-voice` in progress (8 PRs, `SPEC-post-voice.md`): PR 1 (#14) added `scripts/voice_check.py` and
-  `scripts/voice-baseline.json`, written from unedited posts of `main` at `28b63c9`; never regenerate it to get
-  green. PR 2 (#15), the pilot, merged after the owner approved its voice. PR 3 (#16) is machine learning
-  fundamentals, PR 4 (#17) statistics, PR 5 (#18) probability, PR 6 (#19) LLMs, PR 7 recommender systems and ML
-  systems; PR 8 follows the spec's rollout table. An existing sentence that overstates its code stays word for word
-  and goes in the PR's findings list. Edited sources need `tools/posts/build.py . <slug>`, then the feeds and search
-  builds. Reading-page PRs open with `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR
-  0002).
+- `post-voice` (merged, 8 PRs from #14): all 59 posts open on a situation, stake or result, say "I" only for what
+  their code or derivation does, and name their limits; topic posts also end on what is open. The voice check's
+  `--final` passed before PR 8 removed the check, its baseline and its gate. PRs #16 onward each list existing
+  sentences that overstate their code, left word for word for their own fix. Edited sources need
+  `tools/posts/build.py . <slug>`, then the feeds and search builds.
+- Next: every module in `CAPABILITY-MAP.md` is merged, so the understand phase's check, `docs/ARCHITECTURE.md`, comes
+  next.
 - Parked branches: none.
