@@ -5,7 +5,7 @@ group: LLMs and generative AI
 order: 2
 tags: transformers · LLM · inference · KV cache · speculative decoding · mixed precision
 ---
-A transformer language model is a short stack of ideas: attention, an MLP, residual connections, normalization, and a next-token loss. What makes such a model affordable to train and serve is a second set of ideas, mostly about memory. This post covers the ones that matter most, each with the reason it exists, the mechanism, and a small experiment whose assertions check the claim.
+At batch size one, a 7-billion-parameter model in 16-bit floats reads about 14 GB of weights for every token it generates, so a data-centre GPU manages about 140 steps per second at best. A transformer language model is a short stack of ideas: attention, an MLP, residual connections, normalization, and a next-token loss. What makes such a model affordable to train and serve is a second set of ideas, mostly about memory. This post covers the ones that matter most, each with the reason it exists, the mechanism, and a small experiment whose assertions check the claim. I build three of them in small models and check with asserts that each one matches the slower computation it replaces: the KV cache, speculative decoding (in distribution) and blockwise attention.
 
 Throughout, \(L\) is the number of layers, \(H\) the number of query heads, \(d_h\) the size of one head, \(N\) the number of tokens in the sequence, and \(p\) and \(q\) are probability distributions over the vocabulary.
 
@@ -208,6 +208,8 @@ assert per_run < 2                                                 # 3 tokens in
 print(f"TV {tv:.3f} (broken fix-up: {tv_bad:.3f}); 3 tokens in {per_run:.2f} target passes")
 ```
 
+With the leftover fix-up the distance stays under 0.06, about twice the sampling noise; the broken variant lands above 0.1, and three tokens cost fewer than two target passes.
+
 ## Attention without the N-by-N matrix
 In training and prefill, standard attention writes each head's \(N \times N\) score matrix to GPU memory and reads it back, more than once. FlashAttention (Dao et al., 2022) computes the same output without storing it. It streams blocks of keys and values through fast on-chip memory and keeps, per query, a running maximum, softmax denominator and weighted sum of values, rescaling the old sums by \(e^{m_{\text{old}} - m_{\text{new}}}\) when the maximum grows. That online softmax predates it (Milakov and Gimelshein, 2018); FlashAttention's contribution was organizing the computation around memory traffic, and FlashAttention-2 (Dao, 2023) split the work better across the GPU. The result is exact, with extra memory linear in \(N\). Details in [FlashAttention](../flashattention/).
 
@@ -299,7 +301,7 @@ A longer window does not mean the model uses all of it equally. Liu et al. (2023
 - **Using float16 without loss scaling.** Gradients below about \(3 \times 10^{-8}\) become zero. Prefer bfloat16 where supported.
 - **Forgetting the prompt mask.** The model then also learns to imitate users, diluting the signal on responses.
 
-For the basic building blocks see [why attention divides by the square root of d](../attention-scaling/) and [BatchNorm vs LayerNorm](../batchnorm-vs-layernorm/).
+The experiments run on toy models: one attention layer with 8 heads, bigram models over a six-token vocabulary, and a linear fit for mixed precision. They show that a method is exact or how its memory scales, and say nothing about speed on a GPU; the throughput figures are arithmetic or come from the cited papers. Whether the U-shaped curve of Liu et al. (2023) still holds for newer long-window models is not tested here. For the basic building blocks see [why attention divides by the square root of d](../attention-scaling/) and [BatchNorm vs LayerNorm](../batchnorm-vs-layernorm/).
 
 ## References
 1. Vaswani et al., [Attention Is All You Need](https://arxiv.org/abs/1706.03762), NeurIPS 2017.
