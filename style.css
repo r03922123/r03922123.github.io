@@ -109,8 +109,8 @@ body:not(.home) header.site .home { grid-column: 2; }
 body:not(.home) header.site .gh { grid-column: 3; justify-self: end; color: var(--muted); font-family: var(--font-display); font-weight: 600; letter-spacing: .05em; }
 body:not(.home) header.site .gh:hover { color: var(--fg); }
 /* Links on their own row until they fit their cell on one line: measured in Chrome, they need a 376 px cell, which
-   a 940 px page gives; 960 px leaves room for a 15 px scrollbar, which the media width counts. */
-@media (max-width: 959px) { body:not(.home) header.site nav { grid-column: 1 / -1; } }
+   a 940 px page gives; 60em (960 px) leaves room for a 15 px scrollbar, and scales with a larger default font. */
+@media (max-width: 59.99em) { body:not(.home) header.site nav { grid-column: 1 / -1; } }
 @media (min-width: 700px) {
   body:not(.home) header.site { position: sticky; top: 0; z-index: 2; }
   body:not(.home) [id] { scroll-margin-top: 96px; }   /* below the bar, even when its links wrap to two lines */
