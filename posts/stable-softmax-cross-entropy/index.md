@@ -1,6 +1,6 @@
 # Numerically stable softmax and cross-entropy
 
-Softmax and cross-entropy are one line of math each, and the one-line code for each breaks on inputs a real network can produce. In float32, a logit of 100 overflows, and a gap of 120 between two logits makes a probability exactly zero, so the loss comes out infinite where the true value is about 120. I derive the two fixes every deep learning framework uses: subtract the maximum before exponentiating, and compute log-probabilities directly with log-sum-exp instead of taking the log of a probability. The stable cross-entropy is checked against a 50-digit brute force and the stable softmax against SciPy, and the post ends with the common bugs that quietly undo them.
+Softmax and cross-entropy are one line of math each, and the one-line code for each breaks on inputs a real network can produce. In float32, a logit of 100 overflows, and a gap of 120 between two logits makes a probability exactly zero, so the loss comes out infinite where the true value is about 120. I derive the two fixes every deep learning framework uses: subtract the maximum before exponentiating, and compute log-probabilities directly with log-sum-exp instead of taking the log of a probability. The stable cross-entropy is checked against a 50-digit brute force and the stable softmax against SciPy, and the post ends with the common bugs that quietly undo the fixes.
 
 Throughout, \(z \in \mathbb{R}^K\) is a vector of logits (the raw scores a network outputs for \(K\) classes) and \(y\) is the index of the correct class.
 

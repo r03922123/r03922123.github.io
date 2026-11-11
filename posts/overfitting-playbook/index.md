@@ -2,7 +2,7 @@
 
 Fit 20 noisy points from a sine curve with a degree-12 polynomial, and its training error is lower than the best degree's while its validation error is more than twice as high. That model overfits: it learns patterns that are true of its training set and nowhere else, the noise in the labels and the quirks of the particular rows it saw. Training error keeps falling, and error on new data stops falling and then rises.
 
-The fixes are not interchangeable, and the fixes for underfitting point the opposite way, so I start with diagnosis. Then come five levers, most with a small experiment that shows what it does, and a table that orders them by cost.
+The fixes are not interchangeable, and the fixes for underfitting point the opposite way, so I start with diagnosis. Then come five levers, most with a small experiment that shows what it does, and a table that compares their cost.
 
 ## Diagnose first
 The basic instrument is a pair of numbers, training error and validation error, measured on the same metric with the model in evaluation mode. Watch them as one thing varies: model capacity, training set size or training steps.
