@@ -5,10 +5,10 @@ The three most important whys of each change, newest first. Each heading reads `
 ## 2026-11-11 · build: post-voice PR 4, statistics and experimentation
 
 1. **Change the voice, not the claim.** `causal-inference` had an overstated sentence written in "we". The spec
-   forbids "we" and also forbids hiding a correction, so only the pronoun changed ("where the true answer is known")
-   and the overstatement went on the findings list. It is like correcting a typo in a quote without changing what the
-   speaker said. Trade-off: the sentence still overstates until its own fix. Risk: an impersonal rewrite can drift in
-   meaning, so the reviewer compares it with the original.
+   forbids "we" and also forbids hiding a correction, so only the pronouns changed, which made it passive ("where the
+   true answer is known") and the overstatement went on the findings list. It is like correcting a typo in a quote
+   without changing what the speaker said. Trade-off: the sentence still overstates until its own fix. Risk: an
+   impersonal rewrite can drift in meaning, so the reviewer compares it with the original.
 2. **Say what a simulation builds in.** A test that plants an assumption and then recovers it shows the method
    works, not that the assumption holds. So the new limits say so outright: "each simulation here is built so that
    its method's assumption holds, except the DiD run that breaks it on purpose". Trade-off: the posts sound less

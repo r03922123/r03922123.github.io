@@ -44,7 +44,7 @@
 <h2 id="the-missing-column">The missing column</h2>
 <p>Write \(Y_i(1)\) for the outcome unit \(i\) would have with the treatment and \(Y_i(0)\) for the outcome without it. These are <b>potential outcomes</b>. The effect on unit \(i\) is \(Y_i(1) - Y_i(0)\), and the <b>average treatment effect</b> is</p>
 \[ \text{ATE} = \mathbb{E}[Y(1) - Y(0)]. \]
-<p>The fundamental problem is that each unit shows us only one of the two: \(Y_i(1)\) if treated, \(Y_i(0)\) if not. Causal inference is the business of filling in the missing column. The naive estimate compares the treated with the untreated, and a two-line rearrangement shows what it really measures:</p>
+<p>The fundamental problem is that each unit shows only one of the two: \(Y_i(1)\) if treated, \(Y_i(0)\) if not. Causal inference is the business of filling in the missing column. The naive estimate compares the treated with the untreated, and a two-line rearrangement shows what it really measures:</p>
 \[ \underbrace{\mathbb{E}[Y \mid T=1] - \mathbb{E}[Y \mid T=0]}_{\text{naive difference}} = \underbrace{\mathbb{E}[Y(1) - Y(0) \mid T=1]}_{\text{effect on the treated}} + \underbrace{\mathbb{E}[Y(0) \mid T=1] - \mathbb{E}[Y(0) \mid T=0]}_{\text{selection bias}}. \]
 <p>Selection bias is how differently the treated group would have done <b>without</b> the treatment. Randomizing \(T\) makes it zero, because then \(T\) is independent of \(Y(0)\). The simulation below knows both columns, so it can check the identity exactly and show the bias.</p>
 <pre><code class="language-python">import numpy as np

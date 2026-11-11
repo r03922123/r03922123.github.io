@@ -1,6 +1,6 @@
 # P-values: what they measure and how they mislead
 
-Model A gets 850 of 1,000 test examples right and model B gets 830. Is A better, or did it get lucky on this particular test set? A p-value answers a narrower question than that: if the two models were really equally good, how often would a gap this large show up anyway? If the answer is "rarely", the gap is hard to put down to luck. Pairing the two models' results on each example, I get p = 0.03; ignoring the pairing gives about 0.2 on the same data.
+Model A gets 850 of 1,000 test examples right and model B gets 830. Is A better, or did it get lucky on this particular test set? A p-value answers a narrower question than that: if the two models were really equally good, how often would a gap this large show up anyway? If the answer is "rarely", the gap is hard to put down to luck. Pairing the two models' results on each example, I get p = 0.03; ignoring the pairing gives a p-value above 0.15 on the same data.
 
 This post defines the p-value, checks the definition by simulation, uses it to compare two models properly, and then works through the common misreadings, each with a simulation that shows how big the error is.
 
@@ -227,6 +227,6 @@ Here no correction gives about 47 false alarms per run, Bonferroni almost never 
 - **Count every test you ran,** including the slices you looked at and dropped, and correct for them.
 - **A large p-value is not evidence of no effect.** With low power it is mostly evidence of too little data.
 
-Each simulation here knows which hypotheses are true, which a real analysis never does. The 36% share of false alarms rests on an assumed base rate of 1 in 10 at 80% power. For real ideas that base rate is unknown, so how likely a significant result is to be real stays open, and results near the line deserve a replication.
+Each simulation here knows which hypotheses are true, which a real analysis never does. The 36% share of false alarms rests on an assumed base rate of 1 in 10 at 80% power. For real ideas that base rate is unknown, so how likely a significant result is to be real stays open.
 
 The framing of the threshold as a false positive rate follows the hypothesis testing chapter of Berkeley's Data 102 course notes, and the peeking simulation is in the spirit of Evan Miller's "How Not To Run an A/B Test". The false discovery rate procedure is from Benjamini and Hochberg (1995), McNemar's test from McNemar (1947), and the group sequential boundaries from Pocock (1977) and O'Brien and Fleming (1979). The American Statistical Association's 2016 statement on p-values (Wasserstein and Lazar) is a short, readable summary of the misreadings above.
