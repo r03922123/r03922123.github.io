@@ -399,6 +399,13 @@
     <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
   </item>
   <item>
+    <title>Distributed training and GPU efficiency: where the memory goes and what sharding costs</title>
+    <link>https://r03922123.github.io/posts/distributed-training-and-gpu-efficiency/</link>
+    <guid isPermaLink="true">https://r03922123.github.io/posts/distributed-training-and-gpu-efficiency/</guid>
+    <description>What the FSDP, DeepSpeed, mixed-precision and GPU-optimization lines in an ML job ad mean, with numbers. A memory calculator checked against the ZeRO paper's table, a communication calculator for DDP and ZeRO stages 1 to 3, activation checkpointing that keeps the gradients bit for bit, fp16 gradients vanishing where bf16 keeps them, and a roofline for telling compute-bound from memory-bound work.</description>
+    <pubDate>Sun, 01 Nov 2026 00:00:00 +0800</pubDate>
+  </item>
+  <item>
     <title>Solving algorithm problems under a time limit</title>
     <link>https://r03922123.github.io/posts/solving-problems-under-time-limits/</link>
     <guid isPermaLink="true">https://r03922123.github.io/posts/solving-problems-under-time-limits/</guid>
