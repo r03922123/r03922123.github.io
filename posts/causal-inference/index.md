@@ -2,7 +2,7 @@
 
 In a simulation of 200,000 users, those who turned on a new feature spend 19 more a month than those who did not, yet the feature adds only 4. The rest is selection: the users who bother to turn on features are the engaged ones, and engaged users spent more before the feature existed. A **confounder**, something that drives both who gets the treatment and the outcome, can manufacture a gap out of nothing or hide a real one.
 
-A randomized experiment removes the problem by design, and when you can run one you should (see [A/B testing](../ab-testing/)). I cover the cases where you cannot: a policy was already rolled out to some cities, a perk is granted by a score threshold, adoption is voluntary, or there is only one treated region. Each method below trades randomization for an assumption, and each is tested on a simulation where the true answer is known, so it can be watched as it works and as it fails.
+A randomized experiment removes the problem by design, and when you can run one you should (see [A/B testing](../ab-testing/)). I cover the cases where you cannot: a policy was already rolled out to some cities, a perk is granted by a score threshold, adoption is voluntary, or there is only one treated region. Each method below trades randomization for an assumption, and each is tested on a simulation where the true answer is known, so it can be watched as it works, and difference-in-differences also as it fails.
 
 ## The missing column
 Write \(Y_i(1)\) for the outcome unit \(i\) would have with the treatment and \(Y_i(0)\) for the outcome without it. These are **potential outcomes**. The effect on unit \(i\) is \(Y_i(1) - Y_i(0)\), and the **average treatment effect** is

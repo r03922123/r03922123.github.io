@@ -2,7 +2,7 @@
 
 An item with 0 clicks in 20 impressions has a maximum-likelihood click rate of exactly zero, which a ranker would treat as certain failure. A prior fixes that, at a cost I check in code: MAP depends on how the parameter is written. With a uniform prior, 3 heads and 1 tail give a most probable bias of \(3/4\) in \(p\) but \(4/6\) when found in log-odds, while the MLE stays put. A model has a knob: the bias of a coin, the mean of a measurement, the rate of a queue. You have data. Which setting of the knob should you believe? Two answers cover most of machine learning. **Maximum likelihood (MLE)** picks the setting under which the observed data were most probable. **Maximum a posteriori (MAP)** does the same after first weighting each setting by how plausible you thought it was before seeing anything. Almost every loss function you train with is one or the other in disguise.
 
-This post builds both from the definitions, works the standard examples, and checks every claim numerically, including two that are often stated wrong: that the MLE is unbiased, and that MAP is "MLE plus a prior" with no other consequences.
+This post builds both from the definitions, works the standard examples, and checks most claims numerically, including two that are often stated wrong: that the MLE is unbiased, and that MAP is "MLE plus a prior" with no other consequences.
 
 ## The likelihood is a function of the parameter
 Suppose \(x_1, \dots, x_n\) are drawn independently from a distribution with density (or mass function) \(p(x \mid \theta)\). Independence turns the joint probability into a product, and the **likelihood** is that product read as a function of \(\theta\) with the data held fixed:
