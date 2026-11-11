@@ -5,7 +5,7 @@ group: Coding and data
 order: 1
 tags: problem solving · complexity · testing · algorithms
 ---
-On the problem of counting subarrays that sum to `k`, a sliding-window solution passes the worked example, then fails a stress test against the brute force on an input of at most two elements once values can be negative. With a clock running, an attempt can fail with the knowledge all there, through a skipped step: solving a slightly different problem than the one asked, chasing a clever idea for twenty minutes with nothing written, or finishing a correct idea that breaks on an empty list. A fixed sequence of steps removes those failures, and frees attention for the actual problem.
+On the problem of counting subarrays that sum to `k`, a sliding-window solution passes the worked example, then fails a stress test against the brute force on an input of at most two elements once values can be negative. With a clock running, an attempt can fail even when the knowledge is there, because a step was skipped: solving a slightly different problem than the one asked, chasing a clever idea for twenty minutes with nothing written, or finishing a correct idea that breaks on an empty list. A fixed sequence of steps guards against those failures, and frees attention for the actual problem.
 
 The method here has six steps: understand, size, brute force, optimize, code, test. I work all six on one problem, end to end, and test the fast solution against the brute force. For the patterns themselves (sliding windows, heaps, graph searches and so on), the [LeetCode patterns](/leetcode/) series has a short post on each.
 
