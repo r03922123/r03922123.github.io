@@ -43,7 +43,8 @@ paper_table_1 = {1: (120, 120, 120), 4: (52.5, 41.3, 30), 16: (35.6, 21.6, 7.5),
                  256: (30.4, 15.4, 0.47), 1024: (30.1, 15.1, 0.12)}   # 7.5B parameters, GB per GPU, stages 1-3
 for n, row in paper_table_1.items():
     mine = [model_states(7.5e9, n, s) / GB for s in (1, 2, 3)]
-    assert all(abs(m - p) < 0.05 for m, p in zip(mine, row)), (n, mine)
+    tol = [0.005 if p < 2 else 0.05 for p in row]             # the table prints 2 decimals below 2 GB, else 1
+    assert all(abs(m - p) <= e + 1e-9 for m, p, e in zip(mine, row, tol)), (n, mine)
 assert model_states(7.5e9, 64, 0) / GB == 120 and model_states(7.5e9, 64, 3) / GB == 1.875
 
 per_gpu = {s: model_states(7e9, 8, s) / GB for s in range(4)}       # 7B parameters on 8 GPUs; stage 0 = DDP
@@ -65,7 +66,7 @@ assert state == 16 * n_params                             # plain fp32 Adam: 4 +
 
 The calculator matches every 7.5B entry of the paper's Table 1 to its printed precision. For a 7B model on eight 80 GB GPUs, DDP needs 112 GB per GPU and does not fit; stage 1 needs 38.5 GB, stage 2 26.25 GB, stage 3 14 GB. The last assert holds a surprise: plain fp32 Adam also costs 16 bytes per parameter. Mixed precision does not shrink model states; it buys tensor-core speed and halves the activations.
 
-Activations usually dominate. Korthikanti et al. (2022) count, for one transformer layer in 16 bits with sequence length \(s\), micro-batch \(b\), hidden size \(h\) and \(a\) heads, \(sbh(34 + 5as/h)\) bytes; the second term is the \(s \times s\) attention scores. Keeping only each layer's input (full recomputation) leaves \(2sbh\).
+Activations grow with the micro-batch and the sequence length, and once model states are sharded they usually dominate per GPU. Korthikanti et al. (2022) count, for one transformer layer in 16 bits with sequence length \(s\), micro-batch \(b\), hidden size \(h\) and \(a\) heads, \(sbh(34 + 5as/h)\) bytes; the second term is the \(s \times s\) attention scores. Keeping only each layer's input (full recomputation) leaves \(2sbh\).
 
 ```python
 def activation_bytes(s, b, h, a, layers, mode="all"):
@@ -81,9 +82,10 @@ psi = 12 * L * h * h                                      # weights in the trans
 acts = {m: activation_bytes(s, 1, h, a, L, m) / GB for m in ("all", "no_scores", "full_recompute")}
 assert psi == 6_442_450_944 and round(16 * psi / GB) == 103
 assert {m: round(v, 2) for m, v in acts.items()} == {"all": 30.6, "no_scores": 9.13, "full_recompute": 0.54}
+assert round(model_states(psi, 8, 3) / GB, 1) == 12.9 < acts["all"]   # ZeRO-3 on 8 GPUs: states shrink, activations do not
 ```
 
-For a 6.4B-parameter shape (32 layers, hidden size 4,096) at 2,048 tokens, one sequence stores 30.6 GB of activations, 9.13 GB without the attention scores (roughly what a fused attention such as [FlashAttention](../flashattention/) also avoids storing) and 0.54 GB with full recomputation, against 103 GB of model states. ZeRO shards model states, not activations: each GPU keeps the activations of its own micro-batch.
+For a 6.4B-parameter shape (32 layers, hidden size 4,096) at 2,048 tokens, one sequence stores 30.6 GB of activations, 9.13 GB without the attention scores (roughly what a fused attention such as [FlashAttention](../flashattention/) also avoids storing) and 0.54 GB with full recomputation, against 103 GB of model states. ZeRO-3 on 8 GPUs cuts the model states to about 12.9 GB per GPU, and then the activations of one sequence are more than twice that. ZeRO-DP shards model states, not activations: each GPU keeps the activations of its own micro-batch.
 
 ## Activation checkpointing
 `torch.utils.checkpoint` runs a block's forward pass without saving its intermediates, keeps only the block's input, and reruns the forward pass when the backward pass reaches it. I count the bytes autograd saves for the backward pass with a hook, on eight residual blocks, with and without it:
@@ -144,11 +146,13 @@ volume = {st: comm_bytes(7.5e9, 64, st) / GB for st in range(4)}
 assert volume[0] == volume[1] == volume[2] and volume[3] / volume[0] == 1.5
 assert round(volume[0], 1) == 29.5 and round(volume[3], 1) == 44.3
 assert (round(volume[0] / 25, 2), round(volume[3] / 25, 2)) == (1.18, 1.77)   # seconds at an assumed 25 GB/s
-step_flops = 6 * 7.5e9 * 8 * 2048                         # one micro-batch of 8 x 2,048 tokens per GPU
-assert round(step_flops / (0.5 * 312e12), 1) == 4.7       # seconds at half an A100's bf16 peak
+step_flops = 8 * 7.5e9 * 8 * 2048                         # 8 x 2,048 tokens per GPU; 8N per token: full recompute
+assert round(step_flops / (0.5 * 312e12), 1) == 6.3       # seconds at half an A100's bf16 peak
+fsdp_fp32_reduce = (64 - 1) / 64 * 7.5e9 * (4 + 2 + 2)   # fp32 reduce-scatter, two bf16 all-gathers
+assert round(fsdp_fp32_reduce / comm_bytes(7.5e9, 64, 0), 6) == 2
 ```
 
-For the 7.5B model on 64 GPUs with 16-bit gradients, DDP and stages 1 and 2 send about 29.5 GB per GPU per step and stage 3 about 44.3 GB. At an assumed 25 GB/s per GPU between machines, that is about 1.2 and 1.8 seconds, while the compute for one 16,384-token micro-batch takes about 4.7 seconds at half an A100's peak. The communication can hide behind compute only if it overlaps with it, which is why DDP buckets gradients and starts all-reducing during the backward pass, and FSDP prefetches the next layer's weights.
+For the 7.5B model on 64 GPUs with 16-bit gradients, DDP and stages 1 and 2 send about 29.5 GB per GPU per step and stage 3 about 44.3 GB. At an assumed 25 GB/s per GPU between machines, that is about 1.2 and 1.8 seconds, while the compute for one 16,384-token micro-batch takes about 6.3 seconds at half an A100's peak (with full recomputation, which a micro-batch that size needs by the activation formula above, so about \(8N\) FLOPs per token). The communication can hide behind compute only if it overlaps with it, which is why DDP buckets gradients and starts all-reducing during the backward pass, and FSDP prefetches the next layer's weights.
 
 | Scheme | Shards | Bytes per param per GPU (mixed-precision Adam) | Sent per step, relative to DDP |
 |---|---|---|---|
@@ -156,6 +160,8 @@ For the 7.5B model on 64 GPUs with 16-bit gradients, DDP and stages 1 and 2 send
 | ZeRO-1 | optimizer states | \(4 + 12/N\) | 1 |
 | ZeRO-2 | + gradients | \(2 + 14/N\) | 1 |
 | ZeRO-3 / FSDP full shard | + weights | \(16/N\) | 1.5 |
+
+The last column assumes every collective moves 16-bit elements.
 
 The PyTorch and DeepSpeed versions, not run here (the site builds on a CPU without a cluster):
 
@@ -173,7 +179,7 @@ fully_shard(model, mp_policy=mp)              # False keeps them until backward:
   "zero_optimization": { "stage": 3, "offload_optimizer": { "device": "cpu" } } }
 ```
 
-FSDP keeps the sharded master weights and gradients in fp32 and gathers 16-bit copies for compute, so its 16 bytes split differently from the paper's, with the same total. Its hybrid mode shards within a machine and replicates across machines, which keeps the extra all-gathers on the fast links inside a node.
+When the model is created in fp32, as FSDP's mixed precision expects, the sharded fp32 weights double as the master copy (the optimizer steps on the shard in its original dtype) and the gradient shards are fp32 too: 4 + 4 + 8 bytes instead of the paper's 2 + 2 + 12, the same 16. With `reduce_dtype=torch.float32`, as above, the gradient reduce-scatter sends 4 bytes per element and the two weight all-gathers 2 each, so each step sends twice what 16-bit DDP does, not 1.5 times. Its hybrid mode shards within a machine and replicates across machines, which keeps the extra all-gathers on the fast links inside a node.
 
 ## Gradient accumulation and the effective batch
 When a micro-batch is all that fits, run several, let `.grad` add up, and step once. The **effective batch** is micro-batch × accumulation steps × GPUs, and it, not the micro-batch, is what the learning rate was tuned for. Change the GPU count without changing the accumulation and the training run changes too.
@@ -229,7 +235,7 @@ lost = {name: (act_grads.to(dtype) == 0).float().mean().item()
         for name, dtype in (("fp16", torch.float16), ("bf16", torch.bfloat16))}
 lost["fp16 scaled"] = ((act_grads * 2 ** 16).to(torch.float16) == 0).float().mean().item()
 assert 0.08 < lost["fp16"] < 0.12 and lost["bf16"] == 0 and lost["fp16 scaled"] < 1e-5
-assert (act_grads.abs() < f16.tiny).float().mean().item() > 0.99              # nearly all below fp16's normal range
+assert (act_grads.abs() < f16.tiny).float().mean().item() > 0.99              # all below fp16's normal range here
 
 w = torch.tensor(1.0, dtype=torch.bfloat16)
 assert w + 1e-3 == w                                                          # a small update to a bf16 weight is lost
@@ -239,7 +245,7 @@ for _ in range(10):
 assert master.to(torch.bfloat16).item() == 1.0078125                          # and the 16-bit copy moves one step
 ```
 
-In a six-layer network with a mean loss over 4,096 examples, about 10% of the activation gradients become zero in fp16 and nearly all fall below its normal range, where precision drops; bf16 loses none. Scaling by \(2^{16}\) rescues almost all of them in fp16, but the same scale turns a gradient of 2 into infinity, so fp16 training uses a dynamic scale (PyTorch's `GradScaler`, DeepSpeed's `"loss_scale": 0`) that skips a step and halves the scale on overflow. bf16 needs none of this. What it lacks is precision: an update of \(10^{-3}\) to a weight of 1 vanishes, because bf16 numbers near 1 are \(2^{-7}\) apart, so bf16 training still keeps the fp32 master copy, which is where the 12 optimizer bytes per parameter come from.
+In a six-layer network with a mean loss over 4,096 examples, about 10% of the activation gradients become zero in fp16 and all of them fall below its normal range, where precision drops; bf16 loses none. Scaling by \(2^{16}\) rescues almost all of them in fp16, but the same scale turns a gradient of 2 into infinity, so fp16 training uses a dynamic scale (PyTorch's `GradScaler`, DeepSpeed's `"loss_scale": 0`) that skips the step and lowers the scale when it overflows. bf16 needs none of this. What it lacks is precision: an update of \(10^{-3}\) to a weight of 1 vanishes, because bf16 numbers near 1 are \(2^{-7}\) apart, so bf16 training still keeps the fp32 master copy: 4 of the 12 optimizer bytes per parameter, beside Adam's two fp32 moments.
 
 ## Compute-, memory- or input-bound
 A kernel's **arithmetic intensity** is its FLOPs per byte moved to and from GPU memory. The roofline model (Williams, Waterman and Patterson, 2009) says it runs at most at \(\min(\text{peak FLOP/s}, \text{intensity} \times \text{bandwidth})\). On NVIDIA's spec sheet the A100 80GB SXM peaks at 312 TFLOP/s of dense bf16 (624 is the sparse figure) and 2,039 GB/s of memory bandwidth.
@@ -271,7 +277,7 @@ def mfu(n_params, tokens_per_s, n_gpus, peak=PEAK):
 assert mfu(1.3e9, 100_000, 8) == 0.3125
 ```
 
-A layer's weight matrix applied to 16,384 tokens does about 1,820 FLOPs per byte, far above the ridge of 153, so it is compute-bound. The same matrix applied to 8 tokens does 8 and can reach at most about 16 TFLOP/s, and an elementwise add reaches 0.11% of peak at best. That is why fusing elementwise work into neighbouring kernels (what `torch.compile` and FlashAttention do) pays, and why tiny micro-batches waste a GPU. **MFU** sums it up for a whole job: a hypothetical 1.3B model training at 100,000 tokens a second on 8 A100s reaches 31.25%. It counts \(6N\) FLOPs per token even when checkpointing makes the hardware do about \(8N\), so recomputation cannot inflate it; the PaLM paper, which introduced the term, reports 46.2% for its 540B model on TPU v4.
+A layer's weight matrix applied to 16,384 tokens does about 1,820 FLOPs per byte, far above the ridge of 153, so it is compute-bound. The same matrix applied to 8 tokens does 8 and can reach at most about 16 TFLOP/s, and an elementwise add reaches 0.11% of peak at best. That is why fusing elementwise work into neighbouring kernels (what `torch.compile` and FlashAttention do) pays, and why tiny micro-batches waste a GPU. **MFU** sums it up for a whole job: a hypothetical 1.3B model training at 100,000 tokens a second on 8 A100s reaches 31.25%. It counts \(6N\) FLOPs per token even when checkpointing makes the hardware do about \(8N\), so recomputation cannot inflate it; the PaLM paper, which introduced the term and also counts attention FLOPs in it, reports 46.2% for its 540B model on TPU v4.
 
 | Bound by | Symptom in a profiler | Check |
 |---|---|---|
@@ -291,8 +297,8 @@ A layer's weight matrix applied to 16,384 tokens does about 1,820 FLOPs per byte
 | More GPUs, little speed-up | Add more | Communication or the data loader, not compute, was the limit | Overlap, accumulation with `no_sync()`, hybrid sharding, more loader workers | MFU and step time against GPU count |
 
 ## What this does not show
-Everything here ran on a CPU. The memory and communication numbers are formulas: they ignore temporary buffers, memory fragmentation, the gathered layer that ZeRO-3 holds at any moment, and the dropout masks some models do not have, and the time estimates rest on an assumed network bandwidth and an assumed 50% of peak. The roofline uses spec-sheet peaks, which real kernels do not reach. The fp16 result is one untrained network; how many gradients underflow depends on the model, the loss and the stage of training. Nothing here measures FSDP or DeepSpeed themselves, so no claim is made about their speed.
+Everything here ran on a CPU. The memory and communication numbers are formulas: they ignore temporary buffers, memory fragmentation, the gathered layer that ZeRO-3 holds at any moment, and the dropout masks some models do not have, and the time estimates rest on an assumed network bandwidth and an assumed 50% of peak. The roofline uses spec-sheet peaks, which real kernels do not reach. The fp16 result is one untrained network whose gradients were computed in fp32 and then cast, not computed in fp16; how many gradients underflow depends on the model, the loss and the stage of training. Nothing here measures FSDP or DeepSpeed themselves, so no claim is made about their speed.
 
 What stays open is the choice for a given model and cluster: the same memory can go to a larger micro-batch, less recomputation or less sharding, and which wins depends on the measured step time on that hardware, which is the first number to collect before turning any of these knobs.
 
-Sources: model-state memory and communication volume follow Rajbhandari et al., "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models" ([SC 2020](https://arxiv.org/abs/1910.02054)); activation memory and recomputation overhead Korthikanti et al., "Reducing Activation Recomputation in Large Transformer Models" ([2022](https://arxiv.org/abs/2205.05198)); loss scaling and fp32 master weights Micikevicius et al., "Mixed Precision Training" (ICLR 2018); MFU Chowdhery et al., "PaLM" (2022); the roofline Williams, Waterman and Patterson (Communications of the ACM, 2009). `fully_shard` and `MixedPrecisionPolicy` follow the [PyTorch FSDP2 documentation](https://docs.pytorch.org/docs/stable/distributed.fsdp.fully_shard.html), the config keys the DeepSpeed documentation, and the A100 figures NVIDIA's A100 datasheet.
+Sources: model-state memory and communication volume follow Rajbhandari et al., "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models" ([SC 2020](https://arxiv.org/abs/1910.02054)); activation memory and recomputation overhead Korthikanti et al., "Reducing Activation Recomputation in Large Transformer Models" ([2022](https://arxiv.org/abs/2205.05198)); loss scaling and fp32 master weights Micikevicius et al., "Mixed Precision Training" (ICLR 2018); MFU Chowdhery et al., "PaLM" (2022); the roofline Williams, Waterman and Patterson (Communications of the ACM, 2009). FSDP as inspired by ZeRO stage 3 follows the [PyTorch FSDP documentation](https://docs.pytorch.org/docs/2.11/fsdp.html); `fully_shard` and `MixedPrecisionPolicy` follow the [PyTorch FSDP2 documentation](https://docs.pytorch.org/docs/stable/distributed.fsdp.fully_shard.html), the config keys the DeepSpeed documentation, and the A100 figures NVIDIA's A100 datasheet.
