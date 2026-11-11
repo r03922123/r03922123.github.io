@@ -40,7 +40,7 @@
 </aside>
 <div class="prose">
 <p>Model A gets 850 of 1,000 test examples right and model B gets 830. Is A better, or did it get lucky on this particular test set? A p-value answers a narrower question than that: if the two models were really equally good, how often would a gap this large show up anyway? If the answer is "rarely", the gap is hard to put down to luck. Pairing the two models' results on each example, I get p = 0.03; ignoring the pairing gives a p-value above 0.15 on the same data.</p>
-<p>This post defines the p-value, checks the definition by simulation, uses it to compare two models properly, and then works through the common misreadings, each with a simulation that shows how big the error is.</p>
+<p>This post defines the p-value, checks the definition by simulation, uses it to compare two models properly, and then works through the common misreadings, each with code that shows how big the error is.</p>
 <h2 id="the-definition">The definition</h2>
 <p>Pick a <b>null hypothesis</b> \(H_0\), the boring explanation ("the models are equally accurate"), and a <b>test statistic</b> \(T\) that tends to be large when \(H_0\) is wrong. Having observed \(T = t_{\text{obs}}\), the p-value is</p>
 \[ p = P(T \ge t_{\text{obs}} \mid H_0). \]
@@ -117,7 +117,7 @@ shuffled = rng.permuted(np.tile(pool, (5_000, 1)), axis=1)  # the slip: ignore t
 fake_gap = shuffled[:, :n_ex].mean(axis=1) - shuffled[:, n_ex:].mean(axis=1)
 p_unpaired = (1 + np.sum(np.abs(fake_gap) &gt;= abs(gap) - 1e-12)) / (5_000 + 1)
 assert p_unpaired &gt; 0.15 &gt; 0.05 &gt; p_paired                  # same data, opposite conclusions</code></pre>
-<p>The paired test says 0.03; the unpaired one says about 0.2. Same data, and only the paired test asks the right question. The 80 disagreements are made up, so they show how much pairing can matter, not how much it does on a real test set.</p>
+<p>The paired test says 0.03; the unpaired one says about 0.25. Same data, and only the paired test asks the right question. The 80 disagreements are made up, so they show how much pairing can matter, not how much it does on a real test set.</p>
 <h2 id="power-what-happens-when-the-null-is-false">Power: what happens when the null is false</h2>
 <p>A p-value controls one error, the false positive. The other, missing a real effect, is governed by <b>power</b>, the probability of rejecting when a given alternative is true. Picture two bell curves for the statistic, one under \(H_0\) and one under the alternative, with the cutoff between them. The area of the null curve past the cutoff is \(\alpha\). The area of the alternative curve before the cutoff is the false negative rate \(\beta\), and the rest of it is the power \(1 - \beta\).</p>
 <p>For a one-sided z-test where the true effect is \(\delta\) standard errors, the cutoff is \(z_{1-\alpha}\) and</p>

@@ -7,7 +7,7 @@ tags: hypothesis testing · p-value · permutation test · multiple testing
 ---
 Model A gets 850 of 1,000 test examples right and model B gets 830. Is A better, or did it get lucky on this particular test set? A p-value answers a narrower question than that: if the two models were really equally good, how often would a gap this large show up anyway? If the answer is "rarely", the gap is hard to put down to luck. Pairing the two models' results on each example, I get p = 0.03; ignoring the pairing gives a p-value above 0.15 on the same data.
 
-This post defines the p-value, checks the definition by simulation, uses it to compare two models properly, and then works through the common misreadings, each with a simulation that shows how big the error is.
+This post defines the p-value, checks the definition by simulation, uses it to compare two models properly, and then works through the common misreadings, each with code that shows how big the error is.
 
 ## The definition
 Pick a **null hypothesis** \(H_0\), the boring explanation ("the models are equally accurate"), and a **test statistic** \(T\) that tends to be large when \(H_0\) is wrong. Having observed \(T = t_{\text{obs}}\), the p-value is
@@ -108,7 +108,7 @@ p_unpaired = (1 + np.sum(np.abs(fake_gap) >= abs(gap) - 1e-12)) / (5_000 + 1)
 assert p_unpaired > 0.15 > 0.05 > p_paired                  # same data, opposite conclusions
 ```
 
-The paired test says 0.03; the unpaired one says about 0.2. Same data, and only the paired test asks the right question. The 80 disagreements are made up, so they show how much pairing can matter, not how much it does on a real test set.
+The paired test says 0.03; the unpaired one says about 0.25. Same data, and only the paired test asks the right question. The 80 disagreements are made up, so they show how much pairing can matter, not how much it does on a real test set.
 
 ## Power: what happens when the null is false
 A p-value controls one error, the false positive. The other, missing a real effect, is governed by **power**, the probability of rejecting when a given alternative is true. Picture two bell curves for the statistic, one under \(H_0\) and one under the alternative, with the cutoff between them. The area of the null curve past the cutoff is \(\alpha\). The area of the alternative curve before the cutoff is the false negative rate \(\beta\), and the rest of it is the power \(1 - \beta\).
