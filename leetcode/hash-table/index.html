@@ -64,7 +64,7 @@ assert len({mult_hash_wrong(k) for k in keys}) == 1   # low bits of a*k are all 
 <p>Each slot holds a small list of <code>(key, value)</code> pairs. With \(n\) items in \(m\) slots, the <b>load factor</b> \(\alpha = n/m\) is the average chain length, and an operation costs \(O(1 + \alpha)\). Keep \(\alpha\) bounded by doubling \(m\) and rehashing whenever it passes a threshold. A single resize costs \(O(n)\), but doubling means it happens after \(n\) cheap inserts, so the cost averages out to \(O(1)\) per insert.</p>
 <pre><code class="language-python">import random
 
-random.seed(0)                                  # unseeded, the chain-length assert fails in about 1.4% of runs
+random.seed(0)                                  # unseeded, the chain-length assert fails in about 1% of runs
 
 
 class MyHashMap:
@@ -118,7 +118,7 @@ for _ in range(20_000):                         # random operations, checked aga
     assert hm.get(key) == ref.get(key, -1)
 assert hm.n == len(ref) and hm.n &lt;= 0.75 * hm.m
 assert max(len(s) for s in hm.slots) &lt;= 10     # chains stay short</code></pre>
-<p>The final asserts are the point: after twenty thousand random operations the map agrees with <code>dict</code> on every lookup, the load factor is bounded, and no chain grew long.</p>
+<p>The final asserts are the point: after twenty thousand random operations the map agrees with <code>dict</code> on every lookup, the load factor is bounded, and no chain grew long. The seed fixes \(a\), \(b\) and the operations so the build is reproducible; a real table draws \(a\) and \(b\) fresh on each run, which is what the \(1/m\) bound is about.</p>
 <h2 id="chaining-versus-open-addressing">Chaining versus open addressing</h2>
 <p>Python's own <code>dict</code> uses <b>open addressing</b>: no lists, collisions probe other slots in the same array. It is more cache-friendly, but deletion needs tombstones and performance falls off sharply as the table fills, so it resizes earlier. Chaining degrades gracefully and is the easier one to implement correctly.</p>
 <h2 id="practice">Practice</h2>
