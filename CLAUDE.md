@@ -65,8 +65,9 @@ Preview:     python3 -m http.server 8000
 - `post-voice` in progress (8 PRs, `SPEC-post-voice.md`): PR 1 (#14) added `scripts/voice_check.py` and
   `scripts/voice-baseline.json`, written from unedited posts of `main` at `28b63c9`; never regenerate it to get
   green. PR 2 (#15), the pilot, merged after the owner approved its voice. PR 3 (#16) is machine learning
-  fundamentals, PR 4 (#17) statistics, PR 5 (#18) probability, PR 6 LLMs; PRs 7 to 8 follow the spec's rollout table.
-  An existing sentence that overstates its code stays word for word and goes in the PR's findings list. Edited
-  sources need `tools/posts/build.py . <slug>`, then the feeds and search builds. Reading-page PRs open with
-  `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR 0002).
+  fundamentals, PR 4 (#17) statistics, PR 5 (#18) probability, PR 6 (#19) LLMs, PR 7 recommender systems and ML
+  systems; PR 8 follows the spec's rollout table. An existing sentence that overstates its code stays word for word
+  and goes in the PR's findings list. Edited sources need `tools/posts/build.py . <slug>`, then the feeds and search
+  builds. Reading-page PRs open with `Takeover phase: build (owner-approved exception; repo is in understand)` (ADR
+  0002).
 - Parked branches: none.
