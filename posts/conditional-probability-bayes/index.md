@@ -1,8 +1,8 @@
 # Conditional probability and Bayes' rule, by counting
 
-A conditional probability answers the question "given that I now know B happened, how likely is A?" The mechanics are simpler than the notation suggests. Knowing B rules out every outcome where B did not happen. You throw those away, and among the outcomes that are left you count how often A also happens. Everything in this post follows from that: the rules for "or" and "and", Bayes' rule, and the base-rate effect that makes a good detector of a rare event produce mostly false alarms.
+When a detector catches 90% of real events, fires on 20% of normal cases, and real events make up 10% of traffic, only one flag in three is real. Conditional probability explains why. It answers the question "given that I now know B happened, how likely is A?" Knowing B rules out every outcome where B did not happen; among the outcomes that are left you count how often A also happens. From that one idea I derive the rules for "or" and "and", Bayes' rule, and the base-rate effect that makes a good detector of a rare event produce mostly false alarms.
 
-Every claim below is checked in code, on a small sample space we can enumerate exactly, or by simulation.
+Every claim below is checked in code, on a small sample space that can be enumerated exactly, or by simulation.
 
 ## Counting on a small sample space
 Roll two fair dice. There are 36 equally likely outcomes, so the probability of any event is the number of outcomes in it divided by 36. Writing events as functions of an outcome, and conditioning as a filter on the outcomes, gives exact answers with `Fraction`:
@@ -82,7 +82,7 @@ assert P(AND(first6, high)) == P(high, given=first6) * P(first6)
 The shortcut overstates the answer here (51/216 against 42/216) because it treats the overlap as smaller than it is.
 
 ## Bayes' rule
-Writing the multiplication rule both ways round and dividing gives **Bayes' rule**, which turns a probability we know into the one we want:
+Writing the multiplication rule both ways round and dividing gives **Bayes' rule**, which turns a known probability into the wanted one:
 
 \[
 P(H \mid E) = \frac{P(E \mid H)\,P(H)}{P(E)}
@@ -201,7 +201,7 @@ A probabilistic classifier estimates \(P(y = 1 \mid x)\), which by Bayes' rule d
 \text{logit}\,p_{\text{deploy}}(x) = \text{logit}\,p_{\text{train}}(x) - \text{logit}\,\pi_{\text{train}} + \text{logit}\,\pi_{\text{deploy}}
 \]
 
-where \(\pi\) is the positive rate. This assumes only the class mix changed, not what each class looks like. With two Gaussian classes the true posterior is known in closed form, so we can check the correction directly:
+where \(\pi\) is the positive rate. This assumes only the class mix changed, not what each class looks like. With two Gaussian classes the true posterior is known in closed form, so I can check the correction directly:
 
 ```python
 from scipy.special import expit, logit
@@ -243,6 +243,6 @@ The ranking of cases does not change, so ROC AUC is identical before and after; 
 - **Reusing probabilities across populations.** A score learned at one base rate is miscalibrated at another. Shift the logit if only the class mix changed; recalibrate if more than that changed.
 - **Conditioning on an event of probability zero.** \(P(A \mid B)\) is undefined when \(P(B) = 0\). For continuous variables, the conditional density takes its place, which is what the Gaussian example above uses.
 
-The same rule, applied to a parameter instead of an event, is the basis of [MLE and MAP](../statistical-estimation-mle-map/) and of the Beta-Binomial updates in [quantifying uncertainty with the Beta distribution](../beta-uncertainty/). For more of the core identities on one page, see the [probability cheatsheet](../probability-cheatsheet/).
+The detector numbers come from fixed rates of 90% and 20%, and the prior-shift check from two Gaussian classes whose log likelihood ratio is exactly linear, so they show the arithmetic of Bayes' rule, not how a real detector or classifier behaves. On a real score, the open question is whether only the class mix changed or more than that, and the second case needs recalibrating on fresh labelled data. The same rule, applied to a parameter instead of an event, is the basis of [MLE and MAP](../statistical-estimation-mle-map/) and of the Beta-Binomial updates in [quantifying uncertainty with the Beta distribution](../beta-uncertainty/). For more of the core identities on one page, see the [probability cheatsheet](../probability-cheatsheet/).
 
 The opening rules follow the Day 3 tutorial of HackerRank's [10 Days of Statistics](https://www.hackerrank.com/domains/tutorials/10-days-of-statistics); chapter 2 of Blitzstein and Hwang's Introduction to Probability (2nd edition, 2019) covers conditioning, Bayes' rule and the odds form in depth. The prior-shift correction is the standard adjustment described by Saerens, Latinne and Decaestecker (Neural Computation, 2002).
