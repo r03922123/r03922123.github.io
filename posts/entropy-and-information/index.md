@@ -1,13 +1,13 @@
 # Entropy and information: surprise, cross-entropy and KL divergence
 
-Train a classifier with cross-entropy loss, score a language model by perplexity, or grow a decision tree by information gain, and you are using three quantities from information theory: entropy, cross-entropy and KL divergence. All three come from one idea, how surprised you are when something happens, and one identity ties them together. This post builds them from that idea, checks each claim in code, then shows where they turn up in machine learning. For example, three models over a 50-token vocabulary all rank the true token first 80% of the time. The one that puts 0.80 on its top guess has the lowest perplexity, 3.59, and the overconfident one, at 0.95, has the highest.
+Train a classifier with cross-entropy loss, score a language model by perplexity, or grow a decision tree by information gain, and you are using three quantities from information theory: entropy, cross-entropy and KL divergence. All three come from one idea, how surprised you are when something happens, and one identity ties them together. This post builds them from that idea, checks each claim in code, then shows where they turn up in machine learning. Perplexity shows why calibration matters: three models over a 50-token vocabulary all rank the true token first 80% of the time. The one that puts 0.80 on its top guess has the lowest perplexity, 3.59, and the overconfident one, at 0.95, has the highest.
 
 ## Surprise
 Take one outcome \(x\) with probability \(p(x)\). Its surprise, or information content, is
 
 \[ s(x) = \log \frac{1}{p(x)} = -\log p(x). \]
 
-The logarithm is not arbitrary. Surprise should be zero for a sure thing, grow as the outcome gets rarer, and add up over independent events. A pair of independent events has probability \(pq\), so we need \(s(pq) = s(p) + s(q)\), and the continuous functions with that property are exactly the multiples of \(\log p\). The base only sets the unit: base 2 gives **bits**, base \(e\) gives **nats**, and one nat is \(1/\ln 2 \approx 1.44\) bits. A fair coin landing heads is 1 bit of surprise; a fair die showing a six is \(\log_2 6 \approx 2.58\) bits.
+The logarithm is not arbitrary. Surprise should be zero for a sure thing, grow as the outcome gets rarer, and add up over independent events. A pair of independent events has probability \(pq\), so I need \(s(pq) = s(p) + s(q)\), and the continuous functions with that property are exactly the multiples of \(\log p\). The base only sets the unit: base 2 gives **bits**, base \(e\) gives **nats**, and one nat is \(1/\ln 2 \approx 1.44\) bits. A fair coin landing heads is 1 bit of surprise; a fair die showing a six is \(\log_2 6 \approx 2.58\) bits.
 
 ## Entropy is average surprise
 Entropy is the surprise you expect before you look:

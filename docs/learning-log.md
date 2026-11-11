@@ -4,12 +4,12 @@ The three most important whys of each change, newest first. Each heading reads `
 
 ## 2026-11-11 · build: post-voice PR 3, machine learning fundamentals
 
-1. **An overstated sentence stays as it was, and goes on a list.** Three posts claimed their code checks more than
-   it does: "each claim", "against a brute force", "asserts check the claim". Turning those into "I check …" would
-   make the overstatement the author's own, and quietly fixing them would hide a correction in a style diff. So they
-   stay word for word, and the PR lists them for their own fix, like an erratum filed apart from the next edition.
-   Trade-off: known soft spots stay live until that fix. Risk: the list lives in a PR description, so the next
-   session must carry it forward.
+1. **An overstated sentence stays as it was, and goes on a list.** Seven existing sentences in six posts claim more
+   than their code shows, such as "checks each claim in code" and "each with a small experiment". Turning those into
+   "I check …" would make the overstatement the author's own, and quietly fixing them would hide a correction in a
+   style diff. So they stay word for word, and the PR lists them for their own fix, like an erratum filed apart from
+   the next edition. Trade-off: known soft spots stay live until that fix. Risk: the list lives in a PR description,
+   so the next session must carry it forward.
 2. **Name the kind of evidence.** The new limits say which claims the code measures and which it only argues or
    cites: "argued, not measured", "cited, not reproduced", "I train no deep network". A reader can then weigh each
    claim. Trade-off: more caveats in a post that is already careful. Risk: a limit can undersell a claim the code

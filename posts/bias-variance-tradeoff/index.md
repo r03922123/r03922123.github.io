@@ -273,7 +273,7 @@ Three things are worth taking from this. The decomposition itself still holds ev
 - **Expecting bagging to fix bias, or more trees to fix everything.** Bagging leaves bias alone, and its variance reduction stops at \(\rho s^2\).
 - **Forgetting the noise floor.** When train and validation error meet at a level you are unhappy with, and that level is the noise in the labels, no model change helps. Spend the effort on the data.
 
-These numbers come from synthetic problems whose truth I chose: a sine wave with noise \(\sigma = 0.3\) for the sweeps, and Gaussian features with \(n = 40\) rows for double descent. They show how each term moves, not how large it is on real data, where \(\bar f\) cannot be computed and learning curves read against an estimated noise floor are the working tool. Whether a model past the interpolation threshold beats the right-sized one stays open: it did not here, and it did in Belkin et al.'s experiments.
+These numbers come from synthetic problems whose truth I chose: a sine wave with noise \(\sigma = 0.3\) for the sweeps, and Gaussian features with \(n = 40\) rows for double descent. They show how each term moves, not how large it is on real data, where \(\bar f\) cannot be computed and learning curves read against an estimated noise floor are the working tool. Whether a model past the interpolation threshold beats the right-sized one depends on the problem: it did not here, and it did in Belkin et al.'s experiments.
 
 For where this fits among the other basics, see the [ML fundamentals quick reference](../ml-fundamentals-quick-reference/); for why squared error is the natural loss here, see [regression as maximum likelihood](../regression-as-maximum-likelihood/).
 

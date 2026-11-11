@@ -252,6 +252,6 @@ floor = F.binary_cross_entropy_with_logits(torch.sigmoid(z), torch.ones_like(z),
 assert round(floor.item(), 3) == 0.313
 ```
 
-The step counts come from one synthetic dataset with a single feature and evenly spaced normal quantiles, so they show how the factor \(p(1-p)\) slows training, not how many steps a real model loses. I train no deep network, so the claim that a saturated output unit stalls one rests on the gradient algebra alone. Two choices stay untested here: how much label noise it takes before a bounded loss wins, and whether squared error on the raw logits matches cross-entropy beyond the benchmarks Hui and Belkin used.
+The step counts come from one synthetic dataset with a single feature and evenly spaced normal quantiles, so they show how the factor \(p(1-p)\) slows training, not how many steps a real model loses. I train no deep network, so the claim that a saturated output unit stalls one rests on the gradient algebra alone. Two questions stay untested here: how much label noise it takes before a bounded loss wins, and whether squared error on the raw logits matches cross-entropy beyond the benchmarks Hui and Belkin used.
 
 The derivations follow the treatment of sigmoid output units in Goodfellow, Bengio and Courville, Deep Learning (MIT Press, 2016), section 6.2.2, and of logistic regression in Bishop, Pattern Recognition and Machine Learning (Springer, 2006), section 4.3.2.

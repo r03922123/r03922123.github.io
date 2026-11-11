@@ -279,6 +279,6 @@ assert math.isclose(kl, soft_cross_entropy(logits, teacher) - teacher_entropy, r
 
 The rule behind the table: keep everything as logits or log-probabilities for as long as possible, and turn them into probabilities only at the end, when a person needs to read them or a threshold needs to be applied.
 
-The checks use random logits at a few fixed scales plus hand-picked extremes, so they show where each formula breaks, not how often a training run produces such logits. The code does not run PyTorch's autocast or Keras's `from_logits` flag, so those two pitfalls are stated, not checked.
+The checks use random logits at a few fixed scales plus hand-picked extremes, so they show where each formula breaks, not how often a training run produces such logits. The code does not run PyTorch's autocast or Keras's `from_logits` flag, so what those two do is stated, not checked, and how a given framework's loss handles these extremes is for its own tests to show.
 
 The outline of this post, the max shift followed by the log-softmax rearrangement, follows Jay Mody's post [Numerically Stable Softmax and Cross Entropy](https://jaykmody.com/blog/stable-softmax/).
