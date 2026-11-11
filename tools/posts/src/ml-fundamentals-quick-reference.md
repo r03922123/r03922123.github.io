@@ -5,7 +5,7 @@ group: Machine learning fundamentals
 order: 1
 tags: deep learning · optimization · reference
 ---
-Training a neural network rests on a dozen primitives: the loss, autograd, the optimizer and its schedule, activations, initialization, normalization, regularization and, in a transformer, the softmax and the attention mask. This post gives each a few sentences, the equation that matters and a short block of code whose asserts check the claim, with links to longer posts. All the code runs as one script in a few seconds on a laptop CPU.
+Training a neural network rests on a dozen primitives: the loss, autograd, the optimizer and its schedule, activations, initialization, normalization, regularization and, in a transformer, the softmax and the attention mask. Each one can break a model: a learning rate just over \(2/L\) diverges, 30 sigmoid layers pass back no gradient, and forgetting `model.eval()` makes predictions random. This post gives each a few sentences, the equation that matters and a short block of code whose asserts check the claim, with links to longer posts. All the code runs as one script in a few seconds on a laptop CPU. That speed comes from toy cases, such as a quadratic with curvatures 100 and 1 or a batch of 32 random labels, so the asserts show each mechanism, not how large it is in a full-size model.
 
 ## Losses: cross-entropy, MSE and KL
 A classifier outputs a distribution \(q\) over classes; training pulls it toward the data's distribution \(p\). Cross-entropy splits into a part the model cannot change and a part it can:
