@@ -1,20 +1,20 @@
 # Is this coin fair? Testing a proportion from ten flips to a million
 
-A simulated coin is flipped 10 times and comes up tails 8 times. Is it broken? The question is small, but answering it properly uses most of the machinery behind every A/B test and every "is this metric really different" check: a null hypothesis, a p-value, the difference between "not significant" and "fine", and the number of samples it takes before a test can tell you anything.
+A simulated coin is flipped 10 times and comes up tails 8 times. Is it broken? I get an exact p-value of about 0.109, too large to reject fairness, yet the 95% interval for the chance of heads runs from about 0.03 to 0.56, so the data cannot call the coin fair either. The question is small, but answering it properly uses most of the machinery behind every A/B test and every "is this metric really different" check: a null hypothesis, a p-value, the difference between "not significant" and "fine", and the number of samples it takes before a test can tell you anything.
 
 This post works the example by hand, checks each number by brute force and against SciPy, then scales it up to large samples and looks at it from the Bayesian side.
 
 ## The question, made precise
-Let \(p\) be the probability of heads. "Fair" is the **null hypothesis** \(H_0: p = 1/2\). We have no reason to expect bias in one direction, so the alternative is two-sided, \(H_1: p \ne 1/2\). The data are summarized by the number of heads \(X\), which under \(H_0\) follows \(\text{Binomial}(10, 1/2)\) (see [Bernoulli and binomial](../bernoulli-binomial/)). We saw \(X = 2\).
+Let \(p\) be the probability of heads. "Fair" is the **null hypothesis** \(H_0: p = 1/2\). There is no reason to expect bias in one direction, so the alternative is two-sided, \(H_1: p \ne 1/2\). The data are summarized by the number of heads \(X\), which under \(H_0\) follows \(\text{Binomial}(10, 1/2)\) (see [Bernoulli and binomial](../bernoulli-binomial/)). Here \(X = 2\).
 
-The **p-value** is the probability, if the coin were fair, of a result at least as surprising as the one we saw. "At least as surprising" here means 2 or fewer heads, or, symmetrically, 2 or fewer tails:
+The **p-value** is the probability, if the coin were fair, of a result at least as surprising as the one observed. "At least as surprising" here means 2 or fewer heads, or, symmetrically, 2 or fewer tails:
 
 \[ P(X \le 2) + P(X \ge 8) = 2 \cdot \frac{\binom{10}{0} + \binom{10}{1} + \binom{10}{2}}{2^{10}} = 2 \cdot \frac{1 + 10 + 45}{1024} = \frac{112}{1024} \approx 0.109. \]
 
 At the usual threshold \(\alpha = 0.05\), that is not small enough to reject fairness. A fair coin gives a split this lopsided about one time in nine.
 
 ## The exact test, by brute force
-Nothing about this needs a formula. A fair coin makes all \(2^{10} = 1024\) sequences equally likely, so the p-value is just the fraction of sequences at least as extreme as ours. The code counts them and compares with `scipy.stats.binomtest`, which runs the same exact test.
+Nothing about this needs a formula. A fair coin makes all \(2^{10} = 1024\) sequences equally likely, so the p-value is just the fraction of sequences at least as extreme as the observed one. The code counts them and compares with `scipy.stats.binomtest`, which runs the same exact test.
 
 ```python
 import itertools
@@ -93,11 +93,11 @@ for k in range(n + 1):                                   # the interval contains
 ```
 
 ## How many flips would it take?
-To decide in advance, fix the smallest bias you care about and the chance you want of detecting it. Say a coin landing heads 60% of the time matters, and we want 80% **power** at \(\alpha = 0.05\). The normal approximation gives the classic sample-size formula:
+To decide in advance, fix the smallest bias you care about and the chance you want of detecting it. Say a coin landing heads 60% of the time matters, and the goal is 80% **power** at \(\alpha = 0.05\). The normal approximation gives the classic sample-size formula:
 
 \[ n \approx \left( \frac{z_{1 - \alpha/2} \sqrt{p_0 (1 - p_0)} + z_{1 - \beta} \sqrt{p_1 (1 - p_1)}}{p_1 - p_0} \right)^2 = \left( \frac{1.96 \cdot 0.5 + 0.84 \cdot 0.49}{0.1} \right)^2 \approx 194. \]
 
-About two hundred flips, twenty times what we have. The exact test adds a wrinkle: as \(n\) grows its power does not rise smoothly but zigzags, because the rejection region can only grow one whole count at a time. At \(n = 194\) the exact test has only about 76% power, while at 190 it has 79%. Its power first reaches 80% at \(n = 199\), falls back below at 200, and stays above only from \(n = 210\) on. In practice you round up and check the exact power at the chosen \(n\), here by computing it for every \(n\) and by simulating 20,000 experiments at \(n = 210\).
+About two hundred flips, twenty times the flips in hand. The exact test adds a wrinkle: as \(n\) grows its power does not rise smoothly but zigzags, because the rejection region can only grow one whole count at a time. At \(n = 194\) the exact test has only about 76% power, while at 190 it has 79%. Its power first reaches 80% at \(n = 199\), falls back below at 200, and stays above only from \(n = 210\) on. In practice you round up and check the exact power at the chosen \(n\), here by computing it for every \(n\) and by simulating 20,000 experiments at \(n = 210\).
 
 ```python
 z_a, z_b = stats.norm.ppf(0.975), stats.norm.ppf(0.80)
@@ -156,7 +156,7 @@ assert stats.binomtest(502_000, 1_000_000, 0.5).pvalue < 1e-4   # a 0.2-point bi
 ## A Bayesian reading
 A p-value answers "how surprising is this data if the coin is fair?", not "how likely is the coin to be fair?". The second question needs a prior. Put a uniform prior on \(p\); after 2 heads and 8 tails the posterior is \(\text{Beta}(3, 9)\), and the probability that the coin favours tails is about 0.97. That sounds decisive, but it only says which way the coin leans if it leans at all.
 
-To weigh "exactly fair" against "some unknown bias", compare how well each hypothesis predicted the sequence we saw. A fair coin gave it probability \(2^{-10}\); the uniform-bias model gave it \(\int_0^1 p^2 (1-p)^8 \, dp = 2!\,8!/11!\). The ratio, the **Bayes factor**, is about 2.1 in favour of bias: weak evidence, which agrees with the p-value's shrug. [Beta uncertainty](../beta-uncertainty/) and [MLE and MAP](../statistical-estimation-mle-map/) take this further.
+To weigh "exactly fair" against "some unknown bias", compare how well each hypothesis predicted the observed sequence. A fair coin gave it probability \(2^{-10}\); the uniform-bias model gave it \(\int_0^1 p^2 (1-p)^8 \, dp = 2!\,8!/11!\). The ratio, the **Bayes factor**, is about 2.1 in favour of bias: weak evidence, which agrees with the p-value's shrug. [Beta uncertainty](../beta-uncertainty/) and [MLE and MAP](../statistical-estimation-mle-map/) take this further.
 
 ```python
 posterior = stats.beta(1 + heads, 1 + n - heads)
@@ -212,5 +212,7 @@ assert abs(np.mean(np.array(pv_fair) < 0.05) - 0.05) < 0.02       # about 5% fal
 - **With a huge \(n\), everything is significant.** A million flips detect a bias of 0.2 percentage points that may not matter for any purpose. Ask how large a bias would matter, then check whether the interval rules it in or out.
 - **Testing many coins means many chances of a false alarm.** Check 100 fair coins at \(\alpha = 0.05\) and expect around five to look biased by chance alone (somewhat fewer with a conservative exact test).
 - **Rules of thumb such as \(n \ge 30\) are not a licence for the normal approximation.** What matters is that \(n p_0\) and \(n (1 - p_0)\) are both comfortably large; far in the tails even large \(n\) leaves the approximation off by a sizable factor (above, \(2.0 \times 10^{-9}\) against an exact \(1.1 \times 10^{-9}\)). When in doubt, run the exact test.
+
+The sample sizes above hold for one bias, a coin that lands heads 60% of the time, tested at the 0.05 level with 80% power; a smaller bias that matters needs more flips. The Bayes factor of about 2.1 rests on the uniform prior. And the runs test is tried on two patterns, alternating and sticky, so other kinds of dependence stay open; autocorrelation of the sequence, from the table above, is the next check.
 
 The tests here are textbook material. The exact interval is from Clopper and Pearson (1934), the score interval from Wilson (1927), and the runs test from Wald and Wolfowitz (1940).
