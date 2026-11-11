@@ -69,7 +69,7 @@ def head_tags(path, post=None, markdown=False):
         published = datetime.strptime(date, "%B %d, %Y").replace(tzinfo=timezone(timedelta(hours=8))).isoformat()
         data = {"@context": "https://schema.org", "@type": "BlogPosting", "headline": title,
                 "datePublished": published, "description": summary, "author": AUTHOR}
-        ld = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")   # "</" would end the script; same JSON
+        ld = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")   # "</" or "<!--" would change the parse
         tags += f'<script type="application/ld+json">{ld}</script>\n'
     return tags
 
@@ -114,17 +114,9 @@ def inline(text):
         else:
             p = html.escape(p, quote=False)
             p = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", p)
-            p = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", link, p)
+            p = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", r'<a href="\2">\1</a>', p)
             out.append(p)
     return "".join(out)
-
-
-def link(m):
-    text, href = m.group(1), m.group(2)
-    sibling = re.fullmatch(r"\.\./([a-z0-9-]+)/", href)
-    if sibling and not (HERE / "src" / f"{sibling.group(1)}.md").exists():
-        return text                                  # that post is not written yet; becomes a link on a later build
-    return f'<a href="{href}">{text}</a>'
 
 
 def slugify(text):
@@ -259,7 +251,8 @@ def topic_list(sections):
                       for name, sid, rows, _ in sections)
     groups = "\n".join(f'<section class="group" id="{sid}">\n<h2>{html.escape(name)}</h2><a class="all" href="#topics">All topics</a>\n'
                        f'{intro}<ul class="series">\n' + "\n".join(rows) + "\n</ul>\n</section>" for name, sid, rows, intro in sections)
-    chosen = ", ".join(f':root:has(#{sid}:target) .topics a[href="#{sid}"]' for _, sid, _, _ in sections)
+    # [id=...], not #id: an id that starts with a digit is not a valid #selector, and the whole rule would be dropped.
+    chosen = ", ".join(f':root:has([id="{sid}"]:target) .topics a[href="#{sid}"]' for _, sid, _, _ in sections)
     return (f'<nav class="topics" id="topics" aria-label="Topics">\n{cards}\n</nav>\n'
             f'<p class="count">{sum(len(rows) for _, _, rows, _ in sections)} articles</p>\n<div class="groups">\n{groups}\n</div>',
             f"<style>{chosen} {{ border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }}</style>\n")
