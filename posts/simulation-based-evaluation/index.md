@@ -1,8 +1,8 @@
 # Simulation-based evaluation: testing a change before it meets real users
 
-An A/B test is the most trustworthy way to learn what a change does, but it is slow, it exposes real people to a change that may be bad, and some changes cannot be randomized at all. Simulation-based evaluation estimates the effect of a change before (or instead of) randomizing it, using a model of how the population behaves. It is a filter in front of live experiments: it narrows the candidates and flags obvious harm, and the survivors still go to a live test.
+In a toy shop with three offers, replaying 5,000 logged rows through a reward model that is too simple underrates a new discount policy by 0.24, with a spread of only 0.02 over 300 repeats. A doubly robust estimator built on the same model lands on the truth. Simulation-based evaluation estimates the effect of a change before (or instead of) randomizing it, using a model of how the population behaves. An A/B test is the most trustworthy way to learn what a change does, but it is slow, it exposes real people to a change that may be bad, and some changes cannot be randomized at all. Simulation is a filter in front of live experiments: it narrows the candidates and flags obvious harm, and the survivors still go to a live test.
 
-Each method below is only as good as one specific assumption. To see which, every estimator here runs inside a toy world where the true answer is known, so we can tell when it is right and when it is quietly wrong.
+Each method below is only as good as one specific assumption. To see which, I run every estimator inside a toy world where the true answer is known, so I can tell when it is right and when it is quietly wrong.
 
 ## Three tools, three assumptions
 | method | needs | answers | rests on |
@@ -14,7 +14,7 @@ Each method below is only as good as one specific assumption. To see which, ever
 They are not rungs of one ladder. Off-policy evaluation is the cheapest and most principled when its condition holds. Synthetic control is retrospective: it measures a change already made in one region or market. A full simulation can answer anything, and can be confidently wrong.
 
 ## Replaying the logs: off-policy evaluation
-Suppose a system chose an action \(a\) for each user with context \(x\), with a known probability \(\mu(a \mid x)\), and logged the reward \(r\). We want the average reward \(V(\pi)\) that a different policy \(\pi\) would have earned.
+Suppose a system chose an action \(a\) for each user with context \(x\), with a known probability \(\mu(a \mid x)\), and logged the reward \(r\). The goal is the average reward \(V(\pi)\) that a different policy \(\pi\) would have earned.
 
 The **direct method (DM)** fits a reward model \(\hat q(x, a)\) and averages \(\hat q(x, \pi(x))\). It has low variance but inherits every error of the model.
 
@@ -108,7 +108,7 @@ assert dr_sd < 0.6 * ips_sd                   # DR: unbiased like IPS, with abou
 The direct method has the smallest spread and is the only wrong one, the dangerous combination. Its linear model cannot see the steps, so it underrates the discounts. Doubly robust uses the same bad model and still lands on the truth, because the weighted residuals repair the model's error.
 
 ### What the logs cannot tell you
-IPS and DR need one thing from the old policy: every action the new policy takes must have had a nonzero chance of being logged in that context. This is called **support** (or overlap). Suppose the old policy never offered the big discount to engaged users (\(x > 0.5\)), and we ask what giving everyone the big discount would earn:
+IPS and DR need one thing from the old policy: every action the new policy takes must have had a nonzero chance of being logged in that context. This is called **support** (or overlap). Suppose the old policy never offered the big discount to engaged users (\(x > 0.5\)), and I ask what giving everyone the big discount would earn:
 
 ```python
 def cautious_probs(x):                       # never offers the big discount when x > 0.5
@@ -265,5 +265,7 @@ About 10,000 visitors per arm suffice, but only if the simulator's effect size i
 - **A low-variance estimate can be the wrong one**, like the direct method above.
 - **Validate the simulator on held-out history**, stay near its calibration range, and slice before trusting an average.
 - **Confirm live.** A simulation raises confidence in a change; a smaller, well-powered experiment confirms it. For the causal groundwork see [causal inference](../causal-inference/), and for how offline and online evaluation fit together see [evaluating ML systems](/posts/evaluating-ml-systems/).
+
+Every world here is a toy I built so the true answer is known, so the numbers show how each method behaves when its assumption holds or breaks, not how often it holds on real logs or markets. Two questions stay open before a live test: whether the new policy stays inside logged support, which the logs can measure, and whether the behavioral model holds outside its calibration range, which only held-out history or the live test can check.
 
 IPS goes back to Horvitz and Thompson (1952); the doubly robust estimator for policy evaluation follows Dudík, Langford and Li (2011); synthetic control and its placebo test are from Abadie and Gardeazabal (2003) and Abadie, Diamond and Hainmueller (2010). Athey and Imbens (2019), "Machine Learning Methods That Economists Should Know About", is a good bridge between these methods and ML.
