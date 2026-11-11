@@ -233,7 +233,7 @@ assert recall_at_k([1, 0, 1, 0, 0], 3, n_relevant=4) == 0.5
 z, lift = two_proportion_z(10_000, 500_000, 10_500, 500_000)
 assert round(z, 2) == 3.53 and round(lift, 3) == 0.05</code></pre>
 <p>The asserts check NDCG, MRR and recall on small hand-made lists and reproduce the z and lift of the worked
-A/B example. Everything else on the page, ECE and the p-value included, is guidance the code does not test.</p>
+A/B example. Everything else on the page, ECE and the p-value included, is not tested by the code.</p>
 
 <h2 id="refs">References</h2>
 <ol class="refs">
