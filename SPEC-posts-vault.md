@@ -45,6 +45,8 @@ Same source conventions as the LeetCode series: `##`/`###` headings, `\( \)` and
 - Always: rewrite; credit outside sources; run every code block; keep the long-form posts first on the index.
 - Ask first: publishing anything from the private folders.
 - Never: paste vault text; publish interview coaching, résumé details beyond the About page, or personal notes.
+  Exception (2026-11-11, ADR 0003): résumé preparation may be published under `/book/`, unlisted, as
+  `SPEC-resume-book.md` sets out. The rule holds for `/posts/`.
 
 ## Success Criteria
 - [ ] 55 posts render, each with passing code (or no executable code where none fits)

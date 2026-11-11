@@ -25,11 +25,12 @@ branch tip before it is merged or pushed.
 
 | Gate | Rule | `gates.sh` step |
 |---|---|---|
-| Builds | Every post and LeetCode page builds, and every python block passes its asserts; the feed files and the search index build | `post build`, `leetcode build`, `feeds build`, `search index` |
+| Builds | Every post, book and LeetCode page builds, and every python block passes its asserts; the feed files and the search index build | `post build`, `leetcode build`, `feeds build`, `search index` |
 | Privacy and site | No private terms (local denylist) in contents or file names, no phone numbers, no broken links, page heads complete, pinned CDNs, listings complete | `privacy`, then `site` (needs `scripts/denylist.local.txt`; in CI, the `SITE_DENYLIST` secret) |
 | Home weight | `index.html` + `style.css` ≤ 150 KB (three.js lazy and counted apart) | `site` |
 | Check tests | The checker itself still works; the search ranking passes its cases and golden queries | `check tests`, `search tests` |
 | Post wording | No interview framing, vault or Obsidian mentions, no MusicGen authorship; the one allowed hit is the InterviewQuery credit in `coin-flips-normal-approximation.md` | `post wording` |
+| Book wording | `tools/book/src` may use interview framing (ADR 0003) but never names the notes' source | `book wording` |
 | Rebuild is clean | Generated HTML is committed and matches its sources | `rebuild clean` |
 
 ## Measured, not yet enforced
@@ -45,4 +46,5 @@ metrics; `.github/workflows/gates.yml` is the natural place for them later.
 
 ## Exceptions
 
-None.
+- `/book/` (ADR 0003): unlisted on purpose, so it is exempt from "listings complete"; `site` checks the
+  opposite instead, that no listing, feed or index names it. Every other page keeps the full rule.
