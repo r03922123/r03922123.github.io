@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terraform and CI/CD for ML: plans, shared state and a model-quality gate · r03922123</title>
+<meta name="description" content="Infrastructure as code from the inside: how a plan compares the config, the recorded state and the real world, why the state file must be shared and locked, and how modules give dev, staging and prod one definition. Then what a pipeline checks for ML code beyond unit tests, with a model-quality gate that blocks real drops and not seed noise. Small simulations show each rule.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+<link rel="preload" href="/fonts/source-serif-4/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="canonical" href="https://r03922123.github.io/posts/terraform-and-ci-cd-for-ml/">
+<link rel="alternate" type="application/rss+xml" title="r03922123" href="https://r03922123.github.io/rss.xml">
+<link rel="alternate" type="text/markdown" href="https://r03922123.github.io/posts/terraform-and-ci-cd-for-ml/index.md">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Terraform and CI/CD for ML: plans, shared state and a model-quality gate", "datePublished": "2026-11-01T00:00:00+08:00", "description": "Infrastructure as code from the inside: how a plan compares the config, the recorded state and the real world, why the state file must be shared and locked, and how modules give dev, staging and prod one definition. Then what a pipeline checks for ML code beyond unit tests, with a model-quality gate that blocks real drops and not seed noise. Small simulations show each rule.", "author": {"@type": "Person", "name": "Jie-Hong Lin", "url": "https://r03922123.github.io/about.html"}}</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script defer src="/post.js"></script>
+</head>
+<body>
+<header class="site">
+  <nav><a href="/">Common room</a><a href="/posts/" aria-current="true">Posts</a><a href="/leetcode/">LeetCode</a><a href="/about.html">About</a></nav>
+  <a class="home" href="/">r03922123</a>
+  <a class="gh" href="https://github.com/r03922123">GitHub</a>
+</header>
+<div class="wrap">
+<main>
+<article class="post-body">
+<header class="post-head">
+  <p class="crumb"><a href="/posts/#ml-systems-and-design">ML systems and design</a></p>
+  <h1>Terraform and CI/CD for ML: plans, shared state and a model-quality gate</h1>
+</header>
+<aside class="post-side">
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>16 min</dd><dt>Topic</dt><dd>ML systems and design</dd><dt>Tags</dt><dd>Terraform · infrastructure as code · CI/CD · GitHub Actions · deployment</dd></dl>
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#describe-the-end-state-not-the-steps">Describe the end state, not the steps</a></li><li><a href="#a-plan-compares-three-versions-of-the-truth">A plan compares three versions of the truth</a></li><li><a href="#the-state-file-shared-locked-and-sensitive">The state file: shared, locked, and sensitive</a></li><li><a href="#modules-and-variables-one-definition-three-environments">Modules and variables: one definition, three environments</a></li><li><a href="#what-a-pipeline-checks-for-ml-code">What a pipeline checks for ML code</a></li><li><a href="#a-model-quality-gate-that-does-not-cry-wolf">A model-quality gate that does not cry wolf</a></li><li><a href="#shipping-it-stages-and-a-canary">Shipping it: stages and a canary</a></li><li><a href="#problems-and-fixes">Problems and fixes</a></li><li><a href="#a-small-real-pipeline-this-site">A small, real pipeline: this site</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
+</aside>
+<div class="prose">
+<p>Two engineers run <code>apply</code> against the same state file without a lock, and in 4 of the 6 possible orderings of their reads and writes, one of them erases the other's record of an endpoint that still exists and still costs money. A CI gate that blocks a new model whenever its accuracy drops at all blocks about half of retrains that are exactly as good as the old one. Both failures come from the plumbing around the code, and both have standard fixes. <b>Infrastructure as code</b> (IaC) means describing servers, buckets and endpoints in text files that are reviewed and versioned like code; Terraform is the most common tool for it. <b>CI/CD</b> (continuous integration and continuous delivery) means every change runs automated checks before it merges, and a change that passes is shipped through staged environments by a pipeline rather than by hand.</p>
+<p>This post explains how a Terraform plan is computed and why the state file has to be shared and locked, then what a pipeline should check for ML code and how a model reaches production. I build a tiny plan engine, replay the two-writer race over every ordering, and test three model-quality gates on simulated retrains. The container side is in <a href="../docker-for-ml/">Docker for ML</a> and the systems a model runs on are in <a href="../ml-infrastructure/">ML infrastructure</a>.</p>
+<h2 id="describe-the-end-state-not-the-steps">Describe the end state, not the steps</h2>
+<p>A shell script that creates a bucket is imperative: run it twice and it fails, or makes two buckets. Terraform is <b>declarative</b>: the files say what should exist, and Terraform works out the steps. The language is HCL; a sketch (not run):</p>
+<pre><code class="language-plaintext">terraform {
+  backend "s3" {
+    bucket       = "example-tf-state"
+    key          = "serving/dev.tfstate"
+    region       = "eu-west-1"
+    use_lockfile = true          # S3-native state locking; off by default
+  }
+}
+
+resource "aws_s3_bucket" "models" {
+  bucket = "example-ml-models-dev"
+  lifecycle {
+    prevent_destroy = true       # reject any plan that would delete the model store
+  }
+}</code></pre>
+<p>The workflow is two commands. <code>terraform plan</code> computes and prints the changes without making them; <code>terraform apply</code> makes them. Saving the plan (<code>plan -out=tfplan</code>, then <code>apply tfplan</code>) applies exactly what a reviewer read.</p>
+<h2 id="a-plan-compares-three-versions-of-the-truth">A plan compares three versions of the truth</h2>
+<p>Terraform's documentation describes <code>plan</code> in three steps: read the current state of every existing remote object so the recorded state is up to date, compare the configuration with that state, and propose the actions that would make the remote objects match the configuration. So three things are in play: the <b>desired</b> config in the files, the <b>state</b> (Terraform's record of what it created and the IDs that tie each resource to a real object), and the <b>actual</b> world. When the actual world differs from the state because someone changed it outside Terraform, that is <b>drift</b>.</p>
+<p>Each resource gets one action. Some attributes can change in place; others, such as the machine image of a virtual machine, cannot, so changing them forces a <b>replace</b>: destroy and create (Terraform's default order; <code>create_before_destroy</code> reverses it). The engine below follows those rules on dicts.</p>
+<pre><code class="language-python">import copy
+
+
+def plan(desired, state, actual, force_new, replace=(), protect=(), ignore=None):
+    """Return (actions, drift). Each dict maps a resource address to its attributes."""
+    ignore = ignore or {}
+    refreshed, drift = {}, {}
+    for addr, recorded in state.items():                     # refresh: read every object the state knows about
+        if addr not in actual:
+            drift[addr] = "deleted outside"
+            continue
+        refreshed[addr] = dict(actual[addr])
+        changed = sorted(k for k in recorded if actual[addr].get(k) != recorded[k])
+        if changed:
+            drift[addr] = changed
+    actions = {}
+    for addr in sorted(desired.keys() | refreshed.keys()):
+        if addr not in refreshed:
+            actions[addr] = "create"
+        elif addr not in desired:
+            actions[addr] = "delete"
+        else:
+            changed = {k for k in desired[addr] if refreshed[addr].get(k) != desired[addr][k]}
+            changed -= ignore.get(addr, set())                # lifecycle ignore_changes
+            if addr in replace or changed &amp; force_new.get(addr.split(".")[0], set()):
+                actions[addr] = "replace"
+            elif changed:
+                actions[addr] = "update"
+    for addr, act in actions.items():
+        if addr in protect and act in ("replace", "delete"):  # lifecycle prevent_destroy
+            raise RuntimeError(f"{addr} has prevent_destroy; plan rejected")
+    return actions, drift
+
+
+def summary(actions):
+    acts = list(actions.values())
+    add = acts.count("create") + acts.count("replace")       # a replace counts as one add and one destroy
+    destroy = acts.count("delete") + acts.count("replace")
+    return f"Plan: {add} to add, {acts.count('update')} to change, {destroy} to destroy."
+
+
+def apply(actions, desired, state, actual):
+    for addr, act in actions.items():
+        if act == "delete":
+            del actual[addr], state[addr]
+        else:                                                # create, update and replace all end at the config
+            actual[addr] = state[addr] = dict(desired[addr])
+
+
+FORCE_NEW = {"instance": {"image"}, "bucket": {"name"}}      # attributes that cannot change in place
+desired = {"bucket.models": {"name": "ml-models-dev", "versioning": True},
+           "instance.trainer": {"size": "gpu.large", "image": "train-v2"},
+           "endpoint.scorer": {"replicas": 2, "model": "ranker-v41"},
+           "alarm.latency": {"p99_ms": 150}}
+state = {"bucket.models": {"name": "ml-models-dev", "versioning": True},
+         "instance.trainer": {"size": "gpu.large", "image": "train-v1"},
+         "endpoint.scorer": {"replicas": 2, "model": "ranker-v40"},
+         "queue.old": {"retention_h": 24}}
+actual = copy.deepcopy(state)
+actual["endpoint.scorer"]["replicas"] = 4                    # scaled up by hand in a web console
+actual["bucket.scratch"] = {"name": "tmp-notebooks"}         # made by hand, never imported
+
+actions, drift = plan(desired, state, actual, FORCE_NEW)
+for addr, act in actions.items():
+    print(f"{act:&gt;8}  {addr}")
+print("drift:", drift, "|", summary(actions))
+assert actions == {"alarm.latency": "create", "endpoint.scorer": "update",
+                   "instance.trainer": "replace", "queue.old": "delete"}
+assert drift == {"endpoint.scorer": ["replicas"]}
+assert summary(actions) == "Plan: 2 to add, 1 to change, 2 to destroy."
+assert "bucket.scratch" not in actions                       # not in state, so invisible to the plan
+
+apply(actions, desired, state, actual)
+assert plan(desired, state, actual, FORCE_NEW) == ({}, {})   # a second plan is empty: apply converges
+assert actual["bucket.scratch"] == {"name": "tmp-notebooks"}</code></pre>
+<p>Four resources change for four reasons: the alarm is new, the image change forces a replace, the queue left the config, and the endpoint is updated both for its new model and to undo the hand-made scale-up, which the refresh reported as drift. The plan reads "2 to add, 1 to change, 2 to destroy" because a replace counts once on each side. The bucket made by hand is never mentioned: Terraform only knows objects that are in its state, so an unmanaged object is neither tracked nor cleaned up until someone imports it. And once applied, a second plan is empty, which is what declarative buys: running it again is safe.</p>
+<p>Three controls change what a plan may do, and the engine models each:</p>
+<pre><code class="language-python">assert plan(desired, state, actual, FORCE_NEW, replace={"instance.trainer"})[0] == {"instance.trainer": "replace"}
+
+actual["endpoint.scorer"]["replicas"] = 6                    # an autoscaler, not a person, changed it
+assert plan(desired, state, actual, FORCE_NEW)[0] == {"endpoint.scorer": "update"}
+assert plan(desired, state, actual, FORCE_NEW, ignore={"endpoint.scorer": {"replicas"}})[0] == {}
+
+renamed = {**desired, "bucket.models": {"name": "ml-models-v2", "versioning": True}}
+try:
+    plan(renamed, state, actual, FORCE_NEW, protect={"bucket.models"})
+    raise AssertionError("renaming a protected bucket should be rejected")
+except RuntimeError:
+    pass</code></pre>
+<p><code>terraform plan -replace=ADDRESS</code> forces a replace with no config change, for an object that has gone bad. <code>ignore_changes</code> stops planned updates to listed attributes, which is right when something else, such as an autoscaler, owns them; without it every plan fights the autoscaler. <code>prevent_destroy</code> turns a plan that would delete the resource into an error, which matters for the bucket of model artifacts, since renaming it forces a replace. One more mode exists for drift you meant to keep: refresh-only mode (<code>terraform apply -refresh-only</code>) updates the state to match the world and changes nothing else.</p>
+<h2 id="the-state-file-shared-locked-and-sensitive">The state file: shared, locked, and sensitive</h2>
+<p>The state exists because the config alone cannot say which real object <code>endpoint.scorer</code> is. Terraform's documentation gives three uses: mapping config to real resources, keeping metadata, and speed on large setups. Kept on one laptop, it blocks teamwork, so teams store it in a <b>remote backend</b> (an object store, or HCP Terraform). Shared state brings a new failure. Each <code>apply</code> reads the state, changes the world, and writes the whole state back. Below, two jobs each add one endpoint, and I run every ordering of their read and write steps, with and without a lock.</p>
+<pre><code class="language-python">from itertools import permutations
+
+
+def run(schedule, use_lock):
+    """Jobs A and B each add an endpoint. Each letter is that job's next step: read state and apply, then write."""
+    stored = {"bucket.models": {"name": "ml-models-dev"}}    # the shared state file
+    world = dict(stored)                                     # what really exists
+    local, holder, blocked, queue = {}, None, 0, list(schedule)
+    while queue:
+        job = queue.pop(0)
+        if job not in local:                                 # step 1: read state, plan, apply
+            if use_lock and holder is not None:
+                blocked += 1                                 # lock held: this run stops; rerun it afterwards
+                queue.remove(job)
+                queue += [job, job]
+                continue
+            holder, local[job] = job, dict(stored)
+            new = f"endpoint.{job.lower()}"
+            world[new] = local[job][new] = {"replicas": 1}
+        else:                                                # step 2: write the whole state file back
+            stored, holder = local.pop(job), None
+    return stored, world, blocked
+
+
+schedules = sorted(set(permutations("AABB")))
+outcomes = {}
+for use_lock in (False, True):
+    runs = [run(s, use_lock) for s in schedules]
+    lost = ["".join(s) for s, (stored, world, _) in zip(schedules, runs) if stored.keys() != world.keys()]
+    outcomes[use_lock] = (lost, sum(b &gt; 0 for *_, b in runs))
+    print(f"lock={use_lock}: {len(lost)} of {len(schedules)} orderings lose a record {lost}; "
+          f"{outcomes[use_lock][1]} runs stopped by the lock")
+assert len(schedules) == 6
+assert len(outcomes[False][0]) == 4 and outcomes[False][1] == 0
+assert outcomes[True] == ([], 4)
+
+stored, world, _ = run("ABBA", use_lock=False)               # A reads, B reads, B writes, A writes last
+both = {"bucket.models": {"name": "ml-models-dev"}, "endpoint.a": {"replicas": 1}, "endpoint.b": {"replicas": 1}}
+assert "endpoint.b" in world and "endpoint.b" not in stored
+assert plan(both, stored, world, FORCE_NEW)[0] == {"endpoint.b": "create"}   # tries to create what already exists</code></pre>
+<p>Without a lock, every ordering where the two runs overlap loses an update: the last writer's copy, read before the other's write, silently drops the other's resource. The last assert shows the cost. The next plan wants to create <code>endpoint.b</code> again, since an object missing from the state is invisible to the refresh, so the apply either fails on a name clash or makes a duplicate, and the original runs on, unmanaged. With the lock, no ordering loses a record, and the 4 overlapping orderings end with one run stopped instead. That matches the documented behaviour: Terraform locks the state for every operation that could write it, and if it cannot take the lock it does not continue. <code>terraform force-unlock</code> exists for a lock left behind by a crashed run, and the documentation's advice is to use it only on your own lock.</p>
+<p>Not every backend locks. The S3 backend's locking is opt-in (<code>use_lockfile = true</code>; its older DynamoDB-table locking is deprecated), so a team can share state for months without any lock and never notice until two applies overlap. The state can also hold secrets, such as a generated database password, so the backend needs access control and encryption, and the state file never goes into Git.</p>
+<h2 id="modules-and-variables-one-definition-three-environments">Modules and variables: one definition, three environments</h2>
+<p>A <b>module</b> is a set of resources managed together; the directory you run Terraform in is the root module, and it calls child modules with <code>module</code> blocks. The usual layout writes the serving stack once and calls it per environment with different <b>variables</b>, each environment with its own state, so a plan for dev cannot touch prod:</p>
+<pre><code class="language-plaintext"># modules/serving/variables.tf
+variable "env"            { type = string }
+variable "instance_size"  { type = string }
+variable "min_replicas"   { type = number }
+
+# envs/prod/main.tf  (envs/dev and envs/staging differ only in these values and their backend key)
+module "serving" {
+  source        = "../../modules/serving"
+  env           = "prod"
+  instance_size = "gpu.large"
+  min_replicas  = 3
+}</code></pre>
+<p>The point is that staging differs from prod only in values someone chose, not in structure someone forgot. A model that passed staging then meets the same network rules, alarms and IAM roles in prod.</p>
+<h2 id="what-a-pipeline-checks-for-ml-code">What a pipeline checks for ML code</h2>
+<p>Unit tests catch a broken function. An ML change can also break the data, the model or the build while every function still works:</p>
+<table><thead><tr><th>Check</th><th>What it catches</th><th>Runs on</th></tr></thead><tbody><tr><td>Unit tests</td><td>wrong logic in feature code or the serving handler</td><td>every PR</td></tr><tr><td>Data validation</td><td>schema changes, nulls, values out of range, a label rate far from the reference</td><td>every PR, and each new training window</td></tr><tr><td>Model-quality gate</td><td>a candidate worse than the live model on a fixed eval set</td><td>every PR that changes training code or data</td></tr><tr><td>Reproducible build</td><td>an image that differs from what was tested: lockfile installs, a pinned base image</td><td>every build</td></tr><tr><td><code>terraform plan</code></td><td>infrastructure changes the reviewer should read before they happen</td><td>every PR touching <code>.tf</code> files</td></tr></tbody></table>
+<p>The gate is the hard one, because a model's score moves when only its random seed changes.</p>
+<h2 id="a-model-quality-gate-that-does-not-cry-wolf">A model-quality gate that does not cry wolf</h2>
+<p>I simulate a fixed eval set of 2,000 items, each with a difficulty shared by every model, and a trained model as right or wrong on each item, with seed-to-seed noise deciding the borderline ones. Each trial trains a baseline and a candidate and asks three gates whether to block. The naive gate blocks any drop. The unpaired gate runs a one-sided two-proportion z-test as if the two models had seen different items. The paired gate runs McNemar's test, which looks only at the items where the two models disagree and asks whether the candidate loses more of them than a coin flip would.</p>
+<pre><code class="language-python">import numpy as np
+from scipy.stats import binomtest, norm
+
+rng = np.random.default_rng(7)
+n_items, trials = 2_000, 1_000
+difficulty = rng.normal(0, 1.5, n_items)                    # the fixed eval set: some items are hard for any model
+
+
+def correct(skill):
+    """One trained model's right/wrong per item; the noise term is what a new seed changes."""
+    return skill - difficulty + rng.normal(0, 0.5, n_items) &gt; 0
+
+
+def gates(base, cand):
+    drop = base.mean() - cand.mean()
+    worse, better = int(np.sum(base &amp; ~cand)), int(np.sum(~base &amp; cand))     # the items they disagree on
+    pooled = (base.mean() + cand.mean()) / 2
+    z = drop / np.sqrt(2 * pooled * (1 - pooled) / n_items)
+    return {"any drop": drop &gt; 0,
+            "unpaired z-test": norm.sf(z) &lt; 0.05,
+            "paired McNemar": binomtest(worse, worse + better, 0.5, alternative="greater").pvalue &lt; 0.05}
+
+
+rates, mean_drop = {}, {}
+for label, skill_loss in [("same quality", 0.0), ("small drop", 0.025), ("large drop", 0.1)]:
+    runs = [(b, c) for b, c in ((correct(1.0), correct(1.0 - skill_loss)) for _ in range(trials))]
+    mean_drop[label] = 100 * np.mean([b.mean() - c.mean() for b, c in runs])
+    votes = [gates(b, c) for b, c in runs]
+    rates[label] = {g: np.mean([v[g] for v in votes]) for g in votes[0]}
+    print(f"{label:&gt;12} (drop {mean_drop[label]:.2f} pts): " + ", ".join(f"{g} {r:.0%}" for g, r in rates[label].items()))
+
+b, c = correct(1.0), correct(1.0)
+se_paired = np.std(b.astype(float) - c, ddof=1) / np.sqrt(n_items)
+se_unpaired = np.sqrt((b.var() + c.var()) / n_items)
+print(f"accuracy {b.mean():.3f}, models disagree on {np.mean(b != c):.0%} of items, "
+      f"standard error of the difference: paired {se_paired:.4f}, unpaired {se_unpaired:.4f}")
+
+same, small, large = rates["same quality"], rates["small drop"], rates["large drop"]
+assert 1.8 &lt; mean_drop["large drop"] &lt; 2.2 and 0.4 &lt; mean_drop["small drop"] &lt; 0.6
+assert 0.45 &lt; same["any drop"] &lt; 0.55 and small["any drop"] &gt; 0.7 and large["any drop"] &gt; 0.95
+assert same["unpaired z-test"] &lt; 0.01 and small["unpaired z-test"] &lt; 0.01 and 0.25 &lt; large["unpaired z-test"] &lt; 0.45
+assert 0.03 &lt; same["paired McNemar"] &lt; 0.08 and small["paired McNemar"] &lt; 0.2 and large["paired McNemar"] &gt; 0.75
+assert 0.08 &lt; np.mean(b != c) &lt; 0.12 and 0.45 &lt; se_paired / se_unpaired &lt; 0.6</code></pre>
+<table><thead><tr><th>Gate</th><th>blocks a same-quality retrain</th><th>blocks a 0.5-point drop</th><th>blocks a 2-point drop</th></tr></thead><tbody><tr><td>any drop</td><td>about half (49%)</td><td>about three in four (76%)</td><td>almost always (99%)</td></tr><tr><td>unpaired z-test</td><td>almost never (0%)</td><td>almost never (0%)</td><td>about a third (36%)</td></tr><tr><td>paired McNemar</td><td>about 1 in 17 (6%)</td><td>about 1 in 7 (15%)</td><td>about 4 in 5 (83%)</td></tr></tbody></table>
+<p>The paired test is the only one that both lets equal retrains through and catches the large drop; the naive gate fails every second harmless retrain, which teaches a team to rerun or override it. Pairing wins because two models agree on most items, so the noise in their difference comes only from the items they disagree on, about one in ten here, and its standard error is about half the unpaired one. No gate catches half a point reliably on 2,000 items: the paired one blocks such a model about once in seven tries. To guard smaller drops, enlarge the eval set or accept a gate that also blocks some equal models; the same power trade-off appears in <a href="../ab-testing/">A/B testing</a>. The eval set must stay fixed across runs and should be pinned by a hash, or the gate compares two models on different questions.</p>
+<h2 id="shipping-it-stages-and-a-canary">Shipping it: stages and a canary</h2>
+<p>CD moves an artifact that already passed CI through environments: build the image once, deploy it to staging, then promote the same image, by digest, to prod. A sketch of the jobs in GitHub Actions (not run):</p>
+<pre><code class="language-plaintext">on:
+  pull_request:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4            # pin a full commit SHA in practice
+      - run: uv sync --locked &amp;&amp; uv run pytest
+  eval-gate:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - run: uv run python -m train.gate --eval-set eval/fixed.parquet --baseline registry:prod
+  deploy-prod:
+    needs: eval-gate
+    if: github.event_name == 'push'          # a separate workflow on push to main, in practice
+    environment: production                  # waits for the environment's protection rules
+    runs-on: ubuntu-24.04
+    steps:
+      - run: ./deploy.sh --canary</code></pre>
+<p>A job that names an <b>environment</b> must pass that environment's protection rules before it runs, such as required reviewers, a wait timer or a list of branches allowed to deploy, and it can read the environment's secrets only after those rules pass. That puts a human approval and the production credentials behind the same door.</p>
+<p>A <b>canary</b> sends a small share of live traffic to the new model while the rest stays on the old one, compares error rate, latency and the business metric between the two, and then either widens the share step by step or rolls back. It is an online test with a decision rule, so the statistics of <a href="../ab-testing/">A/B testing</a> apply: a small share means few requests, so it catches crashes and latency blow-ups quickly but a small quality drop slowly. Rollback is cheap only if the old model, its image and its feature definitions are still deployable.</p>
+<h2 id="problems-and-fixes">Problems and fixes</h2>
+<table><thead><tr><th>Problem</th><th>Naive fix</th><th>How it breaks</th><th>Real fix</th><th>How it is measured</th></tr></thead><tbody><tr><td>Infra changed by hand</td><td>a wiki page of console steps</td><td>staging and prod drift apart; nobody can rebuild either</td><td>Terraform config, applied only from a reviewed plan</td><td>a scheduled <code>plan</code> that should be empty</td></tr><tr><td>Two people apply at once</td><td>"ask in chat first"</td><td>an overlapping run erases a record; the next plan duplicates the object</td><td>remote backend with locking on</td><td>lock errors in CI logs; the race above loses nothing</td></tr><tr><td>Autoscaler fights Terraform</td><td>turn off the autoscaler</td><td>traffic spikes overload the service</td><td><code>ignore_changes</code> on the replica count</td><td>plans stop proposing replica updates</td></tr><tr><td>Flaky model gate</td><td>block any accuracy drop</td><td>about half of equal retrains are blocked, so people override it</td><td>paired test on a fixed eval set</td><td>false-block rate on seed-only retrains</td></tr><tr><td>Risky model release</td><td>deploy to everyone at once</td><td>a bad model hits every user before anyone sees it</td><td>canary with automatic rollback</td><td>canary vs control on errors, latency and the business metric</td></tr></tbody></table>
+<h2 id="a-small-real-pipeline-this-site">A small, real pipeline: this site</h2>
+<p>This site runs one. Its workflow, <code>.github/workflows/gates.yml</code>, runs on every pull request to <code>main</code> and every push to <code>main</code>, with read-only repository permissions, and its single job runs <code>scripts/gates.sh</code>, the same script run locally before a push, so the two cannot drift apart. A pull request to <code>main</code> must pass that <code>gates</code> check before it merges. Three choices in it match the reproducible-build row above. Every action is pinned to a full commit SHA, since a moved tag would run new code. Every Python package is installed with <code>pip install --require-hashes --only-binary :all:</code>, so each wheel must match a recorded hash. And its final steps rebuild every generated page, then fail if the working tree differs from the commit or holds new files, so the committed HTML is exactly what the sources produce. A repository secret exists and is passed to one step only. The post build in that script runs every Python block in every post, so the asserts on this page are themselves a CI gate.</p>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul><li><b>State in Git or on a laptop.</b> It goes stale the moment someone else applies, and it can hold secrets. Use a remote backend with locking and access control.</li><li><b>Applying an unsaved plan.</b> The world can change between review and apply. Apply the saved plan file that was reviewed.</li><li><b>Hand fixes in the console.</b> The next plan reverts them, or they linger as drift nobody reviewed. Change the config, or <code>import</code> the object.</li><li><b>Renaming a resource in config.</b> Terraform sees one deletion and one creation. A <code>moved</code> block, or <code>terraform state mv</code>, keeps the real object.</li><li><b>An eval set that changes between runs.</b> The gate then compares two models on different questions. Pin it.</li><li><b>Rebuilding the image per environment.</b> Staging tested a different artifact from the one prod runs. Promote one image by digest.</li></ul>
+<p>The simulations model only the logic: the plan engine knows four resource kinds and a hand-written list of attributes that force a replace, where real providers define those per attribute; the race has two jobs with one read and one write each; and the gate's models are drawn from a model of item difficulty I chose, in which the models agree on most items. Real models may agree less, which weakens the paired test's advantage, and the false-block and catch rates depend on the eval set's size and how far apart the models are. None of this ran against a cloud account or a real deployment.</p>
+<p>What stays open is choosing the gate's margin on a real system: how large a drop matters to users, and how large an eval set it takes to see it, are product and data questions that the code above can only frame.</p>
+<p>Terraform behaviour (the plan steps, <code>-replace</code>, <code>-refresh-only</code>, <code>lifecycle</code>, state and locking, the S3 backend) follows the <a href="https://developer.hashicorp.com/terraform/docs">Terraform documentation</a>; environment protection rules follow the <a href="https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments">GitHub Actions documentation on deployment environments</a>. McNemar's test is from Q. McNemar, Psychometrika (1947).</p>
+</div>
+</article>
+</main>
+<footer class="site"><svg class="glyph" viewBox="0 0 20 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 1c2.5 3 3.5 5 3.5 6.6A3.5 3.5 0 0 1 10 11a3.5 3.5 0 0 1-3.5-3.4C6.5 6 7.5 4 10 1zM7 13h6v9H7zM4 22h12v2H4z"/></svg><span>Personal site. Not affiliated with any company.</span></footer>
+</div>
+</body>
+</html>
