@@ -69,5 +69,8 @@ Preview:     python3 -m http.server 8000
   ~0.15" (runs to 0.118), and the LeetCode `hash-table` note's unseeded chain-length assert (fails about 1.4% of
   runs, 42 of 3,000).
 - `docs/ARCHITECTURE.md` (merged) maps the site; `README.md` points to it. Its Follow-ups list holds the known gaps.
+- `resume-book` (merged): a worn purple book on the mantel opens `/book/`, six résumé-preparation pages built by
+  `tools/book/build.py` from `tools/book/src/`. Unlisted and `noindex` (ADR 0003): `check.py` fails if any feed or
+  index names `/book/` or any other page links it. Build after editing a source: `python3 -I tools/book/build.py .`.
 - Next: one cleanup PR for the review nits deferred from PRs #4 to #11; each is fixed or moved to Follow-ups.
 - Parked branches: none.

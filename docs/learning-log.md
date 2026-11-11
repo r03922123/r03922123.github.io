@@ -2,6 +2,24 @@
 
 The three most important whys of each change, newest first. Each heading reads `<date> · <phase>: <title>`.
 
+## 2026-11-11 · build: resume-book, an unlisted book behind the room
+
+1. **Hidden is not private, so write the check both ways.** `/book/` is reached only from a book in the room,
+   but the door is a plain link in `index.html` and the repo is public. So the pages carry `noindex`, and
+   `check.py` now fails if a feed or the search index names the book, or any other page links it: the usual "every page
+   is listed" rule, turned around for one folder. It is like a blinded trial, where the check is that the label
+   never reaches the people who must not see it. Trade-off: one more rule to keep. Risk: `noindex` is a request
+   that well-behaved crawlers honour; copies made before it was read, or by others, stay out of reach.
+2. **Keep an exception in its own folder.** The pages build from `tools/book/src/`, which the feed and search
+   builds never read, instead of from `tools/posts/src/` with an exclusion list in each build. The old rules
+   (no interview framing, no résumé coaching) stay exactly as they were for `/posts/`. Trade-off: a small second
+   build script. Risk: a future build that globs every `src/` folder would list the book; `check.py` would fail it.
+3. **A number keeps its origin, or it stays out.** The notes mark some figures as derived, some as measured on a
+   reproduction, and some as withdrawn estimates. The pages use the first two with their origin stated and leave
+   the withdrawn ones out, like reporting a simulated effect as simulated. Trade-off: two stories have no headline
+   accuracy number. Risk: About and the book are written apart, so the same project can drift between
+   them; a change to one should prompt a look at the other.
+
 ## 2026-11-11 · docs: architecture map, README trimmed
 
 1. **Write the map from the code, not from the specs.** Specs say what a module should do on the day it was
