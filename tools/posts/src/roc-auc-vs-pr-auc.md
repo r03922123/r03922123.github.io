@@ -5,12 +5,12 @@ group: Statistics and experimentation
 order: 6
 tags: evaluation · ROC · precision-recall · class imbalance
 ---
-A classifier that outputs a score, not a label, has no single accuracy. Every threshold you could cut the scores at gives a different trade between catching positives and raising false alarms. The ROC curve and the precision-recall curve both sweep that threshold and summarize the whole sweep as an area. They look like two views of the same thing, and on balanced data they mostly agree. On rare positives (fraud, disease, abusive content) they can rank the same pair of models in opposite orders.
+On rare positives (fraud, disease, abusive content) the ROC curve and the precision-recall curve can rank the same pair of models in opposite orders. In the simulation below, at 1% positives, model A leads on ROC AUC by 0.856 to 0.794 and model B leads on average precision by 0.34 to 0.12. A classifier that outputs a score, not a label, has no single accuracy. Every threshold you could cut the scores at gives a different trade between catching positives and raising false alarms. Both curves sweep that threshold and summarize the whole sweep as an area. They look like two views of the same thing, and on balanced data they mostly agree.
 
-This post builds both curves from scratch, checks what each area means, and shows which part of the ranking each one rewards, so choosing between them stops being a rule of thumb.
+I build both curves from scratch, check what each area means against brute force and scikit-learn, and show which part of the ranking each one rewards, so choosing between them stops being a rule of thumb.
 
 ## Four counts at one threshold
-Fix a threshold \(t\) and call everything with score \(s \ge t\) positive. Against the true labels that gives four counts: true positives \(TP\), false positives \(FP\), true negatives \(TN\) and false negatives \(FN\). Three rates built from them are all this post needs:
+Fix a threshold \(t\) and call everything with score \(s \ge t\) positive. Against the true labels that gives four counts: true positives \(TP\), false positives \(FP\), true negatives \(TN\) and false negatives \(FN\). Three rates built from them are all I need:
 
 | Rate | Formula | Question it answers |
 |---|---|---|
@@ -237,6 +237,6 @@ assert high > 2 * low                      # the 90% interval spans more than a 
 | The threshold is already fixed | Precision and recall at that threshold, with intervals |
 | Scores are used as probabilities | Add a calibration check or log loss; neither area covers it |
 
-For where these numbers sit among product and online metrics, see [evaluating ML systems](/posts/evaluating-ml-systems/).
+Both models here are built from normal scores I chose, reweighted to each prevalence, so the prevalence table shows how prevalence moves each metric, not which kind of model wins on real data. For a real model the open question is which part of the list will be acted on; once that operating point is known, precision there is the number to report. For where these numbers sit among product and online metrics, see [evaluating ML systems](/posts/evaluating-ml-systems/).
 
 Sources: the pairwise reading of AUC goes back to Hanley and McNeil, "The meaning and use of the area under a receiver operating characteristic (ROC) curve" (Radiology, 1982); Tom Fawcett's "An introduction to ROC analysis" (Pattern Recognition Letters, 2006) is a good general reference. The PR interpolation result is from Jesse Davis and Mark Goadrich, "The Relationship Between Precision-Recall and ROC Curves" (ICML 2006). Takaya Saito and Marc Rehmsmeier argue for PR plots on imbalanced data in "The Precision-Recall Plot Is More Informative than the ROC Plot When Evaluating Binary Classifiers on Imbalanced Datasets" (PLoS ONE, 2015), and McDermott et al. question that rule in "A Closer Look at AUROC and AUPRC under Class Imbalance" (NeurIPS 2024). The structure of the first sections follows Sinyi Chou's blog posts on [AUC and the ROC curve](https://sinyi-chou.github.io/classification-auc/) and [the PR curve](https://sinyi-chou.github.io/classification-pr-curve/), rewritten here.
