@@ -37,7 +37,7 @@ branch ─> sh scripts/gates.sh ─> push ─> PR ─> CI runs gates.sh ─> reb
 | Topic posts (55) | `posts/<slug>/index.html` | `tools/posts/build.py` from `tools/posts/src/<slug>.md` | Reading shell (`SPEC-reading-shell.md`): title block, side column (details and contents), one text column. |
 | LeetCode posts (31) | `leetcode/<slug>/index.html` | `tools/leetcode/build.py` from `tools/leetcode/src/<slug>.md` | Same shell. |
 | Long-form posts (4) | `posts/<slug>/index.html` | hand | Listed by `LONGFORM` in `tools/posts/build.py`. No Markdown source, so no `index.md` copy. |
-| Unlisted pages (6) | one folder, see ADR 0003 | `tools/book/build.py` | An unlisted page reached from an object in the room. `noindex`, and in no feed, index or list; `check.py` fails if any other page links it. |
+| Unlisted pages (6) | one folder, not named here | `tools/book/build.py` | An unlisted page reached from an object in the room. `noindex`, and in no feed, index or list; `check.py` fails if any page but the room links it. |
 | MusicGen posts (2) | another repo, served at `/musicgen-prune-inference/` | that repo | Listed by `MUSICGEN` in `tools/posts/build.py`; `EXTERNAL` in `scripts/check.py` lets links to it pass. |
 | About | `about.html` | hand | Each role is a `section` with an id; the room's three portraits link to those ids. |
 | Not found | `404.html` | hand | Pages serves it for any missing path. |
@@ -144,6 +144,6 @@ Known gaps, with why each is not done yet.
 - **No security headers.** Pages cannot set response headers (ADR 0001). Accepted for a static site with no
   sign-in and no forms.
 - **Unlisted is not private.** The unlisted pages rely on `noindex`, which only well-behaved crawlers honour, and
-  their link and sources are public in this repo (ADR 0003). Accepted: they hold nothing that may not be public.
+  their link and sources are public in this repo. Accepted: they hold nothing that may not be public.
 - **Performance is measured once, not checked.** First paint, draw calls and frame rate are in `CONSTRAINTS.md` under
   "Measured, not yet enforced". A Lighthouse step in CI would need a browser in the job.
