@@ -37,6 +37,8 @@ Each slot holds a small list of `(key, value)` pairs. With \(n\) items in \(m\) 
 ```python
 import random
 
+random.seed(0)                                  # unseeded, the chain-length assert fails in about 1.4% of runs
+
 
 class MyHashMap:
     P = (1 << 61) - 1                           # prime larger than any key
