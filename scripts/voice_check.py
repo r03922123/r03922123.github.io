@@ -3,24 +3,28 @@
 Usage, from the repo root:  python3 scripts/voice_check.py [--final]     compare every post with the baseline
                             python3 scripts/voice_check.py --baseline    write the baseline once, before any edit
 A post is a topic source (tools/posts/src/<slug>.md) or a long-form page (posts/<slug>/index.html with no source).
-Code blocks, tables, inline code, maths, headings, front matter and links must stay byte-identical (inline spans
-as a multiset, so a sentence may move). Prose may change, but every number in it must already be in the post, none
-may vanish, and it may grow by at most 10%. --final also fails a post whose prose did not change at all.
-Output names posts, rules and numbers only, never prose, so it cannot print a private term.
+Code blocks, tables, headings, front matter and a long-form page's reference list must stay byte-identical. Inline
+code, maths and links are compared as sets: a sentence may move or reuse one, but none may be new or vanish. Prose may
+change, but every number in it must already be in the post, none may vanish, and it may grow by at most 10%.
+--final also fails a post whose prose did not change at all.
+Output names posts, rules and numbers, never prose; it goes through check.py's scrubber, since a term can be a number.
 """
 import hashlib
 import html
 import json
 import re
 import sys
+import traceback
 from decimal import Decimal
 from pathlib import Path
 
 BASELINE = "scripts/voice-baseline.json"
-WORDS = {w: str(i) for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())}
+WORDS = {w: str(i) for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen "
+                                         "fourteen fifteen sixteen seventeen eighteen nineteen".split())}
 WORDS.update(twenty="20", thirty="30", forty="40", fifty="50", sixty="60", seventy="70", eighty="80", ninety="90",
              hundred="100", thousand="1000", million="1000000", billion="1000000000")
-NUMBER = re.compile(r"(?<![\d.])\d+(?:[,_]\d{3})*(?:\.\d+)?|\b(?:" + "|".join(WORDS) + r")\b", re.I)
+# shortcut: no sign, and "64,128,256" reads as one number; "half", "twice" and "first" are left to the reviewer
+NUMBER = re.compile(r"(?<![\d.])(?:\d+(?:[,_]\d{3})*(?:\.\d+)?|\.\d+)|\b(?:" + "|".join(WORDS) + r")\b", re.I)
 MATHS = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]", re.S)
 
 
@@ -37,8 +41,8 @@ def numbers(text):
 
 
 def spans(rx, text):
-    """Pull rx's matches out of text: (sorted matches, whitespace-normalized, so rewrapping a line is free; rest)."""
-    found = [" ".join(s.split()) for s in rx.findall(text)]
+    """Pull rx's matches out of text: (the set of matches, whitespace-normalized so rewrapping is free; the rest)."""
+    found = {" ".join(s.split()) for s in rx.findall(text)}
     return sorted(found), rx.sub(" ", text)
 
 
@@ -72,22 +76,29 @@ def markdown(text):
     text = "\n".join(prose)
     inline, text = spans(re.compile(r"`[^`]+`"), text)
     maths, text = spans(MATHS, text)
-    links = sorted(re.findall(r"\]\(([^)\s]+)\)", text))
+    links = sorted(set(re.findall(r"\]\(([^)\s]+)\)", text)))
     text = re.sub(r"\]\([^)\s]+\)", "]", text)
-    return code, tables, inline, sorted(display + maths), [front] + heads + links, text
+    return code, tables, inline, sorted(set(display + maths)), [front] + heads + links, text
+
+
+def shown(markup):
+    """Text as a browser shows it: tags dropped, entities decoded."""
+    return html.unescape(re.sub(r"<[^>]+>", " ", markup))
 
 
 def page(text):
-    """Split a long-form page's <article>, leaving out its header, nav and aside (reading-shell's markup)."""
+    """Split a long-form page's <article>, leaving out reading-shell's own header, nav and aside; any other one is prose.
+    Code and tables are compared as markup; their numbers are read as a browser shows them, entities decoded."""
     art = text[text.index("<article"):text.index("</article>")]
-    art = re.sub(r"<(header|nav|aside)\b.*?</\1>", " ", art, flags=re.S)
+    art = re.sub(r'<(header|nav|aside) class="(?:post-head|toc|post-side)".*?</\1>', " ", art, flags=re.S)
+    refs, art = re.findall(r'<ol class="refs">.*?</ol>', art, re.S), re.sub(r'<ol class="refs">.*?</ol>', " ", art, flags=re.S)
     code, art = re.findall(r"<pre\b.*?</pre>", art, re.S), re.sub(r"<pre\b.*?</pre>", " ", art, flags=re.S)
     tables, art = re.findall(r"<table\b.*?</table>", art, re.S), re.sub(r"<table\b.*?</table>", " ", art, flags=re.S)
     heads, art = re.findall(r"<h[1-6]\b.*?</h[1-6]>", art, re.S), re.sub(r"<h[1-6]\b.*?</h[1-6]>", " ", art, flags=re.S)
     inline, art = spans(re.compile(r"<code\b.*?</code>", re.S), art)
-    links = sorted(re.findall(r'\b(?:href|id)="([^"]*)"', art))
-    maths, prose = spans(MATHS, html.unescape(re.sub(r"<[^>]+>", " ", art)))
-    return code, tables, inline, maths, heads + links, prose
+    links = sorted(set(re.findall(r'\b(?:href|id)="([^"]*)"', art)))
+    maths, prose = spans(MATHS, shown(art))
+    return code, tables, inline, maths, heads + refs + links, prose
 
 
 def posts(root):
@@ -101,12 +112,14 @@ def snapshot(root):
     snap = {}
     for path in posts(root):
         text = path.read_text()
-        code, tables, inline, maths, frozen, prose = (markdown if path.suffix == ".md" else page)(text)
+        md = path.suffix == ".md"
+        code, tables, inline, maths, frozen, prose = (markdown if md else page)(text)
+        evidence = "\n".join(code + tables + inline + maths)
         snap[path.relative_to(root).as_posix()] = {
             "code": digest(code), "tables": digest(tables), "inline": digest(inline), "maths": digest(maths),
             "frozen": digest(frozen), "prose": digest(prose.split()), "words": len(prose.split()),
             "numbers": sorted(numbers(prose), key=Decimal),
-            "evidence": sorted(numbers("\n".join(code + tables + inline + maths)), key=Decimal)}
+            "evidence": sorted(numbers(evidence if md else shown(evidence)), key=Decimal)}
     return snap
 
 
@@ -141,13 +154,25 @@ def check(root, final=False):
     return errors
 
 
-if __name__ == "__main__":
+def main(argv):
+    from check import DENYLIST, scrubber            # the same scrubber and fail-closed rule as check.py's main
     root = Path(__file__).resolve().parent.parent
-    if sys.argv[1:] == ["--baseline"]:
+    if argv == ["--baseline"]:
         write_baseline(root)
-        sys.exit(0)
-    if sys.argv[1:] not in ([], ["--final"]):
+        return 0
+    if argv not in ([], ["--final"]):
         sys.exit(__doc__)
-    errors = check(root, final=sys.argv[1:] == ["--final"])
-    print("\n".join(errors) or f"voice check: {len(snapshot(root))} posts match the baseline")
-    sys.exit(1 if errors else 0)
+    if not DENYLIST.exists():
+        sys.exit(f"missing {DENYLIST}: the output could not be scrubbed")
+    terms = [t for t in (line.strip() for line in DENYLIST.read_text(encoding="utf-8-sig").splitlines())
+             if t and not t.startswith("#")]
+    try:
+        errors = check(root, final=argv == ["--final"])
+    except Exception:                                 # a traceback can quote page text: scrub it too
+        errors = traceback.format_exc().splitlines()
+    print("\n".join(map(scrubber(terms), errors)) or f"voice check: {len(posts(root))} posts match the baseline")
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
