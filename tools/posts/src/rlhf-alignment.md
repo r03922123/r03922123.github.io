@@ -1,6 +1,6 @@
 ---
 title: RLHF and alignment: reward models, PPO and DPO
-summary: How a language model is tuned towards answers people prefer: a reward model fit to pairwise comparisons, the KL-regularized objective and its closed-form optimum, PPO as the way classic RLHF optimizes it, DPO as the way to skip the reward model, and a toy world where over-optimizing a good-looking reward model makes answers worse. Every claim is checked with asserts.
+summary: How a language model is tuned towards answers people prefer: a reward model fit to pairwise comparisons, the KL-regularized objective and its closed-form optimum, PPO as the way classic RLHF optimizes it, DPO as the way to skip the reward model, and a toy world where over-optimizing a good-looking reward model makes answers worse. Each of these is checked with asserts on that toy world.
 group: LLMs and generative AI
 order: 7
 tags: LLM · alignment · RLHF · reward model · PPO · DPO
