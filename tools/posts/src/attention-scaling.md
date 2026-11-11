@@ -5,7 +5,7 @@ group: Machine learning fundamentals
 order: 11
 tags: attention · transformers · softmax · initialization
 ---
-Scaled dot-product attention has one constant in it that looks arbitrary: the scores \(QK^\top\) are divided by \(\sqrt{d}\), where \(d\) is the size of one attention head. Without that division, a transformer with 64-dimensional heads and unit-variance queries and keys starts training with attention weights that are already close to one-hot, and the gradient that should teach the queries and keys where to look is close to zero. This post derives the constant from a two-line variance calculation, measures what happens to softmax and its gradient with and without it, and then looks at where the assumptions behind it stop holding.
+Score one random query against 32 random keys, all with 64 unit-variance components, and an unscaled softmax puts on average 0.82 of its weight on a single key; at 1024 components it puts 0.95. Scaled dot-product attention prevents this with one constant that looks arbitrary: the scores \(QK^\top\) are divided by \(\sqrt{d}\), where \(d\) is the size of one attention head. Without that division, a transformer with 64-dimensional heads and unit-variance queries and keys starts training with attention weights that are already close to one-hot, and the gradient that should teach the queries and keys where to look is close to zero. I derive the constant from a two-line variance calculation, measure what happens to softmax and its gradient with and without it, and then look at where the assumptions behind it stop holding.
 
 Throughout, \(d\) is the per-head dimension of queries and keys (often written \(d_k\)), \(L\) is the number of keys a query attends over, and
 
@@ -219,7 +219,7 @@ assert entropy(wrong.numpy()).mean() > entropy(right.numpy()).mean() + 0.3   # b
 - **Thinking the scale prevents overflow.** It keeps scores moderate, which helps in float16, but the numerical safety of softmax comes from subtracting the max, covered in [numerically stable softmax and cross-entropy](../stable-softmax-cross-entropy/).
 - **Confusing the variance rule.** \(\operatorname{Var}(XY) = \operatorname{Var}(X)\operatorname{Var}(Y)\) needs independence and zero means. Non-zero-mean queries and keys add terms the simple argument leaves out.
 
-For how this piece fits into the rest of the architecture, see [transformers and LLMs: key ideas](../transformers-and-llms-key-ideas/).
+Every measurement above draws queries and keys as independent random vectors, the situation at initialization, so it shows why the constant is \(\sqrt{d}\) when training starts, not how large scores get later. The one departure from independence I check is the extreme case \(q = k\), and the divergence of a 22-billion-parameter model is Dehghani et al.'s report, not a measurement here. How fast logits grow while a given model trains stays open, and its logit magnitudes are the place to look. For how this piece fits into the rest of the architecture, see [transformers and LLMs: key ideas](../transformers-and-llms-key-ideas/).
 
 ## References
 1. Vaswani et al., [Attention Is All You Need](https://arxiv.org/abs/1706.03762), NeurIPS 2017. Section 3.2.1 introduces scaled dot-product attention, and its footnote gives the variance argument for unit-variance, independent components.
