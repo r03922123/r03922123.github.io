@@ -35,12 +35,12 @@
   <h1>Conditional probability and Bayes' rule, by counting</h1>
 </header>
 <aside class="post-side">
-  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>10 min</dd><dt>Topic</dt><dd>Probability</dd><dt>Tags</dt><dd>probability · Bayes&#x27; rule · base rates · calibration</dd></dl>
+  <dl class="details"><dt>Published</dt><dd>November 1, 2026</dd><dt>Reading time</dt><dd>11 min</dd><dt>Topic</dt><dd>Probability</dd><dt>Tags</dt><dd>probability · Bayes&#x27; rule · base rates · calibration</dd></dl>
   <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#counting-on-a-small-sample-space">Counting on a small sample space</a></li><li><a href="#or-and-and">"Or" and "and"</a></li><li><a href="#bayes-rule">Bayes' rule</a></li><li><a href="#worked-example-the-base-rate-effect">Worked example: the base-rate effect</a></li><li><a href="#the-odds-form">The odds form</a></li><li><a href="#updating-twice-and-when-not-to">Updating twice, and when not to</a></li><li><a href="#bayes-inside-a-classifier-correcting-for-the-base-rate">Bayes inside a classifier: correcting for the base rate</a></li><li><a href="#pitfalls">Pitfalls</a></li></ol></nav>
 </aside>
 <div class="prose">
-<p>A conditional probability answers the question "given that I now know B happened, how likely is A?" The mechanics are simpler than the notation suggests. Knowing B rules out every outcome where B did not happen. You throw those away, and among the outcomes that are left you count how often A also happens. Everything in this post follows from that: the rules for "or" and "and", Bayes' rule, and the base-rate effect that makes a good detector of a rare event produce mostly false alarms.</p>
-<p>Every claim below is checked in code, on a small sample space we can enumerate exactly, or by simulation.</p>
+<p>When a detector catches 90% of real events, fires on 20% of normal cases, and real events make up 10% of traffic, only one flag in three is real. Conditional probability explains why. It answers the question "given that I now know B happened, how likely is A?" Knowing B rules out every outcome where B did not happen; among the outcomes that are left you count how often A also happens. From that one idea I derive the rules for "or" and "and", Bayes' rule, and the base-rate effect that makes a good detector of a rare event produce mostly false alarms.</p>
+<p>Every claim below is checked in code, on a small sample space that can be enumerated exactly, or by simulation.</p>
 <h2 id="counting-on-a-small-sample-space">Counting on a small sample space</h2>
 <p>Roll two fair dice. There are 36 equally likely outcomes, so the probability of any event is the number of outcomes in it divided by 36. Writing events as functions of an outcome, and conditioning as a filter on the outcomes, gives exact answers with <code>Fraction</code>:</p>
 <pre><code class="language-python">from fractions import Fraction
@@ -103,7 +103,7 @@ assert P(first6, given=high) == P(AND(first6, high)) / P(high)
 assert P(AND(first6, high)) == P(high, given=first6) * P(first6)</code></pre>
 <p>The shortcut overstates the answer here (51/216 against 42/216) because it treats the overlap as smaller than it is.</p>
 <h2 id="bayes-rule">Bayes' rule</h2>
-<p>Writing the multiplication rule both ways round and dividing gives <b>Bayes' rule</b>, which turns a probability we know into the one we want:</p>
+<p>Writing the multiplication rule both ways round and dividing gives <b>Bayes' rule</b>, which turns a known probability into the wanted one:</p>
 \[
 P(H \mid E) = \frac{P(E \mid H)\,P(H)}{P(E)}
 \]
@@ -188,7 +188,7 @@ assert posterior_both_flagged(correlated) == Fraction(49, 133)                 #
 \[
 \text{logit}\,p_{\text{deploy}}(x) = \text{logit}\,p_{\text{train}}(x) - \text{logit}\,\pi_{\text{train}} + \text{logit}\,\pi_{\text{deploy}}
 \]
-<p>where \(\pi\) is the positive rate. This assumes only the class mix changed, not what each class looks like. With two Gaussian classes the true posterior is known in closed form, so we can check the correction directly:</p>
+<p>where \(\pi\) is the positive rate. This assumes only the class mix changed, not what each class looks like. With two Gaussian classes the true posterior is known in closed form, so I can check the correction directly:</p>
 <pre><code class="language-python">from scipy.special import expit, logit
 from sklearn.linear_model import LogisticRegression
 
@@ -219,7 +219,7 @@ assert roc_auc_score(y_dep, p_raw) == roc_auc_score(y_dep, p_dep)</code></pre>
 <p>The ranking of cases does not change, so ROC AUC is identical before and after; only the probabilities and any threshold set on them move. When the class-conditional distributions also drift, this shortcut no longer suffices and the model needs recalibrating on fresh labelled data.</p>
 <h2 id="pitfalls">Pitfalls</h2>
 <ul><li><b>Swapping the condition.</b> \(P(E \mid H)\) and \(P(H \mid E)\) are different numbers; the first is a property of the detector, the second also depends on the base rate. Confusing them is the confusion of the inverse; in a courtroom, with \(H\) as innocence, it is called the prosecutor's fallacy.</li><li><b>Quoting one number for a detector.</b> Ask for recall, the false positive rate and the base rate. On a rare event, accuracy can be high and recall can be high while precision is poor, as in the table above.</li><li><b>The product shortcut without independence.</b> \(1 - P(A^c)\,P(B^c)\) is the probability of "at least one" only for independent events. De Morgan's form \(1 - P(A^c \cap B^c)\) is always correct.</li><li><b>Multiplying likelihood ratios from correlated signals.</b> Two flags that share an error source carry much less than twice the evidence.</li><li><b>Reusing probabilities across populations.</b> A score learned at one base rate is miscalibrated at another. Shift the logit if only the class mix changed; recalibrate if more than that changed.</li><li><b>Conditioning on an event of probability zero.</b> \(P(A \mid B)\) is undefined when \(P(B) = 0\). For continuous variables, the conditional density takes its place, which is what the Gaussian example above uses.</li></ul>
-<p>The same rule, applied to a parameter instead of an event, is the basis of <a href="../statistical-estimation-mle-map/">MLE and MAP</a> and of the Beta-Binomial updates in <a href="../beta-uncertainty/">quantifying uncertainty with the Beta distribution</a>. For more of the core identities on one page, see the <a href="../probability-cheatsheet/">probability cheatsheet</a>.</p>
+<p>The detector numbers come from fixed rates of 90% and 20%, and the prior-shift check from two Gaussian classes whose log likelihood ratio is exactly linear, so they show the arithmetic of Bayes' rule, not how a real detector or classifier behaves. On a real score, the open question is whether only the class mix changed or more than that, and the second case needs recalibrating on fresh labelled data. The same rule, applied to a parameter instead of an event, is the basis of <a href="../statistical-estimation-mle-map/">MLE and MAP</a> and of the Beta-Binomial updates in <a href="../beta-uncertainty/">quantifying uncertainty with the Beta distribution</a>. For more of the core identities on one page, see the <a href="../probability-cheatsheet/">probability cheatsheet</a>.</p>
 <p>The opening rules follow the Day 3 tutorial of HackerRank's <a href="https://www.hackerrank.com/domains/tutorials/10-days-of-statistics">10 Days of Statistics</a>; chapter 2 of Blitzstein and Hwang's Introduction to Probability (2nd edition, 2019) covers conditioning, Bayes' rule and the odds form in depth. The prior-shift correction is the standard adjustment described by Saerens, Latinne and Decaestecker (Neural Computation, 2002).</p>
 </div>
 </article>
