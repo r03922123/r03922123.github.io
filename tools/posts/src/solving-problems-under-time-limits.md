@@ -5,9 +5,9 @@ group: Coding and data
 order: 1
 tags: problem solving · complexity · testing · algorithms
 ---
-With a clock running, most failed attempts are not a lack of knowledge. They are skipped steps: solving a slightly different problem than the one asked, chasing a clever idea for twenty minutes with nothing written, or finishing a correct idea that breaks on an empty list. A fixed sequence of steps removes those failures, and frees attention for the actual problem.
+On the problem of counting subarrays that sum to `k`, a sliding-window solution passes the worked example, then fails a stress test against the brute force on an input of at most two elements once values can be negative. With a clock running, most failed attempts are not a lack of knowledge. They are skipped steps: solving a slightly different problem than the one asked, chasing a clever idea for twenty minutes with nothing written, or finishing a correct idea that breaks on an empty list. A fixed sequence of steps removes those failures, and frees attention for the actual problem.
 
-The method here has six steps: understand, size, brute force, optimize, code, test. Each is shown on one problem, worked end to end. For the patterns themselves (sliding windows, heaps, graph searches and so on), the [LeetCode patterns](/leetcode/) series has a short post on each.
+The method here has six steps: understand, size, brute force, optimize, code, test. I work all six on one problem, end to end, and test the fast solution against the brute force. For the patterns themselves (sliding windows, heaps, graph searches and so on), the [LeetCode patterns](/leetcode/) series has a short post on each.
 
 ## A time budget
 Decide the split before starting, so a stuck step is noticed rather than felt. For a timed block, for example a 45-minute contest problem or practice session:
@@ -173,6 +173,8 @@ def count_fast(nums, k):
 | 2 | 3 | 0 | 1 | 1 |
 | 3 | 6 | 3 | 1 | 2 |
 
+The count ends at 2, the answer worked by hand in step 1.
+
 **Second, run the edge cases** from the list, with answers worked out by hand:
 
 ```python
@@ -248,5 +250,7 @@ If the better idea has not come by the end of the design budget, write the brute
 - **Silent assumptions.** Write the plan as comments before the code, and the invariant next to the loop. A written trail shows where reasoning went wrong, and makes the solution easier to review later.
 - **Testing only the example.** The given example is usually the case the naive idea already handles. The edge-case list and the stress test are where bugs show up.
 - **No time left to test.** Keep the reserve. If coding runs long, cut features, not testing.
+
+Everything here is worked on one problem, so the time split and the pattern table are starting points, not measured results. The stress test covers inputs of up to eight elements and the timing check one run at n = 20,000, so correctness on larger inputs still rests on the prefix-sum argument. The next step is the same six steps on other problems from the [LeetCode patterns](/leetcode/) series.
 
 The understand, plan, carry out, look back structure is George Pólya's, from How to Solve It (1945); stress testing against a brute force is standard practice in competitive programming. The problem is [LeetCode 560](https://leetcode.com/problems/subarray-sum-equals-k/), and the [prefix state map](/leetcode/prefix-state-map/) post covers its pattern in more depth.
