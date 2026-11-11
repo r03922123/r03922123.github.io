@@ -1,6 +1,6 @@
 # MLE and MAP: estimating a parameter from data
 
-A model has a knob: the bias of a coin, the mean of a measurement, the rate of a queue. You have data. Which setting of the knob should you believe? Two answers cover most of machine learning. **Maximum likelihood (MLE)** picks the setting under which the observed data were most probable. **Maximum a posteriori (MAP)** does the same after first weighting each setting by how plausible you thought it was before seeing anything. Almost every loss function you train with is one or the other in disguise.
+An item with 0 clicks in 20 impressions has a maximum-likelihood click rate of exactly zero, which a ranker would treat as certain failure. A prior fixes that at a cost I check in code: with a uniform prior, 3 heads and 1 tail give a most probable bias of \(3/4\) in \(p\) and \(4/6\) in log-odds, while the MLE stays put. A model has a knob: the bias of a coin, the mean of a measurement, the rate of a queue. You have data. Which setting of the knob should you believe? Two answers cover most of machine learning. **Maximum likelihood (MLE)** picks the setting under which the observed data were most probable. **Maximum a posteriori (MAP)** does the same after first weighting each setting by how plausible you thought it was before seeing anything. Almost every loss function you train with is one or the other in disguise.
 
 This post builds both from the definitions, works the standard examples, and checks every claim numerically, including two that are often stated wrong: that the MLE is unbiased, and that MAP is "MLE plus a prior" with no other consequences.
 
@@ -92,6 +92,8 @@ Bias aside, the MLE has three properties that make it the default in large sampl
 - **Consistency.** As \(n\) grows, \(\hat\theta\) converges to the true value, under mild conditions. Both biased examples above are consistent: their bias and their variance both shrink to zero.
 - **Asymptotic normality.** Under smoothness conditions, \(\hat\theta\) is approximately \(\mathcal{N}(\theta, 1 / (n I(\theta)))\), where the **Fisher information** \(I(\theta) = -\mathbb{E}\big[\partial^2 \ln p(x \mid \theta) / \partial\theta^2\big]\) measures how sharply the log-likelihood curves around the truth. For a coin, \(I(p) = 1 / (p(1-p))\), which gives the familiar standard error \(\sqrt{p(1-p)/n}\). Under the same regularity conditions, the Cramér–Rao bound says no unbiased estimator can have a smaller variance than \(1/(nI)\), so in large samples the MLE is about as precise as it gets. The uniform endpoint is outside those conditions, which is how its spread shrinks faster than the bound would allow.
 - **Invariance.** The MLE of \(g(\theta)\) is \(g(\hat\theta)\). The MLE of a standard deviation is the square root of the MLE of the variance; the MLE of a log-odds is the logit of \(\hat p\). Reparametrizing never changes the answer.
+
+The code checks the coin at \(p\) = 0.3 and \(n\) = 400: the spread of \(\hat p\) matches \(\sqrt{p(1-p)/n}\), Wald intervals cover close to 95%, and the average of minus the second derivative matches \(I(p) = 1 / (p(1-p))\).
 
 ```python
 # asymptotic normality for the coin: sd matches sqrt(p (1 - p) / n), and Wald intervals cover ~95%
@@ -209,5 +211,7 @@ assert abs(1 / (1 + math.exp(-mean_phi)) - stats.beta.mean(h + 1, t + 1)) > 0.02
 - **Off by one in the Beta mode.** The mode of \(\text{Beta}(a, b)\) is \((a-1)/(a+b-2)\), while the mean is \(a/(a+b)\). Add-one smoothing is the posterior mean under a uniform prior and the mode under \(\text{Beta}(2, 2)\).
 - **The mode can be unrepresentative.** A Laplace prior can make a MAP weight exactly zero (this is the lasso) while its posterior mean is not zero, and in high dimensions the peak of a distribution can sit far from where its mass is.
 - **The prior is data you did not observe.** A strong prior on a small sample decides the answer. Say what it is, and check that the estimate moves when the data say so.
+
+Every model the code fits has one or two parameters, so the checks say nothing about mixtures or neural networks and their many local maxima. The asymptotic checks use one coin at \(n\) = 400 and the shrinkage simulation two true means under one prior, so neither shows where the answer changes elsewhere. How to choose the prior is left to the [Beta post](../beta-uncertainty/).
 
 The material is standard; for fuller treatments, see G. Casella and R. L. Berger, Statistical Inference (2nd edition), on maximum likelihood and its properties, and K. P. Murphy, Probabilistic Machine Learning: An Introduction (2022), on MAP estimation and Bayesian inference. Stanford's CS109 course notes also cover the MLE recipe and MAP; the examples and code here are new.
