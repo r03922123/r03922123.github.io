@@ -97,13 +97,15 @@ x = torch.randn(3, 512)
 assert torch.equal(naive(x), lean(x))
 assert peak_naive == 2 * weight_bytes and peak_lean == weight_bytes
 
-w_gib = 1.5e9 * 2 / GiB                          # a 1.5B-parameter model in bfloat16
+w_gib = 1.5e9 * 2 / GiB                          # a 1.5B-parameter model, built and stored in bfloat16
+fp32_build_peak = 1.5e9 * 4 / GiB + w_gib        # built in float32 first, then the bf16 weights loaded
 limit = 5.0                                      # GiB, the memory limit in the manifest
 print(f"weights {w_gib:.2f} GiB: naive load peaks at {2 * w_gib:.2f} GiB, lean load at {w_gib:.2f} GiB")
 assert round(w_gib, 2) == 2.79 and round(2 * w_gib, 2) == 5.59 and w_gib < limit < 2 * w_gib
+assert fp32_build_peak / w_gib == 3
 ```
 
-Both models compute the same outputs, but the naive load holds twice the weight bytes at its peak. For a 1.5B-parameter model in bfloat16 that is 5.59 GiB against 2.79 GiB, so under a 5 GiB limit the pod is killed during every start, restarts, and is killed again, which Kubernetes reports as `CrashLoopBackOff`.
+Both models compute the same outputs, but the naive load holds twice the weight bytes at its peak. For a 1.5B-parameter model built directly in bfloat16 that is 5.59 GiB against 2.79 GiB (built in the default float32 first, the fresh weights alone are twice the checkpoint and the peak is 3 times it), so under a 5 GiB limit the pod is killed during every start, restarts, and is killed again, which Kubernetes reports as `CrashLoopBackOff`.
 
 The second trap fires under load. Each request in flight holds activations and buffers, so memory follows concurrency, which is random. Below, 20 requests a second arrive at random, each takes about 0.25 s and holds 0.15 GiB, on top of the weights and 0.5 GiB of runtime overhead. Then the same traffic goes through a server that admits at most as many concurrent requests as the limit has room for and queues the rest.
 
@@ -232,7 +234,7 @@ The kubelet on each node runs three kinds of **probe** against a container:
 - **Liveness**: after `failureThreshold` failures in a row (default 3, every `periodSeconds`, default 10), the container is restarted.
 - **Startup**: while it has not yet succeeded, liveness and readiness probes do not run; if it fails `failureThreshold` times, the container is restarted.
 
-A model server's process starts in seconds, but its model loads for much longer, so "started" and "able to answer" are far apart. A liveness probe alone kills the server before it can load:
+A model server's process starts in seconds, but its model loads for much longer, so "started" and "able to answer" are far apart. If the server loads its model before it starts listening, so that `/live` cannot answer during the load, a liveness probe alone kills the server before it can load:
 
 ```python
 load_s = 60
@@ -305,6 +307,8 @@ def recommend(n, ready, load_rps):
     ratio = load_rps / (ready * POD_RPS) / TARGET
     if ratio > 1 and ready < n:                  # scaling up: not-ready pods count as idle
         ratio = ratio * ready / n
+        if ratio <= 1 + TOLERANCE:               # now a scale-down or inside the tolerance: no action
+            return n
     return n if abs(ratio - 1) <= TOLERANCE else math.ceil(n * ratio)
 
 
@@ -338,11 +342,11 @@ def autoscale(window_s, seed=4, hours=6, lo=2, hi=60):
 flappy, stable = autoscale(0), autoscale(300)
 print(f"pods created in 6 h: window 0 s -> {flappy[0]}, window 300 s -> {stable[0]}; "
       f"unserved load {flappy[1]:.2%} vs {stable[1]:.2%}")
-assert flappy[0] > 2_000 and stable[0] < 150 and flappy[0] > 10 * stable[0]
+assert 1_600 < flappy[0] < 1_700 and stable[0] < 150 and flappy[0] > 10 * stable[0]
 assert stable[1] == 0 and 0 < flappy[1] < 0.005
 ```
 
-Without the window, the HPA creates over 2,000 pods in six hours, each loading a model for 75 seconds before it serves, and still leaves a little load unserved when a burst follows a scale-down; the default 300-second window creates fewer than 150 and serves everything. For model servers the stabilization window is not a detail: a pod is expensive to start, so removing one that will be needed a minute later is pure waste.
+Without the window, the HPA creates about 1,600 pods in six hours, each loading a model for 75 seconds before it serves, and still leaves a little load unserved when a burst follows a scale-down; the default 300-second window creates fewer than 150 and serves everything. For model servers the stabilization window is not a detail: a pod is expensive to start, so removing one that will be needed a minute later is pure waste.
 
 ## The failure modes in one table
 | Problem | Naive fix | How it breaks | Real fix | How it's measured |

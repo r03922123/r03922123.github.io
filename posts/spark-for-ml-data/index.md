@@ -2,7 +2,7 @@
 
 Hash 2,000,000 simulated click events by user id into 200 partitions, with user activity following a Zipf law, and one user owns 165,157 rows. The partition holding that user has 176,441 rows, 17.6 times the mean, and on 50 cores the stage finishes 4.6 times later than the same rows with evenly spread keys. Nothing in pandas or SQL prepares you for that, because on one machine a group is a group, whatever its size. Apache Spark runs a DataFrame program on many machines by splitting the table into **partitions**, and nearly every slow or failing Spark job comes from how rows move between them.
 
-This post rebuilds the moving parts in plain pandas and numpy: a tiny lazy engine that cuts a plan into stages, the shuffle, skew and salting, the two join strategies and the bytes each moves, and the size of a table once it lands on the driver. The PySpark next to each piece is shown, not run. The pandas and SQL versions of the same operations are in the [pandas](../pandas-cheatsheet/) and [SQL](../sql-cheatsheet/) cheat sheets, and joining features without leaking the label is in [ML infrastructure](../ml-infrastructure/).
+In this post I rebuild the moving parts in plain pandas and numpy: a tiny lazy engine that cuts a plan into stages, the shuffle, skew and salting, the two join strategies and the bytes each moves, and the size of a table once it lands on the driver. The PySpark next to each piece is shown, not run. The pandas and SQL versions of the same operations are in the [pandas](../pandas-cheatsheet/) and [SQL](../sql-cheatsheet/) cheat sheets, and joining features without leaking the label is in [ML infrastructure](../ml-infrastructure/).
 
 ## The vocabulary
 | Term | What it is | pandas analogue |

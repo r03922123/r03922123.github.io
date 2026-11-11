@@ -154,6 +154,8 @@ assert all(abs(res["plain", pc][0] - acc32) < 0.005 for pc in (False, True))   #
 assert 0.012 < res["plain", False][1] < 0.014 and res["plain", True][1] < 0.01
 assert 0.70 < res["outlier", False][0] < 0.75 and res["outlier", False][1] > 0.7
 assert acc32 - res["outlier", True][0] < 0.01 and 0.075 < res["outlier", True][1] < 0.095
+coarser = (outlier[0].weight.abs().max() / model[0].weight.abs().max()).item()
+assert 65 < coarser < 72                     # per-tensor scale grows ~70x, not 100x: row 0 was not the widest
 ```
 
 | Weights | float32 accuracy | int8 per-tensor: accuracy, output error | int8 per-channel: accuracy, output error |
@@ -161,7 +163,7 @@ assert acc32 - res["outlier", True][0] < 0.01 and 0.075 < res["outlier", True][1
 | As trained | about 97% | about 97%, about 1.3% | about 97%, under 1% |
 | One channel scaled up 100× | about 97% (same function) | about 72%, over 70% | about 97% (under 1 point lower), about 8% |
 
-Without the outlier, int8 costs nothing measurable on this task: about 1.3% output error per-tensor and under 1% per-channel, with accuracy unchanged. With the outlier, per-tensor quantization drops accuracy from about 97% to about 72%, because the other 63 rows share a scale 100 times too coarse and most of their weights round to a handful of levels. Per-channel brings accuracy back within a point. Its output error is still about 8%, not 1%: the second layer's column for that unit was divided by 100, and per-output-channel scales cannot help a small *input* column. Equalizing the ranges across the two layers (Nagel et al.'s cross-layer equalization) or scaling by activation statistics (AWQ, in [LLM inference](../llm-inference/)) targets exactly that.
+Without the outlier, int8 costs nothing measurable on this task: about 1.3% output error per-tensor and under 1% per-channel, with accuracy unchanged. With the outlier, per-tensor quantization drops accuracy from about 97% to about 72%, because the other 63 rows share a scale about 70 times coarser than before (row 0 was not already the widest, so not the full 100) and most of their weights round to a handful of levels. Per-channel brings accuracy back within a point. Its output error is still about 8%, not 1%: the second layer's column for that unit was divided by 100, and per-output-channel scales cannot help a small *input* column. Equalizing the ranges across the two layers (Nagel et al.'s cross-layer equalization) or scaling by activation statistics (AWQ, in [LLM inference](../llm-inference/)) targets exactly that.
 
 PyTorch's own quantized tensors agree with the hand-written version, and an int8 element is a quarter of the size of a float32 one:
 
@@ -197,17 +199,19 @@ assert torch.equal(traced(neg), neg * 2) and torch.equal(Gate()(neg), -neg)   # 
 
 try:
     torch.export.export(Gate(), (pos,))
-    raise AssertionError("export should refuse a data-dependent branch")
 except Exception as e:
     assert "data-dependent" in str(e)
+else:
+    raise AssertionError("export should refuse a data-dependent branch")
 
 net = torch.nn.Sequential(torch.nn.Linear(8, 4), torch.nn.ReLU())
 fixed = torch.export.export(net, (torch.randn(4, 8),)).module()
 try:
     fixed(torch.randn(16, 8))
+except Exception as e:
+    assert "Guard failed" in str(e)
+else:
     raise AssertionError("a graph exported at batch 4 should reject batch 16")
-except Exception:
-    pass
 batch = torch.export.Dim("batch", min=1, max=64)
 dynamic = torch.export.export(net, (torch.randn(4, 8),), dynamic_shapes={"input": {0: batch}}).module()
 x = torch.randn(16, 8)
@@ -240,8 +244,9 @@ That `scale` is also where the per-channel weight ranges of the previous section
 ```plaintext
 # PyTorch -> ONNX, batch dimension dynamic
 batch = torch.export.Dim("batch", min=1, max=32)
-torch.onnx.export(model.eval(), (torch.randn(1, 3, 224, 224),), "model.onnx",
-                  input_names=["images"], dynamic_shapes=({0: batch},))      # dim 0 of the first input
+torch.onnx.export(model.eval(), (torch.randn(2, 3, 224, 224),), "model.onnx",   # example batch >= 2: a size-1
+                  input_names=["images"], output_names=["logits"],             # dim would be fixed to 1
+                  dynamic_shapes=({0: batch},))                                # dim 0 of the first input
 
 # ONNX -> TensorRT engine, with an optimization profile
 trtexec --onnx=model.onnx --saveEngine=model.plan \

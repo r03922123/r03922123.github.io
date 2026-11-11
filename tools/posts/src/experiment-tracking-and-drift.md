@@ -99,7 +99,7 @@ Rebuilding the run from its record gives the same AUC exactly, and a refreshed t
 Hashing `X.tobytes()` works here because the array is in memory. A real pipeline hashes the files or a table snapshot, and treats a missing hash as a failed run rather than a blank field.
 
 ## The same thing in MLflow
-MLflow Tracking stores runs grouped into experiments. A run holds parameters, metrics, tags and artifacts, and MLflow sets some tags itself: the source file always, and the git commit in `mlflow.source.git.commit` when the code runs from a git repository. A dataset logged with `mlflow.log_input` carries a digest computed from its contents, which plays the role of my data hash. The calls below follow the MLflow 3 documentation; they are not run here, since MLflow is not installed in the build.
+MLflow Tracking stores runs grouped into experiments. A run holds parameters, metrics, tags and artifacts, and MLflow sets some tags itself: the source file always, and the git commit in `mlflow.source.git.commit` when the code runs from a git repository. A dataset logged with `mlflow.log_input` carries a digest, but it covers a sample, not the whole table: for a pandas DataFrame it hashes the first 10,000 rows plus the row count and column names. A table refreshed in place that changes only later rows, keeping the same row count, gets the same digest, which is exactly the failure above. So log a full-content hash of the files, or the table's snapshot id, as well. The calls below follow the MLflow 3 documentation; they are not run here, since MLflow is not installed in the build.
 
 ```plaintext
 import mlflow
@@ -316,4 +316,4 @@ Everything here runs on synthetic data from a logistic model, the same family as
 
 What stays open is choosing thresholds from cost rather than convention: how much a missed drift costs against an hour spent on a false alarm, and how that trade changes with each feature's traffic. Detecting concept drift before labels arrive, from proxy signals such as early user behaviour, is the harder open problem.
 
-The MLflow details (tracked fields, system tags, dataset digests, registry versions, aliases and the deprecation of stages in 2.9) follow the [MLflow documentation](https://mlflow.org/docs/latest/ml/); the KS test is `scipy.stats.ks_2samp` as documented in SciPy.
+The MLflow details (tracked fields, system tags, registry versions, aliases and the deprecation of stages in 2.9) follow the [MLflow documentation](https://mlflow.org/docs/latest/ml/), and the pandas dataset digest follows `compute_pandas_digest` in MLflow's `mlflow/data/digest_utils.py`; the KS test is `scipy.stats.ks_2samp` as documented in SciPy.
