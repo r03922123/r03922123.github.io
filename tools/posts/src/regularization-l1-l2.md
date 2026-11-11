@@ -5,11 +5,11 @@ group: Machine learning fundamentals
 order: 7
 tags: regularization · ridge · lasso · weight decay
 ---
-A model with enough freedom fits the noise in its training set as faithfully as the signal. Regularization puts a price on that freedom, and the most common price is on the size of the weights:
+Fit 100 rows with 50 features and 5 real effects, and the lasso's test MSE averages 4.9 over five draws, against 7.7 for ridge. Spread small effects over all 50 features and ridge wins, 6.2 to 6.4. A model with enough freedom fits the noise in its training set as faithfully as the signal. Regularization puts a price on that freedom, and the most common price is on the size of the weights:
 
 \[ \mathcal{L}(w) = \text{data loss}(w) + \lambda\, \Omega(w), \qquad \lambda \ge 0 \]
 
-Two choices of \(\Omega\) cover most of practice: the squared L2 norm \(\lVert w \rVert_2^2 = \sum_i w_i^2\) (ridge regression, and weight decay in neural networks) and the L1 norm \(\lVert w \rVert_1 = \sum_i \lvert w_i \rvert\) (the lasso). They look alike, but L2 makes every weight smaller and leaves them all nonzero, while L1 sets some weights exactly to zero and so selects features. This post shows why on one weight solved by hand, checks it on real regressions, gives the Bayesian reading of each penalty, and ends with deep learning, where an L2 penalty and weight decay stop being the same thing under Adam.
+Two choices of \(\Omega\) cover most of practice: the squared L2 norm \(\lVert w \rVert_2^2 = \sum_i w_i^2\) (ridge regression, and weight decay in neural networks) and the L1 norm \(\lVert w \rVert_1 = \sum_i \lvert w_i \rvert\) (the lasso). They look alike, but L2 makes every weight smaller and leaves them all nonzero, while L1 sets some weights exactly to zero and so selects features. I show why on one weight solved by hand, check it on real regressions, give the Bayesian reading of each penalty, and end with deep learning, where an L2 penalty and weight decay stop being the same thing under Adam.
 
 ## One weight, solved exactly
 Strip the problem down to one weight whose unpenalized best value is \(z\), with data loss \(\tfrac12 (w - z)^2\). This is what each coefficient of a linear regression faces when the features are uncorrelated, as the next section checks. Adding each penalty and minimizing gives
@@ -104,7 +104,7 @@ That depends on what the true weights look like. The next block fits 100 rows wi
 | Sparse | 8.3 | 7.7 | 4.9 (about 16 of 50 weights kept) |
 | Dense | 8.3 | 6.2 | 6.4 |
 
-Least squares scores the same under both truths because its error here is pure variance: it does not depend on the true weights at all. The lasso wins easily when most features are irrelevant. When every feature carries a little signal, zeroing some of them costs more than it saves, and ridge comes out ahead.
+Least squares scores the same under both truths because its error here is pure variance: it does not depend on the true weights at all. The lasso wins easily when most features are irrelevant. When every feature carries a little signal, zeroing some of them costs more than it saves, and ridge comes out ahead. These numbers come from independent Gaussian features, one sparse and one dense truth, and five draws, so they show which shape of truth favours which penalty, not by how much on other data.
 
 ```python
 def test_mse(w_true, seed):
@@ -334,6 +334,6 @@ for a in [0.001, 0.01]:                                         # 30 rows, 100 f
 | Neural network trained with SGD | The optimizer's `weight_decay` | Identical to an L2 penalty |
 | Neural network trained with Adam | AdamW | Decay that does not depend on gradient size |
 
-Weight penalties are one tool among several against overfitting: the [overfitting playbook](../overfitting-playbook/) puts them next to the others, and [dropout](../dropout/) covers the main alternative in neural networks.
+No network is trained here: the optimizer checks fit a linear model or pure gradient noise, and the normalization check only shows scale invariance, so decay acting like a learning-rate schedule is argued, not measured. Weight penalties are one tool among several against overfitting: the [overfitting playbook](../overfitting-playbook/) puts them next to the others, and [dropout](../dropout/) covers the main alternative in neural networks.
 
 The orthonormal-design comparison of ridge and lasso follows section 3.4 of Hastie, Tibshirani and Friedman's The Elements of Statistical Learning. Ridge regression is from Hoerl and Kennard (1970), the lasso from Tibshirani (1996), the elastic net from Zou and Hastie (2005), and AdamW from Loshchilov and Hutter (2019).
