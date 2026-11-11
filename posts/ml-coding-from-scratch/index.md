@@ -1,6 +1,6 @@
 # ML building blocks from scratch, checked against the library
 
-Most of deep learning is built from about a dozen small pieces: a linear map, a nonlinearity, a softmax, a normalization, attention, a recurrence, a convolution. Each one is a few lines of tensor code, and writing them yourself is the fastest way to learn what the shapes are, which axis everything reduces over, and where the numerical traps are.
+Written naively, softmax returns NaN on a logit of 1000, and a softmax over the wrong axis returns a tensor of the right shape that is quietly wrong. Most of deep learning is built from about a dozen small pieces: a linear map, a nonlinearity, a softmax, a normalization, attention, a recurrence, a convolution. Each one is a few lines of tensor code, and writing them yourself is the fastest way to learn what the shapes are, which axis everything reduces over, and where the numerical traps are. I write each piece in float64 and check it against a reference.
 
 Writing them is half the exercise; proving them right is the other half. Every piece below is asserted equal to the PyTorch, scikit-learn or brute-force version, usually to nine decimal places, with the library's weights copied across where needed, which is also the best way to learn its weight layout.
 
@@ -119,6 +119,8 @@ for _ in range(300):
 pred = (F.relu(X @ params[0] + params[1]) @ params[2] + params[3]).argmax(1)
 assert (pred == y).double().mean() > 0.95
 ```
+
+The same hand-written gradients also train the network: 300 steps of full-batch gradient descent on three Gaussian blobs reach a training accuracy above 0.95.
 
 ## LayerNorm, BatchNorm and dropout
 Both normalizations subtract a mean and divide by a standard deviation; LayerNorm averages over each example's features, BatchNorm over the batch for each feature (the [BatchNorm vs LayerNorm](../batchnorm-vs-layernorm/) post covers the consequences). Two details catch almost everyone. The variance used to normalize is the biased one, dividing by \(n\), while `torch.var` divides by \(n-1\) by default. And BatchNorm's running variance, used at inference, is updated with the unbiased variance.
@@ -455,7 +457,7 @@ assert beam_search(V ** L)[0] == best
 assert score(greedy) < score(best)                         # -3.48 vs -1.97: greedy walked into a bad path
 ```
 
-Real decoders add a length penalty, since summed log-probabilities favour short outputs, and stop each beam at an end-of-sequence token.
+On this toy model greedy scores -3.48 against -1.97 for the best sequence. Real decoders add a length penalty, since summed log-probabilities favour short outputs, and stop each beam at an end-of-sequence token.
 
 ## Classical models in NumPy
 Linear regression has a closed form, the least-squares solution, best computed with `lstsq` rather than by inverting \(X^\top X\) (see [regression as maximum likelihood](../regression-as-maximum-likelihood/)). Logistic regression has none, but its loss is convex, so plain gradient descent on the mean log-loss reaches the same optimum as scikit-learn's solver. The gradient is \(X^\top(\sigma(Xw) - y)/n\), the same "prediction minus label" shape as the softmax gradient above.
@@ -572,5 +574,7 @@ The bugs these asserts catch, roughly from most to least common:
 - **Train and eval mode.** BatchNorm and dropout behave differently in each; evaluating in training mode changes both the outputs and the running statistics.
 - **Weight layout.** `nn.Linear` stores `[out, in]`; LSTM and GRU gates are stacked in a fixed order.
 - **Loose tolerances.** In float32 a 1e-4 tolerance hides real bugs, such as a missing \(\epsilon\) in a normalization. Test in float64 and tighten.
+
+Each assert runs on small random inputs in float64 with fixed seeds, so it shows that a piece computes the same function as its reference, not how it behaves in float32 or at the size of a real model. The tiled attention reproduces exact attention without FlashAttention's speed, which comes from fast on-chip GPU memory. Padding masks, which the Pitfalls flag as needing care, have no assert here.
 
 The checklist of building blocks follows a post on [Yuan Meng's blog](https://www.yuan-meng.com/); the code and explanations here are original. For building these pieces up from nothing, Andrej Karpathy's [Neural Networks: Zero to Hero](https://karpathy.ai/zero-to-hero.html) and Sebastian Raschka's [PyTorch in One Hour](https://sebastianraschka.com/teaching/pytorch-1h/) are excellent.
