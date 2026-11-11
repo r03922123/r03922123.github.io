@@ -205,7 +205,7 @@ def continuation_tv(fix_up, runs=20_000):
 
 tv, per_run = continuation_tv("leftover")
 tv_bad, _ = continuation_tv("target")                              # wrong fix-up: redraw from p
-assert tv &lt; 0.06 &lt; 0.1 &lt; tv_bad                                    # noise ~0.03; the bug ~0.15
+assert tv &lt; 0.06 &lt; 0.1 &lt; tv_bad                                    # noise ~0.03; the bug ~0.12
 assert per_run &lt; 2                                                 # 3 tokens in under 2 passes
 print(f"TV {tv:.3f} (broken fix-up: {tv_bad:.3f}); 3 tokens in {per_run:.2f} target passes")</code></pre>
 <p>With the leftover fix-up the distance stays under 0.06, a bound set at twice the sampling noise; the broken variant lands above 0.1, and three tokens cost fewer than two target passes.</p>
