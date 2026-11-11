@@ -6,6 +6,15 @@ The map, not file names, is the index of what exists.
 Status, 2026-11-11: every module of versions 3 and 4 is built and merged. `docs/ARCHITECTURE.md` maps the site as
 it is now; this map keeps what each module was for.
 
+## Version 5: the old book (approved 2026-11-11)
+
+| Module id | Responsibility | Depends on | Spec |
+|---|---|---|---|
+| `resume-book` | A worn purple book on the mantel opens `/book/`: unlisted, `noindex` résumé-preparation pages rewritten from private notes | `room`, `reading-shell` | `SPEC-resume-book.md` |
+
+Decision: `docs/adr/0003-unlisted-resume-book.md`. It narrows the version 2 rule "private folders are never
+published" for résumé preparation only; personal identifiers stay out.
+
 ## Version 4: reading pages after an Anthropic research article (approved 2026-11-10)
 
 Changes two things in version 3. The visual reference for `blog-theme`, `reading-shell` and `posts-index` moves from
