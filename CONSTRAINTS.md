@@ -30,6 +30,7 @@ branch tip before it is merged or pushed.
 | Home weight | `index.html` + `style.css` ≤ 150 KB (three.js lazy and counted apart) | `site` |
 | Check tests | The checker itself still works; the search ranking passes its cases and golden queries | `check tests`, `search tests` |
 | Post wording | No interview framing, vault or Obsidian mentions, no MusicGen authorship; the one allowed hit is the InterviewQuery credit in `coin-flips-normal-approximation.md` | `post wording` |
+| Post voice (until `post-voice` ends) | Reframed posts keep every code block, table, inline span, heading, link and number of `scripts/voice-baseline.json`; prose grows at most 10% | `voice tests`, `post voice` |
 | Rebuild is clean | Generated HTML is committed and matches its sources | `rebuild clean` |
 
 ## Measured, not yet enforced
