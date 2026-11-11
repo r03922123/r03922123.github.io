@@ -5,9 +5,9 @@ group: LLMs and generative AI
 order: 5
 tags: LoRA · fine-tuning · PEFT · LLM
 ---
-Fine-tuning a 7-billion-parameter model the ordinary way means a gradient and two optimizer moments for every parameter, and a full copy of the model per task. LoRA (Hu et al., 2021) freezes the pretrained weights and learns each layer's change as the product of two thin matrices. The trainable part shrinks by a factor of hundreds to thousands, and afterwards the change can be folded back into the weights, so the merged model runs exactly as fast as the original.
+Fine-tuning a 7-billion-parameter model the ordinary way means a gradient and two optimizer moments for every parameter, over 100 GB before activations, and a full copy of the model per task. LoRA (Hu et al., 2021) freezes the pretrained weights and learns each layer's change as the product of two thin matrices. Rank-8 adapters on all seven linear layers per block bring that under 14 GB. The trainable part shrinks by a factor of hundreds to thousands, and afterwards the change can be folded back into the weights, so the merged model runs exactly as fast as the original.
 
-The implementation, step by step with asserts, is in [LoRA from scratch](/posts/lora-from-scratch/). This post is the conceptual companion: why the trick works, what it gives up, and what each design choice (initialization, the \(\alpha / r\) scale, which layers to adapt) does to training.
+The implementation, step by step with asserts, is in [LoRA from scratch](/posts/lora-from-scratch/). Here I explain why the trick works, what it gives up, and what each design choice (initialization, the \(\alpha / r\) scale, which layers to adapt) does to training. I check the rank limit, the initialization and the scale on small synthetic matrices: training reaches the best rank-\(r\) approximation and no further.
 
 ## The bet: the update is low rank
 Take one linear layer with pretrained weight \(W_0 \in \mathbb{R}^{d \times k}\). Fine-tuning replaces it with \(W_0 + \Delta W\). LoRA restricts the change to rank \(r\):
@@ -189,6 +189,8 @@ assert loss_r[0] - loss_r[2] < 0.5 * (loss_rs[0] - loss_rs[2])  # alpha / r gain
 assert loss_rs[0] > loss_rs[1] > loss_rs[2]
 ```
 
+At rank 64 the first \(\alpha / r\) step is over 3 times smaller than at rank 4, while \(\alpha / \sqrt{r}\) keeps the steps across ranks within a factor of 1.3, and after 60 steps it gives rank 64 under 0.6 times the \(\alpha / r\) loss. One random 128-wide target at one learning rate shows the direction of the effect, not its size in a real model.
+
 A common habit is \(\alpha = r\) or \(\alpha = 2r\), which fixes \(s\) at 1 or 2 and quietly removes the \(1/r\), so the step grows like \(\sqrt{r}\). Whatever the convention, \(\alpha\) and the learning rate are coupled: change one, revisit the other, and store \(s\) with the adapter.
 
 ## Where to put the adapters
@@ -238,7 +240,7 @@ Common ways it goes wrong:
 - **Lossy merges.** Merge in higher precision and keep the original base.
 - **Mismatched base.** An adapter is a delta against one exact checkpoint; on another, even a requantized one, it silently gives a different model.
 
-For the surrounding architecture, see [transformers and LLMs: key ideas](../transformers-and-llms-key-ideas/) and [foundation models](../foundation-models/).
+The training checks here use small synthetic targets, so they show each mechanism, not which rank a real task needs: that depends on the spectrum of the ideal update, which is unknown in a real model. Where to put the adapters comes from the LoRA and QLoRA papers, not from code here. For the surrounding architecture, see [transformers and LLMs: key ideas](../transformers-and-llms-key-ideas/) and [foundation models](../foundation-models/).
 
 ## References
 - E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen. [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685). ICLR 2022.
