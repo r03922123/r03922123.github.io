@@ -1,8 +1,8 @@
 # BatchNorm vs LayerNorm: one formula, two axes
 
-A normalization layer takes a set of activations, subtracts their mean, divides by their standard deviation, and applies a learned scale and shift. BatchNorm and LayerNorm both do exactly this. They differ only in which set: BatchNorm averages one feature over the examples in a batch, LayerNorm averages all the features of one example. That choice of axis decides nearly everything else: whether training and inference differ, whether a batch of one works, whether the layer can be folded away at serving time, and whether it suits CNNs or Transformers.
+Train with BatchNorm at batch size 2 and every output is \(+1\) or \(-1\) (up to \(\epsilon\)), whatever the input; simulated for one feature, training-mode outputs sit on average 0.75 of its standard deviation from evaluation-mode ones, and 0.085 at batch size 128. LayerNorm has no such gap. A normalization layer takes a set of activations, subtracts their mean, divides by their standard deviation, and applies a learned scale and shift. BatchNorm and LayerNorm both do exactly this. They differ only in which set: BatchNorm averages one feature over the examples in a batch, LayerNorm averages all the features of one example. That choice of axis decides nearly everything else: whether training and inference differ, whether a batch of one works, whether the layer can be folded away at serving time, and whether it suits CNNs or Transformers.
 
-Both are built from scratch below and checked against PyTorch, each consequence gets a small experiment, and the post ends with RMSNorm, the stripped-down LayerNorm that most recent large language models use.
+I build both from scratch, check them against PyTorch, give each consequence a small experiment, and end with RMSNorm, the stripped-down LayerNorm that most recent large language models use.
 
 ## One formula, two axes
 Take a set \(S\) of activations with mean \(\mu_S\) and variance \(\sigma_S^2\). Every layer here computes
@@ -311,6 +311,8 @@ assert (h16 / torch.sqrt((h16**2).mean(dim=-1, keepdim=True) + 1e-6) == 0).all()
 up = h16.float()
 assert torch.allclose((up / torch.sqrt((up**2).mean(dim=-1, keepdim=True) + 1e-6)).half(), torch.ones_like(h16))
 ```
+
+Every experiment here runs on synthetic inputs, and no layer in it is trained by an optimizer, so it shows what each axis does to the numbers, not how much accuracy a choice gains or costs on a real model. GroupNorm's flat accuracy as the batch shrinks, ConvNeXt's small gain and RMSNorm's speed are the cited papers' results. Why BatchNorm helps at all is still argued, between reduced internal covariate shift and a smoother loss surface.
 
 ## References
 - S. Ioffe, C. Szegedy. Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift. ICML 2015.
