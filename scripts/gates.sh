@@ -10,20 +10,9 @@ gate() { name=$1; shift; echo "== $name"; "$@" || { echo "FAILED: $name"; exit 1
 
 check_tests() { (cd scripts && python3 -m unittest test_check); }
 
-# One allowed hit, the InterviewQuery credit. -l and -c print names and counts, never a matching line.
-WORDING='interview|obsidian|vault|musicgen'
-ALLOWED=tools/posts/src/coin-flips-normal-approximation.md
-post_wording() {
-  files=$(grep -l -i -E "$WORDING" tools/posts/src/*.md)
-  [ "$files" = "$ALLOWED" ] || { echo "files with a match: $files (allowed: $ALLOWED only)"; return 1; }
-  count=$(grep -c -i -E "$WORDING" "$ALLOWED")
-  [ "$count" -eq 1 ] || { echo "$ALLOWED has $count matching lines (allowed: 1)"; return 1; }
-  grep -i -E "$WORDING" "$ALLOWED" | grep -q InterviewQuery || { echo "the one match is not the InterviewQuery credit"; return 1; }
-}
-
-# The old book (ADR 0003) may use interview framing, but never names where its notes came from.
-book_wording() {
-  files=$(grep -l -i -E 'obsidian|vault' tools/book/src/*.md); status=$?
+# A post or book source never names where its notes came from. -l prints names, never a matching line.
+no_source_names() {
+  files=$(grep -l -i -E 'obsidian|vault' "$@"); status=$?
   [ "$status" -le 1 ] || { echo "grep failed ($status)"; return 1; }    # 1 is "no match"; 2 is an error, not a pass
   [ -z "$files" ] || { echo "files with a match: $files"; return 1; }
 }
@@ -38,8 +27,8 @@ gate "privacy"        python3 scripts/check.py --denylist-only
 gate "site"           python3 scripts/check.py
 gate "check tests"    check_tests
 gate "search tests"   node --test scripts/test_search.mjs   # ranking cases and golden queries, on the committed index
-gate "post wording"   post_wording
-gate "book wording"   book_wording
+gate "post wording"   no_source_names tools/posts/src/*.md
+gate "book wording"   no_source_names tools/book/src/*.md
 gate "post build"     python3 -I tools/posts/build.py .
 gate "leetcode build" python3 -I tools/leetcode/build.py .
 gate "book build"     python3 -I tools/book/build.py .          # unlisted: the feed and search builds skip it

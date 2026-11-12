@@ -29,7 +29,7 @@ branch tip before it is merged or pushed.
 | Privacy and site | No private terms (local denylist) in contents or file names, no phone numbers, no broken links, page heads complete, pinned CDNs, listings complete | `privacy`, then `site` (needs `scripts/denylist.local.txt`; in CI, the `SITE_DENYLIST` secret) |
 | Home weight | `index.html` + `style.css` ≤ 150 KB (three.js lazy and counted apart) | `site` |
 | Check tests | The checker itself still works; the search ranking passes its cases and golden queries | `check tests`, `search tests` |
-| Post wording | No interview framing, vault or Obsidian mentions, no MusicGen authorship; the one allowed hit is the InterviewQuery credit in `coin-flips-normal-approximation.md` | `post wording` |
+| Post wording | No vault or Obsidian mentions, so a post never names where its notes came from | `post wording` |
 | Book wording | `tools/book/src` may use interview framing (ADR 0003) but never names the notes' source | `book wording` |
 | Rebuild is clean | Generated HTML is committed and matches its sources | `rebuild clean` |
 

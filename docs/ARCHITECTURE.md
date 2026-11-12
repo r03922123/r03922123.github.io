@@ -99,7 +99,7 @@ work) and `workflows/` (the agent workflows that wrote the room and the topic po
 | site | `scripts/check.py` | a broken link or `#fragment`, an incomplete page head, an unpinned CDN, a post missing from its list, a card count that differs from its rows, a feed or search entry missing, `index.html` plus `style.css` over 150 KB (`room.js` and three.js are not counted), a hand-written count out of date |
 | check tests | `python3 -m unittest test_check` | the checker regressed, or the theme's tokens lost contrast or the room's pinned colours changed |
 | search tests | `node --test scripts/test_search.mjs` | ranking cases or golden queries fail |
-| post wording | `grep` over `tools/posts/src` | interview, vault, Obsidian or MusicGen wording, except one allowed credit |
+| post wording | `grep` over `tools/posts/src` | vault or Obsidian wording |
 | post, leetcode, feeds, search builds | the four builds above | a post's code fails |
 | rebuild clean | `git status --short` | the builds changed a committed file: generated HTML was edited by hand or not rebuilt |
 
