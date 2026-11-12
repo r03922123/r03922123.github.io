@@ -231,6 +231,7 @@ for layer in layers:
     hidden.append(out)
 torch.nn.functional.cross_entropy(head(out), torch.randint(0, 10, (4096,))).backward()
 act_grads = torch.cat([t.grad.flatten() for t in hidden])
+act_grads = act_grads[act_grads != 0]                     # count only gradients the cast destroys, not exact fp32 zeros
 lost = {name: (act_grads.to(dtype) == 0).float().mean().item()
         for name, dtype in (("fp16", torch.float16), ("bf16", torch.bfloat16))}
 lost["fp16 scaled"] = ((act_grads * 2 ** 16).to(torch.float16) == 0).float().mean().item()
