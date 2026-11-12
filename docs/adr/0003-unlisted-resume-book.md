@@ -46,3 +46,8 @@ So the pages must be fit for anyone to read. Only content the owner would show a
 - Pages under `/posts/` with an exclusion list in the feed and search builds: every build and check would need an
   exception, and a missed one would list the page.
 - A private repo or password page: GitHub Pages cannot gate access, and the owner wants the pages public.
+
+## Update 2026-11-12
+
+`post wording` now fails only on obsidian or vault (PR #37). Keeping interview framing out of `/posts/` is a
+review rule in `SPEC-posts-vault.md`, no longer a gate.
