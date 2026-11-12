@@ -72,5 +72,7 @@ Preview:     python3 -m http.server 8000
 - `resume-book` (merged): a worn purple book on the mantel opens `/book/`, six résumé-preparation pages built by
   `tools/book/build.py` from `tools/book/src/`. Unlisted and `noindex` (ADR 0003): `check.py` fails if any feed or
   index names `/book/` or any other page links it. Build after editing a source: `python3 -I tools/book/build.py .`.
+- `post wording` (PR #37, owner's request, 2026-11-12) now fails only on obsidian or vault. Interview and MusicGen
+  wording in posts is a review question, not a gate.
 - Next: nothing queued. Pick from the Follow-ups list in `docs/ARCHITECTURE.md`.
 - Parked branches: none.
