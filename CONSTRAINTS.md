@@ -15,7 +15,7 @@ can be a quiet change; loosening one must be said in the commit message.
 | Commit after each finished unit: one post, one fix, one spec change. | Commits are save points. 11 h of uncommitted v2 work (2026-11-01) could not be reviewed, bisected or reverted in pieces. |
 | No more than **1 h of uncommitted work** at any time. | Caps what one crash, bad edit or stray `git checkout` can lose. The Stop hook below warns when it looks exceeded. |
 | Checks gate **merge and push**, not local commits. | A local commit is a private save point and should be cheap. What must be clean is what leaves the machine. A failing check is fixed in a later commit on the branch, before merge. |
-| Push and merge once the gates and a review pass; no separate OK is needed (owner's decision, 2026-11-13). | Publishing is public and hard to take back (pages get cached and indexed), so the gates and the review are what stand before it. |
+| Push and merge once the gates and a fresh-context review pass; no separate OK is needed. | Publishing is public and hard to take back (pages get cached and indexed), so the gates and the review are what stand before it (owner's decision, 2026-11-13). |
 
 ## Gates for merge and push
 

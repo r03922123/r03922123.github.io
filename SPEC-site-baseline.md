@@ -1,7 +1,7 @@
 # Spec: site-baseline
 
 Module of `CAPABILITY-MAP.md` (version 3). Depends on nothing. Status: **approved** 2026-11-10; **amended** the same
-day after two pre-merge review rounds, and the amendment is approved. Superseded in part 2026-11-12 (PR #37):
+day after two pre-merge review rounds, and the amendment is approved. Superseded in part 2026-11-13: merges need no separate owner OK (CONSTRAINTS.md). Superseded in part 2026-11-12 (PR #37):
 `post wording` now fails only on obsidian or vault, so the InterviewQuery rows below are history.
 
 ## Objective
