@@ -10,13 +10,21 @@ All gates:   sh scripts/gates.sh          # run before every push; about 4 min, 
 Check tests: (cd scripts && python3 -m unittest test_check)
 Search tests: node --test scripts/test_search.mjs
 Site check:  python3 scripts/check.py     # --denylist-only for terms only; --show-terms only when debugging locally
-Builds:      python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py . && python3 -I tools/search/build.py .
+Builds:      python3 -I tools/posts/build.py . && python3 -I tools/leetcode/build.py . && python3 -I tools/book/build.py . \
+               && python3 -I tools/feeds/build.py . && python3 -I tools/search/build.py .   # gates.sh order; skip one and rebuild clean fails
+One post:    python3 -I tools/posts/build.py . <slug>   # after editing its source; then the feeds and search builds
+One check:   (cd scripts && python3 -m unittest test_check.CheckTest.test_phone_numbers)   # any Class.test_name
+One search:  node --test --test-name-pattern='<test name>' scripts/test_search.mjs
+Screenshot:  sh tools/dev/shoot.sh <name> light|dark desktop|phone <site path>   # needs Preview on 8765; prints the PNG
+Merge:       gh pr merge <n> --rebase --match-head-commit <sha>
+Identity:    git log --format='%ae%n%ce' origin/main..HEAD | grep -c -v noreply   # before every push: must print 0
+Layout:      python3 tools/dev/same_articles.py origin/main   # after a layout change: shows no article text moved
 Lock CI:     uv pip compile requirements-ci.in --generate-hashes --python-version 3.12 \
                --python-platform x86_64-manylinux_2_28 --index-strategy unsafe-best-match \
                --emit-index-url -o requirements-ci.txt   # after any change to requirements-ci.in
 Set secret:  base64 < scripts/denylist.local.txt | gh secret set SITE_DENYLIST   # base64: see gates.yml
 Read back:   gh api repos/r03922123/r03922123.github.io/branches/main/protection
-Preview:     python3 -m http.server 8000
+Preview:     python3 -m http.server 8765
 ```
 
 ## Where things are decided
@@ -34,8 +42,15 @@ Preview:     python3 -m http.server 8000
 - Never print a denylist term anywhere: not in a commit, PR, log or chat. `check.py` scrubs its own output, but
   your own commands do not. Use `grep -l` or `grep -c`, never `grep -n`, on text that might hold a term.
 - Commit with `-c user.name=r03922123 -c user.email=<the account's GitHub noreply address>` (as on `main`'s
-  commits), and check `git log --format='%ae %ce'` before every push: the machine's default email is personal.
-- Merge PRs with rebase, not squash, since squash can take the account's default email.
+  commits), and run Identity before every push: the machine's default email is personal. Never print the addresses.
+- `main` is protected, admins included: a PR with a green `gates` check. Merge with rebase, not squash, since squash
+  can take the account's default email.
+- `gates.sh` ends with `rebuild clean`, which fails on any uncommitted or untracked file, your own edits included:
+  commit first.
+- A new worktree has no `scripts/denylist.local.txt` (gitignored), so `check.py` refuses to run: copy it in from the
+  main checkout.
+- Post code runs on macOS here and Linux in CI, and float results differ: write asserts as ranges that hold on both.
+  If an existing assert fails only on Linux, stop and report it.
 - `check.py` walks the whole folder. Keep virtualenvs and worktrees outside the repo, or their files become findings.
 - A new branch made from `origin/main` tracks it; unset the upstream so a bare `git push` cannot target `main`.
 - The post build forwards its whole environment to every post script, so no secret may be job-level in CI.
@@ -44,35 +59,13 @@ Preview:     python3 -m http.server 8000
   in national form) and a CJK term inside CJK text, which the scrubber does not hide either. Fix `term_rx` and
   `scrubber` in `check.py` before adding either.
 
-## Current state (2026-11-11)
+## Status and decisions in force
 
-- Merged: `site-baseline` (PR #3: gates script, CI, scrubbed checker, this file, ADRs 0001 and 0002, the learning
-  log; `main` is protected: a PR with a green `gates` check, for admins too), CI hardening (hash-locked wheels-only
-  install, base64 denylist secret), `post-feeds` (feed files, `index.md` copies, page head tags), `blog-theme`
-  (reading tokens at `:root`, the room's under `body.home`), `reading-shell` (fragment check, then the layout)
-  and an expert accuracy pass over all 90 posts (PR #9, which lists the doubts left unedited).
-- `posts-index` (merged): both list pages are topic cards, a count and `section.group`s in `.groups`, built by
-  `topic_list` in `tools/leetcode/build.py`; the `#fragment` is the filter, with no JavaScript. `check.py` matches
-  each card's count to its section's rows.
-- Reading pages: the bar sits outside `.wrap`; the home keeps its own header inside it. After a layout change, run
-  `python3 tools/dev/same_articles.py origin/main` to show no article text moved.
-- `site-search` (merged): `search.mjs` inserts a box on the two list pages and ranks with `search-core.mjs`
-  over `search-index.json`, written by `tools/search/build.py` after the post builds (gates.sh runs both, and
-  `node --test scripts/test_search.mjs`). `check.py` fails on a listed post missing from the index.
-- `post-voice` (merged, 8 PRs from #14): all 59 posts open on a situation, stake or result, say "I" only for what
-  their code or derivation does, and name their limits; topic posts also end on what is open. The voice check's
-  `--final` passed before PR 8 removed the check, its baseline and its gate. The sentences PRs #16 to
-  #21 listed as overstating their code were fixed (or, once, confirmed), prose only, in `post-claims` (PRs #22
-  to #24). PR #28 (owner's OK) seeded the `hash-table` note's random operations and corrected a comment in
-  `transformers-and-llms-key-ideas`. Edited sources need `tools/posts/build.py . <slug>`, then the feeds and
-  search builds.
-- `docs/ARCHITECTURE.md` (merged) maps the site; `README.md` points to it. Its Follow-ups list holds the known gaps.
-- Review nits deferred from PRs #4 to #11 (merged, one cleanup PR): all fixed, or noted where the spec allowed (`.role-head h3`). `check.py` now also requires every
-  listed post in `rss.xml` and `llms.txt` on this host, and reports an `index.md` whose source is gone.
-- `resume-book` (merged): a worn purple book on the mantel opens `/book/`, six résumé-preparation pages built by
-  `tools/book/build.py` from `tools/book/src/`. Unlisted and `noindex` (ADR 0003): `check.py` fails if any feed or
-  index names `/book/` or any other page links it. Build after editing a source: `python3 -I tools/book/build.py .`.
-- `post wording` (PR #37, owner's request, 2026-11-12) now fails only on obsidian or vault. Interview and MusicGen
-  wording in posts is a review question, not a gate.
-- Next: nothing queued. Pick from the Follow-ups list in `docs/ARCHITECTURE.md`.
-- Parked branches: none.
+- History is the git log. Known gaps, and the next thing to pick, are the Follow-ups list in `docs/ARCHITECTURE.md`;
+  PR #9 lists the post-accuracy doubts left unedited.
+- Every post follows `SPEC-post-voice.md`: open on a situation, stake or result; say "I" only for what its code or
+  derivation does; name its limits.
+- The résumé book is unlisted and `noindex` (ADR 0003): `check.py` fails if a feed or index names it, or any page
+  but the home's one door links it.
+- The post wording gate fails only on obsidian or vault (PR #37). Interview and MusicGen wording in posts is a
+  review question, not a gate.
