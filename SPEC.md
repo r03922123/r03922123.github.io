@@ -134,7 +134,7 @@ light and dark mode, math and code render, and a side-by-side read of the About 
 - **Always:** take facts and numbers only from `resume-mle.tex`; rewrite content, never paste
   vault notes; run `scripts/check.py` before each commit; keep a post's references to primary sources.
 - **Ask first:** adding any dependency beyond KaTeX/highlight.js; publishing any note not in the
-  table above; any wording about a role that goes beyond the résumé bullet; pushing to `main`.
+  table above; any wording about a role that goes beyond the résumé bullet.
 - **Never:** write to the Obsidian vault; push the vault or copy its git history; publish the phone
   number, the timeline/family narrative, target-company lists, or interview
   coaching; invent a metric or resolve a "not measured" item into a number.
